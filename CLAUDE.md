@@ -14,8 +14,10 @@ Current stage: single-agent baseline (`agent.py`, tasks in `tasks.jsonl`, output
 - Never run GPU or heavy work on the login node (`neuronic`). Do installs and downloads inside a job.
 
 ## Workflow
-- Code lives in the private repo github.com/mghilea/agent-scaling. Edit and push from the Mac;
-  the cluster clone pulls with a read-only deploy key. `runs/` and `logs/` contents are not in git.
+- Code lives in the private repo github.com/mghilea/agent-scaling. It's edited both on the Mac and
+  on the cluster (the cluster clone pushes with a read-write deploy key scoped to this repo).
+  `git pull` before starting work, commit in small steps, and push when a change works, so the
+  other machine doesn't diverge. `runs/` and `logs/` contents are not in git.
 - Real runs go through Slurm: `sbatch run.sbatch [20b|120b] [agent.py args]`, submitted from
   `~/agent-scaling`. Interactive `salloc` is for setup and debugging.
 
