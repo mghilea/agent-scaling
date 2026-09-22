@@ -4,8 +4,9 @@ This is the baseline from "Towards a Science of Scaling Agent Systems"
 (arXiv 2512.08296). The multi-agent topologies will reuse the Agent class.
 
 Usage (on a compute node, with vLLM serving on localhost:8000):
-    python agent.py                      # run every task in tasks.jsonl
-    python agent.py --only primes        # run one task
+    python agent.py                                  # run every task in tasks.jsonl
+    python agent.py --only primes --show-reasoning   # one task, including the model's thinking
+    python agent.py --ask "How many days until 2027?" # your own question (logged, not scored)
     python agent.py --reasoning-effort low --quiet
 """
 import argparse
@@ -124,13 +125,44 @@ def call_tool(name: str, arguments: str) -> str:
     return out
 
 
+# ---- display ----------------------------------------------------------------
+
+_COLOR = sys.stdout.isatty()
+BOLD, DIM, GREEN, YELLOW, CYAN = "1", "2", "32", "33", "36"
+
+
+def _c(color, text):
+    return f"\033[{color}m{text}\033[0m" if _COLOR else text
+
+
+def _block(label, text, color, limit=1500):
+    """Render text as a labelled, indented block: '  run_python │ line 1\n             │ line 2'."""
+    text = (text or "").strip()
+    if len(text) > limit:
+        text = text[:limit] + f"\n... [{len(text) - limit} more chars]"
+    lines = text.splitlines() or [""]
+    head, pad = _c(color, f"  {label:>10} │ "), _c(color, f"  {'':>10} │ ")
+    return head + lines[0] + "".join(f"\n{pad}{line}" for line in lines[1:])
+
+
+def _show_args(arguments: str) -> str:
+    """Show a tool call's arguments readably: the code itself for run_python, not escaped JSON."""
+    try:
+        args = json.loads(arguments or "{}")
+    except json.JSONDecodeError:
+        return arguments
+    if isinstance(args, dict) and len(args) == 1:
+        return str(next(iter(args.values())))
+    return json.dumps(args, indent=2)
+
+
 # ---- agent ------------------------------------------------------------------
 
 class Agent:
     """One reasoning loop: ask the model, run any tools it calls, repeat until it answers."""
 
     def __init__(self, client, model, tools=TOOLS, system_prompt=SYSTEM_PROMPT,
-                 max_turns=12, reasoning_effort="medium", verbose=True):
+                 max_turns=12, reasoning_effort="medium", verbose=True, show_reasoning=False):
         self.client = client
         self.model = model
         self.tools = tools
@@ -138,6 +170,7 @@ class Agent:
         self.max_turns = max_turns
         self.reasoning_effort = reasoning_effort
         self.verbose = verbose
+        self.show_reasoning = show_reasoning
 
     def log(self, text):
         if self.verbose:
@@ -149,14 +182,18 @@ class Agent:
         stats = {"turns": 0, "tool_calls": 0, "tool_errors": 0, "prompt_tokens": 0, "completion_tokens": 0}
         schemas = [schema for _, schema in self.tools.values()]
 
-        for _ in range(self.max_turns):
+        for turn in range(1, self.max_turns + 1):
+            started = time.time()
             resp = self.client.chat.completions.create(
                 model=self.model, messages=messages, tools=schemas,
                 reasoning_effort=self.reasoning_effort)
             stats["turns"] += 1
+            used = ""
             if resp.usage:
                 stats["prompt_tokens"] += resp.usage.prompt_tokens
                 stats["completion_tokens"] += resp.usage.completion_tokens
+                used = f"{resp.usage.prompt_tokens} prompt + {resp.usage.completion_tokens} completion tokens, "
+            self.log(_c(BOLD, f"── turn {turn} ──") + _c(DIM, f" {used}{time.time() - started:.1f}s"))
 
             msg = resp.choices[0].message
             entry = {"role": "assistant", "content": msg.content}
@@ -164,24 +201,29 @@ class Agent:
             reasoning = getattr(msg, "reasoning", None) or getattr(msg, "reasoning_content", None)
             if reasoning:
                 entry["reasoning"] = reasoning
+                if self.show_reasoning:
+                    self.log(_c(DIM, _block("thinking", reasoning, DIM)))
 
             if not msg.tool_calls:
                 messages.append(entry)
-                self.log(f"  [answer] {(msg.content or '').strip()[-300:]}")
+                self.log(_block("answer", msg.content, GREEN))
                 return {"final": msg.content or "", "stop": "final", "messages": messages, **stats}
 
+            if msg.content:
+                self.log(_block("says", msg.content, DIM))
             entry["tool_calls"] = [tc.model_dump(exclude_none=True) for tc in msg.tool_calls]
             messages.append(entry)
             for tc in msg.tool_calls:
                 stats["tool_calls"] += 1
-                self.log(f"  [{tc.function.name}] {tc.function.arguments[:200]}")
+                self.log(_block(tc.function.name, _show_args(tc.function.arguments), CYAN, limit=3000))
                 out = call_tool(tc.function.name, tc.function.arguments)
-                if out.startswith("[error]") or "[exit code" in out:
-                    stats["tool_errors"] += 1
-                self.log(f"    -> {out[:200]}")
+                failed = out.startswith("[error]") or "[exit code" in out
+                stats["tool_errors"] += failed
+                self.log(_block("output", out, YELLOW if failed else DIM, limit=800))
                 messages.append({"role": "tool", "tool_call_id": tc.id,
                                  "name": tc.function.name, "content": out})
 
+        self.log(_c(YELLOW, f"  stopped: hit --max-turns ({self.max_turns}) without a final answer"))
         return {"final": "", "stop": "max_turns", "messages": messages, **stats}
 
 
@@ -227,10 +269,15 @@ def main():
     ap.add_argument("--only", help="run just the task with this id")
     ap.add_argument("--max-turns", type=int, default=12)
     ap.add_argument("--reasoning-effort", default="medium", choices=["low", "medium", "high"])
-    ap.add_argument("--quiet", action="store_true", help="hide per-step tool output")
+    ap.add_argument("--ask", help="ask your own question instead of running the task file")
+    ap.add_argument("--show-reasoning", action="store_true", help="also print the model's reasoning each turn")
+    ap.add_argument("--quiet", action="store_true", help="only print one result line per task")
     args = ap.parse_args()
 
-    tasks = [json.loads(line) for line in open(args.tasks) if line.strip()]
+    if args.ask:
+        tasks = [{"id": "ask", "question": args.ask}]
+    else:
+        tasks = [json.loads(line) for line in open(args.tasks) if line.strip()]
     if args.only:
         tasks = [t for t in tasks if t["id"] == args.only]
     if not tasks:
@@ -240,16 +287,17 @@ def main():
     if not args.model:
         args.model = client.models.list().data[0].id
 
-    run_dir = ROOT / "runs" / f"{datetime.now():%Y%m%d-%H%M%S}-sas-{args.model}"
+    kind = "ask" if args.ask else "sas"
+    run_dir = ROOT / "runs" / f"{datetime.now():%Y%m%d-%H%M%S}-{kind}-{args.model}"
     (run_dir / "traces").mkdir(parents=True)
     (run_dir / "config.json").write_text(json.dumps({"topology": "single", "git_commit": git_commit(), **vars(args)}, indent=2))
 
-    agent = Agent(client, args.model, max_turns=args.max_turns,
-                  reasoning_effort=args.reasoning_effort, verbose=not args.quiet)
+    agent = Agent(client, args.model, max_turns=args.max_turns, reasoning_effort=args.reasoning_effort,
+                  verbose=not args.quiet, show_reasoning=args.show_reasoning)
 
     rows = []
     for t in tasks:
-        print(f"\n=== {t['id']} ===", flush=True)
+        print(_c(BOLD, f"\n=== {t['id']} ===") + f"\n{t['question']}", flush=True)
         start = time.time()
         try:
             r = agent.run(t["question"])
@@ -257,8 +305,10 @@ def main():
             r = {"final": "", "stop": f"error: {type(e).__name__}: {e}", "messages": [],
                  "turns": 0, "tool_calls": 0, "tool_errors": 0, "prompt_tokens": 0, "completion_tokens": 0}
         answer = extract_answer(r["final"])
-        row = {"id": t["id"], "correct": is_correct(answer, t["answer"]), "answer": answer,
-               "expected": t["answer"], "stop": r["stop"], "turns": r["turns"],
+        # Tasks without an "answer" (like --ask) are run and logged but not scored.
+        correct = is_correct(answer, t["answer"]) if "answer" in t else None
+        row = {"id": t["id"], "correct": correct, "answer": answer,
+               "expected": t.get("answer"), "stop": r["stop"], "turns": r["turns"],
                "tool_calls": r["tool_calls"], "tool_errors": r["tool_errors"],
                "prompt_tokens": r["prompt_tokens"],
                "completion_tokens": r["completion_tokens"], "seconds": round(time.time() - start, 1)}
@@ -266,15 +316,17 @@ def main():
         (run_dir / "traces" / f"{t['id']}.json").write_text(json.dumps(r["messages"], indent=2, default=str))
         with open(run_dir / "results.jsonl", "a") as f:
             f.write(json.dumps(row) + "\n")
-        mark = "PASS" if row["correct"] else "FAIL"
-        print(f"{mark}  answer={answer!r} expected={t['answer']!r}  turns={row['turns']} "
+        mark = {True: _c(GREEN, "PASS"), False: _c(YELLOW, "FAIL"), None: "DONE"}[correct]
+        expected = f" expected={t['answer']!r}" if "answer" in t else ""
+        print(f"{mark}  answer={answer!r}{expected}  turns={row['turns']} "
               f"tools={row['tool_calls']} tool_errors={row['tool_errors']} tokens={row['prompt_tokens'] + row['completion_tokens']} "
               f"{row['seconds']}s  stop={row['stop']}", flush=True)
 
     n = len(rows)
+    scored = [r for r in rows if r["correct"] is not None]
     summary = {
         "tasks": n,
-        "accuracy": round(sum(r["correct"] for r in rows) / n, 3),
+        "accuracy": round(sum(r["correct"] for r in scored) / len(scored), 3) if scored else None,
         "mean_turns": round(sum(r["turns"] for r in rows) / n, 2),
         "mean_tool_calls": round(sum(r["tool_calls"] for r in rows) / n, 2),
         "total_tool_errors": sum(r["tool_errors"] for r in rows),
