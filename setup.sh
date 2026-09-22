@@ -10,7 +10,8 @@
 # Safe to re-run: each step is skipped if it's already done on this node.
 # In a second terminal on the same node, re-sourcing it just restores the environment.
 # Overrides: PORT (default 8000), TP (tensor-parallel size, default = GPUs allocated),
-# VLLM_VERSION (default 0.30.0, the version first tested on Neuronic).
+# VLLM_VERSION (default 0.30.0, the version first tested on Neuronic), VLLM_LOG (log path).
+# For unattended runs, use run.sbatch instead, which sources this for you.
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
     echo "Run this with: source $0" >&2
@@ -78,7 +79,7 @@ _agent_setup() {
             return 1
         fi
     else
-        local log="$WORK/vllm-$name.log"
+        local log="${VLLM_LOG:-$WORK/vllm-$name.log}"
         local pid
         pid=$(pgrep -u "$USER" -f "vllm serve" | head -n 1)
         if [[ -n "$pid" ]]; then
@@ -120,5 +121,5 @@ _agent_setup() {
     echo "Next:   python ~/agent-scaling/agent.py"
 }
 
+# Last command, so `source setup.sh || exit 1` sees whether setup succeeded
 _agent_setup "$@"
-unset -f _agent_setup

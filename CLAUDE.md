@@ -13,6 +13,12 @@ Current stage: single-agent baseline (`agent.py`, tasks in `tasks.jsonl`, output
 - Compute nodes have internet access. Interactive jobs (`salloc`) are capped at 2 hours.
 - Never run GPU or heavy work on the login node (`neuronic`). Do installs and downloads inside a job.
 
+## Workflow
+- Code lives in the private repo github.com/mghilea/agent-scaling. Edit and push from the Mac;
+  the cluster clone pulls with a read-only deploy key. `runs/` and `logs/` contents are not in git.
+- Real runs go through Slurm: `sbatch run.sbatch [20b|120b] [agent.py args]`, submitted from
+  `~/agent-scaling`. Interactive `salloc` is for setup and debugging.
+
 ## Model serving
 - After `salloc`, run `source ~/agent-scaling/setup.sh [20b|120b]`: it sets env vars, installs uv/vLLM
   and downloads weights into `/scratch/$USER` if missing, and starts vLLM. Re-sourcing is safe.
