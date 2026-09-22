@@ -4,6 +4,9 @@ Multi-agent harness inspired by "Towards a Science of Scaling Agent Systems" (ar
 single, independent, centralized, decentralized and hybrid topologies, compared with the paper's
 metrics (turns, tokens/overhead, message density, redundancy, error amplification).
 Current stage: single-agent baseline (`agent.py`, tasks in `tasks.jsonl`, outputs in `runs/`).
+Benchmark: WorkBench (`workbench.py`, `agent.py --benchmark workbench --limit N`), one of the
+paper's six; its repo is cloned by `setup.sh` into `/scratch/$USER/WorkBench` and scored with its own
+state-based evaluator (accuracy plus side-effect rate).
 
 ## Cluster: Princeton CS Neuronic (Slurm)
 - Nodes: 8x NVIDIA L40 (46 GB each, PCIe, no NVLink), 512 GB RAM, 3.5 TB local SSD at `/scratch`,

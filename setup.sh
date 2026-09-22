@@ -60,6 +60,19 @@ _agent_setup() {
     fi
     source "$WORK/venv/bin/activate"
 
+    # WorkBench benchmark (agent.py --benchmark workbench): its tools, tasks and evaluator.
+    # Pinned so scores stay comparable; pandas is pinned to the version in WorkBench's uv.lock.
+    export WORKBENCH_DIR="$WORK/WorkBench"
+    if [[ ! -d "$WORKBENCH_DIR/.git" ]]; then
+        echo "==> Cloning WorkBench"
+        git clone -q https://github.com/olly-styles/WorkBench.git "$WORKBENCH_DIR" || return 1
+        git -C "$WORKBENCH_DIR" checkout -q 49c7dfd || return 1
+    fi
+    if ! python -c "import pandas" 2>/dev/null; then
+        echo "==> Installing pandas for WorkBench"
+        uv pip install --python "$WORK/venv/bin/python" "pandas==2.3.3" || return 1
+    fi
+
     local model_dir="$WORK/models/$name"
     if [[ ! -f "$model_dir/.complete" ]]; then
         echo "==> Downloading openai/$name"

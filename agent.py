@@ -8,6 +8,7 @@ Usage (on a compute node, with vLLM serving on localhost:8000):
     python agent.py --only primes --show-reasoning   # one task, including the model's thinking
     python agent.py --ask "How many days until 2027?" # your own question (logged, not scored)
     python agent.py --reasoning-effort low --quiet
+    python agent.py --benchmark workbench --limit 10  # 10 random WorkBench tasks (see workbench.py)
 """
 import argparse
 import ast
@@ -101,8 +102,8 @@ TOOLS = {
 }
 
 
-def call_tool(name: str, arguments: str) -> str:
-    if name not in TOOLS:
+def call_tool(name: str, arguments: str, tools=TOOLS) -> str:
+    if name not in tools:
         return f"[error] unknown tool: {name}"
     try:
         args = json.loads(arguments or "{}")
@@ -112,12 +113,12 @@ def call_tool(name: str, arguments: str) -> str:
         # gpt-oss was trained with a built-in python tool that takes raw code, so it
         # often sends the script itself instead of {"code": ...}. For single-argument
         # tools, treat the raw text as that argument rather than burning a turn.
-        required = TOOLS[name][1]["function"]["parameters"]["required"]
+        required = tools[name][1]["function"]["parameters"].get("required", [])
         if len(required) != 1:
             return "[error] arguments must be a JSON object"
         args = {required[0]: arguments}
     try:
-        out = TOOLS[name][0](**args)
+        out = tools[name][0](**args)
     except Exception as e:
         return f"[error] {type(e).__name__}: {e}"
     if len(out) > MAX_TOOL_OUTPUT:
@@ -211,12 +212,16 @@ class Agent:
 
             if msg.content:
                 self.log(_block("says", msg.content, DIM))
+            for tc in msg.tool_calls:
+                # vLLM's gpt-oss parser sometimes leaves format tokens on the name, like
+                # "email_search_emails<|channel|>commentary". Keep just the tool name.
+                tc.function.name = tc.function.name.split("<|")[0].strip()
             entry["tool_calls"] = [tc.model_dump(exclude_none=True) for tc in msg.tool_calls]
             messages.append(entry)
             for tc in msg.tool_calls:
                 stats["tool_calls"] += 1
                 self.log(_block(tc.function.name, _show_args(tc.function.arguments), CYAN, limit=3000))
-                out = call_tool(tc.function.name, tc.function.arguments)
+                out = call_tool(tc.function.name, tc.function.arguments, self.tools)
                 failed = out.startswith("[error]") or "[exit code" in out
                 stats["tool_errors"] += failed
                 self.log(_block("output", out, YELLOW if failed else DIM, limit=800))
@@ -265,17 +270,26 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--base-url", default="http://localhost:8000/v1")
     ap.add_argument("--model", help="vLLM's --served-model-name (default: whatever the server is running)")
+    ap.add_argument("--benchmark", default="toy", choices=["toy", "workbench"],
+                    help="toy: the task file (--tasks); workbench: WorkBench tasks, scored by its evaluator")
     ap.add_argument("--tasks", default=str(ROOT / "tasks.jsonl"))
     ap.add_argument("--only", help="run just the task with this id")
-    ap.add_argument("--max-turns", type=int, default=12)
+    ap.add_argument("--limit", type=int, help="workbench: run a random sample of this many tasks")
+    ap.add_argument("--seed", type=int, default=0, help="workbench: which random sample --limit takes")
+    ap.add_argument("--domain", action="append", help="workbench: only this domain (repeatable), e.g. email")
+    ap.add_argument("--max-turns", type=int, help="default 12, or 20 for workbench (as in WorkBench)")
     ap.add_argument("--reasoning-effort", default="medium", choices=["low", "medium", "high"])
     ap.add_argument("--ask", help="ask your own question instead of running the task file")
     ap.add_argument("--show-reasoning", action="store_true", help="also print the model's reasoning each turn")
     ap.add_argument("--quiet", action="store_true", help="only print one result line per task")
     args = ap.parse_args()
 
+    wb = None
     if args.ask:
         tasks = [{"id": "ask", "question": args.ask}]
+    elif args.benchmark == "workbench":
+        import workbench as wb
+        tasks = wb.load_tasks(args.domain, args.limit, args.seed)
     else:
         tasks = [json.loads(line) for line in open(args.tasks) if line.strip()]
     if args.only:
@@ -287,7 +301,8 @@ def main():
     if not args.model:
         args.model = client.models.list().data[0].id
 
-    kind = "ask" if args.ask else "sas"
+    args.max_turns = args.max_turns or (20 if wb else 12)
+    kind = "ask" if args.ask else "sas-workbench" if wb else "sas"
     run_dir = ROOT / "runs" / f"{datetime.now():%Y%m%d-%H%M%S}-{kind}-{args.model}"
     (run_dir / "traces").mkdir(parents=True)
     (run_dir / "config.json").write_text(json.dumps({"topology": "single", "git_commit": git_commit(), **vars(args)}, indent=2))
@@ -299,16 +314,25 @@ def main():
     for t in tasks:
         print(_c(BOLD, f"\n=== {t['id']} ===") + f"\n{t['question']}", flush=True)
         start = time.time()
+        if wb:
+            episode = wb.Episode()
+            agent.tools, agent.system_prompt = episode.tools, wb.SYSTEM_PROMPT
         try:
             r = agent.run(t["question"])
         except Exception as e:
             r = {"final": "", "stop": f"error: {type(e).__name__}: {e}", "messages": [],
                  "turns": 0, "tool_calls": 0, "tool_errors": 0, "prompt_tokens": 0, "completion_tokens": 0}
-        answer = extract_answer(r["final"])
-        # Tasks without an "answer" (like --ask) are run and logged but not scored.
-        correct = is_correct(answer, t["answer"]) if "answer" in t else None
-        row = {"id": t["id"], "correct": correct, "answer": answer,
-               "expected": t.get("answer"), "stop": r["stop"], "turns": r["turns"],
+        if wb:
+            # Scored on what the agent did (its tool calls), not on what it said.
+            verdict = episode.score(t["outcome"], error=r["stop"] != "final")
+            correct, answer, expected = verdict["correct"], episode.actions, t["outcome"]
+        else:
+            verdict = {}
+            answer, expected = extract_answer(r["final"]), t.get("answer")
+            # Tasks without an "answer" (like --ask) are run and logged but not scored.
+            correct = is_correct(answer, t["answer"]) if "answer" in t else None
+        row = {"id": t["id"], "correct": correct, **verdict, "answer": answer,
+               "expected": expected, "stop": r["stop"], "turns": r["turns"],
                "tool_calls": r["tool_calls"], "tool_errors": r["tool_errors"],
                "prompt_tokens": r["prompt_tokens"],
                "completion_tokens": r["completion_tokens"], "seconds": round(time.time() - start, 1)}
@@ -317,8 +341,11 @@ def main():
         with open(run_dir / "results.jsonl", "a") as f:
             f.write(json.dumps(row) + "\n")
         mark = {True: _c(GREEN, "PASS"), False: _c(YELLOW, "FAIL"), None: "DONE"}[correct]
-        expected = f" expected={t['answer']!r}" if "answer" in t else ""
-        print(f"{mark}  answer={answer!r}{expected}  turns={row['turns']} "
+        if wb:
+            shown = f"actions={answer}  expected={expected}  side_effects={verdict['side_effects']}"
+        else:
+            shown = f"answer={answer!r}" + (f" expected={expected!r}" if "answer" in t else "")
+        print(f"{mark}  {shown}  turns={row['turns']} "
               f"tools={row['tool_calls']} tool_errors={row['tool_errors']} tokens={row['prompt_tokens'] + row['completion_tokens']} "
               f"{row['seconds']}s  stop={row['stop']}", flush=True)
 
@@ -327,6 +354,7 @@ def main():
     summary = {
         "tasks": n,
         "accuracy": round(sum(r["correct"] for r in scored) / len(scored), 3) if scored else None,
+        **({"side_effect_rate": round(sum(r["side_effects"] for r in rows) / n, 3)} if wb else {}),
         "mean_turns": round(sum(r["turns"] for r in rows) / n, 2),
         "mean_tool_calls": round(sum(r["tool_calls"] for r in rows) / n, 2),
         "total_tool_errors": sum(r["tool_errors"] for r in rows),
