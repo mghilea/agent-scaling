@@ -1,0 +1,7 @@
+{"id": "primes", "question": "What is the sum of the first 1000 prime numbers?", "answer": 3682913}
+{"id": "sundays", "question": "How many Sundays fell on the first day of a month during the twentieth century (1 January 1901 to 31 December 2000)?", "answer": 171}
+{"id": "fibonacci", "question": "Using F(1) = F(2) = 1, what is F(30), the 30th Fibonacci number?", "answer": 832040}
+{"id": "digit_sum", "question": "How many integers from 1 to 10000 inclusive have a digit sum that is divisible by 7?", "answer": 1421}
+{"id": "sales_west_march", "question": "The file data/sales.csv lists orders. What was the total revenue (quantity times unit_price) for the West region in March 2026?", "answer": 729.75}
+{"id": "sales_top_product", "question": "In data/sales.csv, which product sold the most units in total? Answer with the product name.", "answer": "widget"}
+{"id": "capital", "question": "What is the capital of Australia?", "answer": "Canberra"}

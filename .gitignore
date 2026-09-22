@@ -1,0 +1,5 @@
+# Experiment outputs stay on the cluster; sync them back with rsync when needed
+runs/
+__pycache__/
+*.pyc
+.DS_Store
