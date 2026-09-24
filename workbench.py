@@ -58,6 +58,7 @@ TOOLS_IN_ORDER = [t for prefix in _TOOL_ORDER for t in all_tools if t.name.split
 
 # The 14 tools that change the databases (send_email, create_event, update_task, ...).
 WRITE_TOOLS = {t.name for t in tools_with_side_effects}
+_MUTABLE = ("calendar_events", "emails", "plots_data", "project_tasks", "crm_data")  # what they can change
 
 
 def is_write(action: str) -> bool:
@@ -92,6 +93,7 @@ class Sandbox:
     def __init__(self):
         self.state = _state._pristine_state().copy()
         self.actions = []  # WorkBench action strings, e.g. 'email.delete_email.func(email_id="00000479")'
+        self.changes = []  # the actions that actually changed the databases (not rejected writes)
         self.tools = {}
         for t in TOOLS_IN_ORDER:
             schema = tool_to_openai_schema(t)
@@ -105,11 +107,16 @@ class Sandbox:
             kwargs = {k: str(v) for k, v in kwargs.items() if v is not None}
             # WorkBench tools act on the calling thread's state; point it at this sandbox.
             _state._local.tool_state = self.state
+            before = {f: getattr(self.state, f).copy() for f in _MUTABLE} if t.name in WRITE_TOOLS else None
             out = str(t(**kwargs))
             # Only calls that ran are scored. A call that raised (e.g. an argument the tool doesn't
             # have) changed nothing, and the agent saw the error and could retry. WorkBench's own
             # runner instead ends the task as an error there, so it is stricter than this.
-            self.actions.append(convert_intermediate_step_to_function_call(t.name, kwargs))
+            action = convert_intermediate_step_to_function_call(t.name, kwargs)
+            self.actions.append(action)
+            # A write tool can refuse (e.g. "Assignee email not valid") and change nothing.
+            if before is not None and any(not getattr(self.state, f).equals(before[f]) for f in _MUTABLE):
+                self.changes.append(action)
             return out
         return run
 

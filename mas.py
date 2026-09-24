@@ -191,21 +191,21 @@ class Worker:
         self.agent = make_agent(name=agent_id, tools=self.sandbox.tools,
                                 system_prompt=wb.SYSTEM_PROMPT + "\n\n" + role)
         self.summaries = []  # what it sent the team at the end of each round
-        self.writes = []     # (round, action) for every change it made
+        self.writes = []     # (round, action) for every change it made (rejected writes excluded)
         self.error = None
 
     def work(self, round_num, message):
         """One round: act on the message with tools, then summarize its findings for the team."""
         if not self.summaries:
             message = WORKER_START.format(task=self.task, objective=self.objective, guidance=message)
-        before = len(self.sandbox.actions)
+        before = len(self.sandbox.changes)
         try:
             self.agent.send(message)
             self.summaries.append(self.agent.reply(SUMMARIZE))
         except Exception as e:  # one failed worker (e.g. context overflow) shouldn't sink the team
             self.error = f"{type(e).__name__}: {e}"
             self.summaries.append("")
-        self.writes += [(round_num, a) for a in self.sandbox.actions[before:] if wb.is_write(a)]
+        self.writes += [(round_num, a) for a in self.sandbox.changes[before:]]
 
     @property
     def last_summary(self):
