@@ -9,6 +9,9 @@ comparing the final database state with the ground truth's, using WorkBench's ow
 Setup mirrors the WorkBench Revisited (2026) runs: all tools on every task, native tool calling,
 the benchmark's date prefix as the system prompt, and the "act without confirmation" suffix.
 
+Each agent works in its own Sandbox (a private copy of the databases), so several agents can run
+at once without seeing each other's changes; mas.py decides which of their changes get scored.
+
 The WorkBench repo is cloned by setup.sh into $WORKBENCH_DIR (default /scratch/$USER/WorkBench).
 """
 import ast
@@ -29,9 +32,8 @@ import pandas as pd  # noqa: E402
 from src.evals.actions import convert_intermediate_step_to_function_call  # noqa: E402
 from src.evals.evaluation import has_side_effects, is_correct, is_exact_match  # noqa: E402
 from src.tools import state as _state  # noqa: E402
-from src.tools.state import reset_state  # noqa: E402
 from src.tools.tool import tool_to_openai_schema  # noqa: E402
-from src.tools.toolkits import all_tools  # noqa: E402
+from src.tools.toolkits import all_tools, tools_with_side_effects  # noqa: E402
 
 # WorkBench loads its databases from paths relative to its repo root; make them absolute.
 _state._CSV_PATHS = {k: str(WORKBENCH_DIR / v) for k, v in _state._CSV_PATHS.items()}
@@ -54,6 +56,19 @@ _TOOL_ORDER = ["email", "calendar", "analytics", "project_management", "customer
                "company_directory"]
 TOOLS_IN_ORDER = [t for prefix in _TOOL_ORDER for t in all_tools if t.name.split(".")[0] == prefix]
 
+# The 14 tools that change the databases (send_email, create_event, update_task, ...).
+WRITE_TOOLS = {t.name for t in tools_with_side_effects}
+
+
+def is_write(action: str) -> bool:
+    """Whether an action string like 'email.send_email.func(...)' changes the databases."""
+    return action.split(".func(")[0] in WRITE_TOOLS
+
+
+def show(action: str) -> str:
+    """An action string without WorkBench's '.func', for prompts and logs."""
+    return action.replace(".func(", "(", 1)
+
 
 def load_tasks(domains=None, limit=None, seed=0):
     """Tasks as dicts: id (e.g. email-17), question, outcome (ground-truth action strings), template.
@@ -71,11 +86,11 @@ def load_tasks(domains=None, limit=None, seed=0):
     return tasks
 
 
-class Episode:
-    """One task's sandbox: fresh databases, tools that log every call, and scoring at the end."""
+class Sandbox:
+    """A private copy of the databases, with tools that act on it and log every call."""
 
     def __init__(self):
-        reset_state()
+        self.state = _state._pristine_state().copy()
         self.actions = []  # WorkBench action strings, e.g. 'email.delete_email.func(email_id="00000479")'
         self.tools = {}
         for t in TOOLS_IN_ORDER:
@@ -88,6 +103,8 @@ class Episode:
         def run(**kwargs):
             # WorkBench passes every argument as a string. JSON nulls mean "not given", so drop them.
             kwargs = {k: str(v) for k, v in kwargs.items() if v is not None}
+            # WorkBench tools act on the calling thread's state; point it at this sandbox.
+            _state._local.tool_state = self.state
             out = str(t(**kwargs))
             # Only calls that ran are scored. A call that raised (e.g. an argument the tool doesn't
             # have) changed nothing, and the agent saw the error and could retry. WorkBench's own
@@ -96,9 +113,14 @@ class Episode:
             return out
         return run
 
-    def score(self, expected, error=False):
-        # As in WorkBench, a run that crashed or hit the turn limit counts as wrong.
-        correct = is_correct(self.actions, expected, "error" if error else "")
-        return {"correct": correct,
-                "side_effects": has_side_effects(self.actions, correct),
-                "exact_match": is_exact_match(self.actions, expected)}
+
+def score(actions, expected, error=False):
+    """WorkBench's verdict on a list of action strings: replayed on fresh databases, compared by state.
+
+    As in WorkBench, a run that crashed or hit the turn limit counts as wrong.
+    """
+    _state._local.tool_state = None  # score on a fresh copy, never on an agent's sandbox
+    correct = is_correct(actions, expected, "error" if error else "")
+    return {"correct": correct,
+            "side_effects": has_side_effects(actions, correct),
+            "exact_match": is_exact_match(actions, expected)}
