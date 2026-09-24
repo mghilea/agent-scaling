@@ -6,7 +6,8 @@ metrics (turns, tokens/overhead, message density, redundancy, error amplificatio
 Current stage: single agent (`agent.py`) plus the paper's four multi-agent topologies (`mas.py`,
 `agent.py --topology independent|centralized|decentralized|hybrid`, WorkBench only), following the
 authors' released code (github.com/ybkim95/agent-scaling). `compare.py` tabulates runs with the
-paper's metrics. Toy tasks in `tasks.jsonl`, outputs in `runs/`.
+paper's metrics; `show_trace.py` prints a task's trace as a timeline; `trace_viz.py` builds an animated
+HTML replay of one task across runs. Toy tasks in `tasks.jsonl`, outputs in `runs/`.
 Benchmark: WorkBench (`workbench.py`, `agent.py --benchmark workbench --limit N`), one of the
 paper's six; its repo is cloned by `setup.sh` into `/scratch/$USER/WorkBench` and scored with its own
 state-based evaluator (accuracy plus side-effect rate).

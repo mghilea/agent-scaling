@@ -1,0 +1,503 @@
+<title>Message Flow Replay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root {
+  --ground: #f3f5f8; --surface: #ffffff; --sunken: #eaeef3; --ink: #16202e; --muted: #5a6677; --line: #cfd7e2;
+  --msg: #0b7a84; --msg-soft: #d8eff1; --orch: #5b47c7; --orch-soft: #e9e5fb; --write: #b0560c; --write-soft: #fbe9d8;
+  --pass: #22784a; --pass-soft: #dcf1e5; --fail: #b3261e; --fail-soft: #fbe2df;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --cond: "IBM Plex Sans Condensed", "IBM Plex Sans", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground: #0e131a; --surface: #151c26; --sunken: #1b2430; --ink: #e5eaf1; --muted: #93a0b2; --line: #2b3645;
+    --msg: #45c3cc; --msg-soft: #13363b; --orch: #a898ff; --orch-soft: #29244a; --write: #f0a14e; --write-soft: #3b2913;
+    --pass: #53c487; --pass-soft: #163527; --fail: #f2786d; --fail-soft: #3d1c1a;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #0e131a; --surface: #151c26; --sunken: #1b2430; --ink: #e5eaf1; --muted: #93a0b2; --line: #2b3645;
+  --msg: #45c3cc; --msg-soft: #13363b; --orch: #a898ff; --orch-soft: #29244a; --write: #f0a14e; --write-soft: #3b2913;
+  --pass: #53c487; --pass-soft: #163527; --fail: #f2786d; --fail-soft: #3d1c1a;
+}
+* { box-sizing: border-box; }
+body { background: var(--ground); color: var(--ink); font: 15px/1.55 var(--sans); }
+.wrap { max-width: 1240px; margin: 0 auto; padding-inline: 20px; }
+header.wrap { padding-block: 28px 8px; display: grid; gap: 12px; }
+.eyebrow { margin: 0; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { margin: 0; font: 600 clamp(26px, 3.4vw, 36px)/1.15 var(--cond); text-wrap: balance; }
+.task { margin: 0; padding: 12px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  font: 500 16px/1.5 var(--mono); }
+.task b { font-family: var(--sans); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); display: block; font-weight: 500; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px 24px; margin: 0; color: var(--muted); font-size: 14px; }
+.facts dt { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+.facts dd { margin: 2px 0 0; color: var(--ink); }
+.facts code, .mono { font-family: var(--mono); font-size: 13px; }
+
+nav.tabs { display: flex; flex-wrap: wrap; gap: 8px; padding-block: 16px 4px; }
+.tab { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--ink); font: 500 14px var(--sans); cursor: pointer; }
+.tab[aria-selected="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.tab:focus-visible, button:focus-visible, .step:focus-visible { outline: 2px solid var(--msg); outline-offset: 2px; }
+.pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font: 600 11px/1.6 var(--sans); letter-spacing: .05em; }
+.pill.pass { background: var(--pass-soft); color: var(--pass); }
+.pill.fail { background: var(--fail-soft); color: var(--fail); }
+.pill.stop { background: var(--orch-soft); color: var(--orch); }
+.tab[aria-selected="true"] .pill.pass { background: var(--pass); color: var(--surface); }
+.tab[aria-selected="true"] .pill.fail { background: var(--fail); color: var(--surface); }
+
+.intro { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px 28px; padding-block: 10px; }
+.intro h2 { margin: 0 0 2px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+.intro p { margin: 0; max-width: 68ch; }
+.stats { display: flex; flex-wrap: wrap; gap: 6px 22px; padding-block: 4px 12px; font-size: 14px; color: var(--muted); }
+.stats b { color: var(--ink); font-variant-numeric: tabular-nums; font-weight: 600; }
+
+.stage { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 980px) { .stage { grid-template-columns: 1fr; } }
+figure.diagram { margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 10px 12px; }
+figure.diagram svg { display: block; width: 100%; height: auto; }
+figcaption { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 6px 6px 0; font-size: 12px; color: var(--muted); }
+.key { display: inline-flex; align-items: center; gap: 6px; }
+.key i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.key i.dash { width: 18px; height: 0; border-radius: 0; border-top: 2px dashed var(--muted); }
+
+.controls { display: flex; align-items: center; gap: 8px; padding: 10px 6px 0; flex-wrap: wrap; }
+.controls button { font: 500 13px var(--sans); color: var(--ink); background: var(--sunken); border: 1px solid var(--line);
+  border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+.controls button.primary { background: var(--ink); color: var(--surface); border-color: var(--ink); min-width: 78px; }
+.controls .count { margin-left: auto; font: 500 13px var(--sans); color: var(--muted); font-variant-numeric: tabular-nums; }
+.progress { display: flex; gap: 3px; padding: 10px 6px 0; }
+.progress span { flex: 1; height: 4px; border-radius: 2px; background: var(--line); cursor: pointer; }
+.progress span.done { background: var(--muted); }
+.progress span.now { background: var(--msg); }
+
+article.detail { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px;
+  max-height: 640px; overflow: auto; }
+@media (max-width: 980px) { article.detail { max-height: none; } }
+.detail h3 { margin: 0 0 4px; font: 600 19px/1.3 var(--cond); text-wrap: balance; }
+.detail .roundtag { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 0 0 12px; }
+.detail p { margin: 0 0 10px; max-width: 68ch; }
+.msg { border: 1px solid var(--line); border-left: 3px solid var(--msg); border-radius: 8px; margin: 0 0 10px; overflow: hidden; }
+.msg.from-orch { border-left-color: var(--orch); }
+.msg header { padding: 6px 10px; background: var(--sunken); font: 600 13px var(--sans); display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.msg header small { font-weight: 400; color: var(--muted); }
+.msgtext { margin: 0; padding: 8px 10px; white-space: pre-wrap; overflow-wrap: anywhere; font: 13px/1.5 var(--mono); max-height: 260px; overflow: auto; }
+.agentwork { margin: 0 0 14px; }
+.agentwork h4 { margin: 0 0 6px; font: 600 14px var(--sans); display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.agentwork h4 small { font-weight: 400; color: var(--muted); }
+ol.calls { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+ol.calls li { padding: 6px 8px; border-radius: 6px; background: var(--sunken); font: 12.5px/1.45 var(--mono); overflow-wrap: anywhere; }
+ol.calls li.write { background: var(--write-soft); }
+ol.calls li .fn { font-weight: 500; }
+ol.calls li .out { color: var(--muted); display: block; margin-top: 2px; }
+.tag { font: 600 10.5px/1.6 var(--sans); letter-spacing: .05em; text-transform: uppercase; padding: 0 6px; border-radius: 4px; margin-left: 6px; }
+.tag.change { background: var(--write); color: var(--surface); }
+.tag.rejected { background: var(--fail-soft); color: var(--fail); }
+details { margin-top: 6px; }
+details summary { cursor: pointer; font: 500 13px var(--sans); color: var(--muted); }
+.none { color: var(--muted); font-style: italic; font-size: 13px; }
+.note { padding: 8px 12px; border-radius: 8px; background: var(--sunken); color: var(--muted); font-size: 14px; }
+ul.changes { list-style: none; padding: 0; margin: 0 0 12px; display: grid; gap: 6px; }
+ul.changes li { padding: 6px 8px; border-radius: 6px; background: var(--sunken); font: 12.5px/1.45 var(--mono); overflow-wrap: anywhere; display: flex; gap: 8px; }
+ul.changes li .mark { font-family: var(--sans); font-weight: 600; flex: none; width: 1.2em; }
+ul.changes li.good .mark { color: var(--pass); }
+ul.changes li.bad .mark { color: var(--fail); }
+ul.changes li.picked { outline: 2px solid var(--orch); }
+ul.changes li small { font-family: var(--sans); color: var(--muted); display: block; }
+.detail h5 { margin: 12px 0 6px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+.verdict { font: 600 16px var(--cond); margin: 12px 0 0; }
+
+section.timeline { padding-block: 18px 40px; }
+section.timeline h2 { margin: 0 0 8px; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+ol.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.step { width: 100%; text-align: left; display: grid; grid-template-columns: 64px 1fr; gap: 10px; align-items: baseline;
+  padding: 7px 10px; border: 1px solid transparent; border-radius: 8px; background: none; color: var(--ink); font: 14px var(--sans); cursor: pointer; }
+.step:hover { background: var(--surface); border-color: var(--line); }
+.step[aria-current="step"] { background: var(--surface); border-color: var(--msg); }
+.step .r { font: 500 12px var(--sans); color: var(--muted); letter-spacing: .04em; text-transform: uppercase; }
+
+/* diagram */
+.edge { fill: none; stroke: var(--line); stroke-width: 1.6; }
+.edge.peer-h { stroke-dasharray: 5 5; }
+.edge.faint { stroke-dasharray: 2 4; }
+.edge.active { stroke: var(--msg); stroke-width: 2.6; }
+.edge.active.db { stroke: var(--muted); }
+.node rect, .node ellipse, .node path { fill: var(--surface); stroke: var(--ink); stroke-width: 1.4; }
+.node text { fill: var(--ink); font: 500 13px var(--sans); }
+.node.orch rect { stroke: var(--orch); fill: var(--orch-soft); }
+.node.orch text { fill: var(--orch); font-weight: 600; }
+.node.db path, .node.db ellipse { stroke: var(--muted); fill: var(--sunken); stroke-width: 1.1; }
+.node.task rect { fill: var(--sunken); stroke: var(--muted); }
+.node.score rect { stroke: var(--muted); }
+.node.score.pass rect { stroke: var(--pass); fill: var(--pass-soft); }
+.node.score.fail rect { stroke: var(--fail); fill: var(--fail-soft); }
+.node.score.pass text { fill: var(--pass); } .node.score.fail text { fill: var(--fail); }
+.node.lit rect { stroke-width: 2.6; }
+.node.agent.lit rect { stroke: var(--msg); }
+.badge { fill: var(--muted); font: 12px var(--sans); }
+.badge.w { fill: var(--write); }
+.small { fill: var(--muted); font: 11px var(--sans); }
+.lane { fill: var(--muted); font: 11px var(--sans); }
+.pulse { fill: none; stroke: var(--msg); stroke-width: 2; opacity: 0; transform-box: fill-box; transform-origin: center; }
+.dot { fill: var(--msg); }
+.dot.read { fill: var(--muted); }
+.dot.write { fill: var(--write); }
+@media (prefers-reduced-motion: reduce) { .pulse { display: none; } }
+</style>
+
+<header class="wrap">
+  <p class="eyebrow" id="eyebrow">WorkBench</p>
+  <h1>How five agent systems handled the same task</h1>
+  <p class="task" id="task"></p>
+  <dl class="facts" id="facts"></dl>
+</header>
+
+<main class="wrap">
+  <nav class="tabs" role="tablist" aria-label="Agent systems" id="tabs"></nav>
+  <div class="intro">
+    <div><h2>How it communicates</h2><p id="how"></p></div>
+    <div><h2>What happened on this task</h2><p id="story"></p></div>
+  </div>
+  <div class="stats" id="stats"></div>
+  <div class="stage">
+    <figure class="diagram">
+      <svg id="svg" viewBox="0 0 700 450" role="img" aria-label="Diagram of the agents and the messages between them"></svg>
+      <figcaption>
+        <span class="key"><i style="background:var(--msg)"></i>message between agents</span>
+        <span class="key"><i style="background:var(--muted)"></i>tool call that reads</span>
+        <span class="key"><i style="background:var(--write)"></i>tool call that writes to the agent's own copy</span>
+        <span class="key" id="key-peer" hidden><i class="dash"></i>link used only in the final peer round</span>
+      </figcaption>
+      <div class="controls">
+        <button id="restart" type="button" aria-label="Back to the first step">⏮ Start</button>
+        <button id="prev" type="button" aria-label="Previous step">◀ Back</button>
+        <button id="play" type="button" class="primary">▶ Play</button>
+        <button id="next" type="button" aria-label="Next step">Next ▶</button>
+        <span class="count" id="count"></span>
+      </div>
+      <div class="progress" id="progress"></div>
+    </figure>
+    <article class="detail" id="detail" aria-live="polite"></article>
+  </div>
+  <section class="timeline">
+    <h2>All steps</h2>
+    <ol class="steps" id="steps"></ol>
+  </section>
+</main>
+
+<script>
+const DATA = /*DATA*/null;
+const ORDER = ["single", "independent", "centralized", "decentralized", "hybrid"];
+const NAME = { single: "Single agent", independent: "Independent", centralized: "Centralized", decentralized: "Decentralized", hybrid: "Hybrid" };
+const HOW = {
+  single: "One agent in one conversation. It calls tools until it gives an answer. There are no messages, and its changes are scored directly.",
+  independent: "Three agents each do the whole task alone, at the same time, each in its own copy of the databases. They never exchange a message. Every distinct change any of them made is applied, with no checking.",
+  centralized: "An orchestrator with no tools splits the task into three subtasks. Each round it writes guidance to each worker and reads back their summaries. Workers never talk to each other. The orchestrator decides when to stop and which of the workers' changes to apply.",
+  decentralized: "No orchestrator. Round 1 is independent. In rounds 2 and 3 each agent reads both peers' summaries from the previous round and can add or undo changes. A majority vote over the agents' changes picks the answer.",
+  hybrid: "Centralized, plus one final round where each worker also reads its peers' summaries directly (the first 400 characters of each). The orchestrator then picks which changes to apply."
+};
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const SVGNS = "http://www.w3.org/2000/svg";
+
+let sys = null, stepIdx = 0, playing = false, timer = null, anims = [];
+
+// ---- layout ------------------------------------------------------------------------------------
+const X = { task: 310, orch: 310, score: 310 }, Y = { task: 34, orch: 128, agent: 248, db: 318, score: 412 };
+function layout(s) {
+  const orch = s.key === "centralized" || s.key === "hybrid";
+  const nodes = {};
+  nodes.task = { x: X.task, y: Y.task, w: 150, h: 34, kind: "task", label: "Task" };
+  if (orch) nodes.orch = { x: X.orch, y: Y.orch, w: 150, h: 40, kind: "orch", label: "orchestrator" };
+  const xs = s.nodes.length === 1 ? [310] : [110, 310, 510];
+  s.nodes.forEach((a, i) => {
+    nodes[a] = { x: xs[i], y: Y.agent, w: 116, h: 40, kind: "agent", label: a.replace("_", " ") };
+    nodes["db:" + a] = { x: xs[i], y: Y.db, kind: "db", owner: a };
+  });
+  nodes.score = { x: X.score, y: Y.score, w: 170, h: 36, kind: "score", label: "WorkBench score" };
+  return { nodes, orch };
+}
+function pairKey(a, b) { return [a, b].sort().join("|"); }
+function edgesFor(s, L) {
+  const n = L.nodes, E = {};
+  const add = (a, b, d, cls = "") => { E[pairKey(a, b)] = { a, b, d, cls }; };
+  const top = (k) => n[k].y - (n[k].h || 26) / 2, bot = (k) => n[k].y + (n[k].h || 26) / 2;
+  if (L.orch) add("task", "orch", `M ${n.task.x} ${bot("task")} L ${n.orch.x} ${top("orch")}`, "faint");
+  s.nodes.forEach((a) => {
+    if (!L.orch) {
+      const mx = n[a].x, my = top(a);
+      add("task", a, `M ${n.task.x} ${bot("task")} C ${n.task.x} ${bot("task") + 60}, ${mx} ${my - 70}, ${mx} ${my}`, "faint");
+    } else {
+      add("orch", a, `M ${n.orch.x} ${bot("orch")} C ${n.orch.x} ${bot("orch") + 40}, ${n[a].x} ${top(a) - 40}, ${n[a].x} ${top(a)}`);
+    }
+    add(a, "db:" + a, `M ${n[a].x} ${bot(a)} L ${n[a].x} ${n[a].y + 52}`, "db");
+  });
+  if ((s.key === "decentralized" || s.key === "hybrid") && s.nodes.length === 3) {
+    const [a1, a2, a3] = s.nodes, cls = s.key === "hybrid" ? "peer-h" : "";
+    const arc = (p, q, lift) => `M ${n[p].x} ${top(p)} Q ${(n[p].x + n[q].x) / 2} ${top(p) - lift}, ${n[q].x} ${top(q)}`;
+    add(a1, a2, arc(a1, a2, 70), cls); add(a2, a3, arc(a2, a3, 70), cls); add(a1, a3, arc(a1, a3, 150), cls);
+  }
+  // Where the final changes come from on their way to the scorer.
+  if (L.orch) {
+    const r = n.orch.x + n.orch.w / 2;
+    add("orch", "score", `M ${r} ${n.orch.y} H 650 V ${n.score.y} H ${n.score.x + n.score.w / 2}`, "faint");
+  } else {
+    s.nodes.forEach((a) => add(a, "score", `M ${n[a].x + 30} ${n[a].y + 52} C ${n[a].x + 30} ${n[a].y + 110}, ${n.score.x} ${n.score.y - 70}, ${n.score.x} ${n.score.y - 18}`, "faint"));
+  }
+  return E;
+}
+
+function el(tag, attrs = {}, text) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+function drawDiagram() {
+  const svg = $("svg"); svg.replaceChildren();
+  const L = sys.L, n = L.nodes;
+  const gE = el("g"), gN = el("g"), gD = el("g");
+  for (const [k, e] of Object.entries(sys.E)) {
+    const p = el("path", { d: e.d, class: `edge ${e.cls}`, id: "e-" + k.replace(/[^a-z0-9]/gi, "_") });
+    gE.append(p); e.el = p;
+  }
+  if (L.orch) gE.append(el("text", { x: 656, y: (n.orch.y + n.score.y) / 2, class: "lane", transform: `rotate(90 656 ${(n.orch.y + n.score.y) / 2})`, "text-anchor": "middle" }, "orchestrator's pick of the workers' changes"));
+  for (const [k, v] of Object.entries(n)) {
+    const g = el("g", { class: `node ${v.kind}`, id: "n-" + k.replace(/[^a-z0-9]/gi, "_") });
+    if (v.kind === "db") {
+      const x = v.x - 24, y = v.y - 12;
+      g.append(el("path", { d: `M ${x} ${y} v 22 a 24 6 0 0 0 48 0 v -22` }));
+      g.append(el("ellipse", { cx: v.x, cy: y, rx: 24, ry: 6 }));
+      g.append(el("text", { x: v.x, y: v.y + 30, class: "small", "text-anchor": "middle" }, "own copy of DBs"));
+    } else {
+      g.append(el("rect", { x: v.x - v.w / 2, y: v.y - v.h / 2, width: v.w, height: v.h, rx: v.kind === "task" ? 17 : 8 }));
+      g.append(el("text", { x: v.x, y: v.y + 4.5, "text-anchor": "middle" }, v.label));
+      if (v.kind === "agent" || v.kind === "orch") {
+        g.append(el("circle", { cx: v.x, cy: v.y, r: v.w / 2 + 6, class: "pulse" }));
+        g.append(el("text", { x: v.x + v.w / 2 + 8, y: v.y - v.h / 2 - 6, class: "badge", "text-anchor": "end", id: "b-" + k }, ""));
+      }
+    }
+    gN.append(g); v.g = g;
+  }
+  svg.append(gE, gN, gD); sys.dots = gD;
+  $("key-peer").hidden = sys.key !== "hybrid";
+}
+
+// ---- animation -----------------------------------------------------------------------------------
+function stopAnims() { anims.forEach((a) => cancelAnimationFrame(a)); anims = []; if (sys) sys.dots.replaceChildren(); }
+function moveDot(path, reverse, cls, delay, dur) {
+  if (REDUCED) return;
+  const len = path.getTotalLength(), dot = el("circle", { r: 5.5, class: "dot " + cls, opacity: 0 });
+  sys.dots.append(dot);
+  const t0 = performance.now() + delay;
+  const frame = (now) => {
+    const t = Math.min(1, Math.max(0, (now - t0) / dur));
+    if (now >= t0) {
+      const pt = path.getPointAtLength((reverse ? 1 - t : t) * len);
+      dot.setAttribute("cx", pt.x); dot.setAttribute("cy", pt.y); dot.setAttribute("opacity", t >= 1 ? 0 : 1);
+    }
+    if (t < 1) anims.push(requestAnimationFrame(frame)); else dot.remove();
+  };
+  anims.push(requestAnimationFrame(frame));
+}
+function pulse(nodeKey) {
+  const c = sys.L.nodes[nodeKey]?.g?.querySelector(".pulse");
+  if (!c || REDUCED) return;
+  c.animate([{ opacity: .7, transform: "scale(1)" }, { opacity: 0, transform: "scale(1.12)" }], { duration: 1100, iterations: 2 });
+}
+function edgeFor(from, to) { return sys.E[pairKey(from, to)]; }
+function sendAlong(from, to, cls, delay, dur = 1100) {
+  const e = edgeFor(from, to);
+  if (!e) return;
+  e.el.classList.add("active"); if (cls !== "msg") e.el.classList.add("db");
+  moveDot(e.el, e.a !== from, cls === "msg" ? "" : cls, delay, dur);
+}
+
+// ---- step rendering --------------------------------------------------------------------------------
+function counts(w) {
+  const writes = w.calls.filter((c) => c.write), ok = writes.filter((c) => c.ok).length;
+  return { calls: w.calls.length, writes: writes.length, ok };
+}
+function stepLabel(st) {
+  const r = st.round === 0 ? "start" : st.round === 99 ? "end" : "round " + st.round;
+  let text = st.title;
+  if (st.kind === "work") {
+    const tot = Object.values(st.agents).reduce((a, w) => { const c = counts(w); return [a[0] + c.calls, a[1] + c.ok]; }, [0, 0]);
+    text = `${Object.keys(st.agents).length > 1 ? "Workers act" : "Agent acts"}: ${tot[0]} tool calls, ${tot[1]} change${tot[1] === 1 ? "" : "s"}`;
+  } else if (st.kind === "send") {
+    text = `${st.title} (${st.edges.length} message${st.edges.length === 1 ? "" : "s"})`;
+  } else if (st.kind === "decide") {
+    text = `Orchestrator's stop decision: ${st.stop ? "STOP" : "CONTINUE"}`;
+  } else if (st.kind === "final") {
+    text = `${st.title}: ${st.correct ? "PASS" : "FAIL"}`;
+  }
+  return { r, text };
+}
+function callHTML(c) {
+  const tag = c.write ? (c.ok ? '<span class="tag change">change</span>' : '<span class="tag rejected">rejected</span>') : "";
+  const out = c.out.length > 240 ? `${esc(c.out.slice(0, 240))} <details><summary>full output</summary>${esc(c.out)}</details>` : esc(c.out);
+  return `<li class="${c.write ? "write" : ""}"><span class="fn">${esc(c.name)}</span>(${esc(c.args)})${tag}<span class="out">→ ${out}</span></li>`;
+}
+const norm = (s) => s.toLowerCase().replace(/\s+/g, " ");
+function renderDetail(st) {
+  const d = $("detail"), { r } = stepLabel(st);
+  let h = `<h3>${esc(st.title)}</h3><p class="roundtag">${esc(r)}</p>`;
+  if (st.kind === "task") {
+    h += `<div class="msg"><header>user → ${st.edges.length > 1 ? "each agent" : esc(st.edges[0].to === "orch" ? "orchestrator" : st.edges[0].to)}</header><pre class="msgtext">${esc(st.text)}</pre></div>`;
+    if (sys.key !== "single") h += `<p class="note">Every worker starts with its own private copy of WorkBench's databases (email, calendar, CRM, projects, analytics). A change one worker makes is invisible to the others.</p>`;
+  } else if (st.kind === "plan") {
+    h += `<p>The orchestrator's prompt, taken from the paper's code, asks for exactly three subtasks, whatever the task.</p>`;
+    h += st.subtasks.map((s) => `<div class="msg from-orch"><header>${esc(s.agent)} <small>focus: ${esc(s.focus)}</small></header><pre class="msgtext">${esc(s.objective)}</pre></div>`).join("");
+  } else if (st.kind === "send") {
+    const groups = [];
+    st.edges.forEach((e) => {
+      const g = groups.find((x) => x.from === e.from && x.text === e.text);
+      if (g) g.to.push(e.to); else groups.push({ from: e.from, to: [e.to], text: e.text });
+    });
+    h += groups.map((g) => `<div class="msg ${g.from === "orch" ? "from-orch" : ""}"><header>${esc(g.from === "orch" ? "orchestrator" : g.from)} → ${esc(g.to.map((t) => t === "orch" ? "orchestrator" : t).join(", "))}<small>${g.text.length.toLocaleString()} characters</small></header><pre class="msgtext">${esc(g.text)}</pre></div>`).join("");
+  } else if (st.kind === "work") {
+    if (st.note) h += `<p class="note">${esc(st.note)}</p>`;
+    for (const [a, w] of Object.entries(st.agents)) {
+      const c = counts(w);
+      h += `<section class="agentwork"><h4>${esc(a)} <small>${c.calls} tool call${c.calls === 1 ? "" : "s"}${c.writes ? `, ${c.ok} change${c.ok === 1 ? "" : "s"}${c.writes - c.ok ? `, ${c.writes - c.ok} rejected` : ""}` : ""}</small></h4>`;
+      h += c.calls ? `<ol class="calls">${w.calls.map(callHTML).join("")}</ol>` : `<p class="none">No tool calls this round.</p>`;
+      if (w.summary) h += `<details><summary>${sys.key === "single" ? "Its final reply" : "The summary it wrote for the team"}</summary><pre class="msgtext">${esc(w.summary)}</pre></details>`;
+      h += `</section>`;
+    }
+  } else if (st.kind === "decide") {
+    h += `<p><span class="pill ${st.stop ? "stop" : ""}">${st.stop ? "STOP" : "CONTINUE"}</span></p><div class="msg from-orch"><header>orchestrator's reply</header><pre class="msgtext">${esc(st.text)}</pre></div>`;
+  } else if (st.kind === "final") {
+    const exp = st.expected.map(norm);
+    if (st.mode === "single") h += `<p>The agent's changes are replayed on fresh databases and compared with the correct end state.</p>`;
+    if (st.mode === "independent") h += `<p>No voting and no checking: every distinct change any agent made is applied. Identical changes count once.</p>`;
+    if (st.answers) {
+      h += `<p>Each agent's answer is every change it made. The most common answer wins; a tie goes to agent_1.</p><h5>The agents' answers</h5><ul class="changes">`;
+      for (const [a, acts] of Object.entries(st.answers)) {
+        h += `<li class="${a === st.winner ? "picked" : ""}"><span class="mark">${a === st.winner ? "★" : ""}</span><span><small>${esc(a)}${a === st.winner ? ` — wins with ${st.votes} of ${Object.keys(st.answers).length} votes` : ""}</small>${acts.length ? acts.map(esc).join("<br>") : "(no changes)"}</span></li>`;
+      }
+      h += `</ul>`;
+    }
+    if (st.candidates) {
+      h += `<p>The orchestrator gets a numbered list of every change the workers made in their private copies and replies with the numbers to apply.</p><h5>Changes the workers made</h5><ul class="changes">`;
+      st.candidates.forEach((c, i) => {
+        const picked = st.selection.includes(i + 1);
+        h += `<li class="${picked ? "picked" : ""}"><span class="mark">${i + 1}.</span><span>${esc(c.change)}<small>made by ${esc(c.who.join("; "))}${picked ? " — applied" : ""}</small></span></li>`;
+      });
+      if (!st.candidates.length) h += `<li><span class="mark"></span><span>(the workers made no changes)</span></li>`;
+      h += `</ul><p>Orchestrator's reply: <span class="mono">{"apply": [${st.selection.join(", ")}]}</span>${st.fallback ? ` (${esc(st.fallback)})` : ""}</p>`;
+    }
+    h += `<h5>Changes that were scored</h5><ul class="changes">`;
+    h += st.scored.length ? st.scored.map((a) => { const ok = exp.includes(norm(a)); return `<li class="${ok ? "good" : "bad"}"><span class="mark">${ok ? "✓" : "✗"}</span><span>${esc(a)}${ok ? "" : "<small>not what the task asked for</small>"}</span></li>`; }).join("") : `<li><span class="mark"></span><span>(no changes)</span></li>`;
+    const scored = st.scored.map(norm), missing = st.expected.filter((a) => !scored.includes(norm(a)));
+    h += missing.map((a) => `<li class="bad"><span class="mark">–</span><span>${esc(a)}<small>needed but missing</small></span></li>`).join("");
+    h += `</ul><p class="verdict">${st.correct ? '<span class="pill pass">PASS</span> The databases end up exactly as the task requires.' : `<span class="pill fail">FAIL</span> ${st.side_effects ? "The databases were changed in ways the task didn't ask for (a side effect)." : "The required changes weren't made."}`}</p>`;
+  }
+  d.innerHTML = h; d.scrollTop = 0;
+}
+
+function animateStep(st) {
+  stopAnims();
+  Object.values(sys.E).forEach((e) => e.el.classList.remove("active", "db"));
+  Object.values(sys.L.nodes).forEach((v) => v.g.classList.remove("lit", "pass", "fail"));
+  sys.nodes.concat(["orch"]).forEach((a) => { const b = $("b-" + a); if (b) { b.textContent = ""; b.setAttribute("class", "badge"); } });
+  const lit = (k) => sys.L.nodes[k]?.g.classList.add("lit");
+  if (st.kind === "task") st.edges.forEach((e, i) => { sendAlong(e.from, e.to, "msg", i * 120); lit(e.to); });
+  if (st.kind === "plan" || st.kind === "decide") { lit("orch"); pulse("orch"); }
+  if (st.kind === "send") st.edges.forEach((e, i) => { sendAlong(e.from, e.to, "msg", (i % 3) * 180 + Math.floor(i / 3) * 500); lit(e.from === "orch" ? e.to : e.from); });
+  if (st.kind === "work") {
+    for (const [a, w] of Object.entries(st.agents)) {
+      const c = counts(w), b = $("b-" + a);
+      if (b) { b.textContent = c.calls ? `${c.calls} calls${c.ok ? ` · ${c.ok} change${c.ok === 1 ? "" : "s"}` : ""}` : "idle"; if (c.ok) b.setAttribute("class", "badge w"); }
+      if (!c.calls) continue;
+      lit(a); pulse(a);
+      w.calls.slice(0, 12).forEach((call, i) => {
+        const cls = call.write ? "write" : "read";
+        sendAlong(a, "db:" + a, cls, i * 330, 320);        // the call goes to the agent's own databases
+        sendAlong("db:" + a, a, "read", i * 330 + 320, 320); // and its result comes back
+      });
+    }
+  }
+  if (st.kind === "final") {
+    st.edges.forEach((e, i) => sendAlong(e.from, e.to, "msg", i * 150, 1300));
+    sys.L.nodes.score.g.classList.add(st.correct ? "pass" : "fail");
+    if (st.answers) for (const [a, acts] of Object.entries(st.answers)) { const b = $("b-" + a); if (b) b.textContent = a === st.winner ? `★ ${acts.length} changes` : `${acts.length} changes`; }
+  }
+}
+
+function show(i) {
+  stepIdx = Math.max(0, Math.min(sys.steps.length - 1, i));
+  const st = sys.steps[stepIdx];
+  animateStep(st); renderDetail(st);
+  $("count").textContent = `step ${stepIdx + 1} of ${sys.steps.length}`;
+  [...$("progress").children].forEach((s, j) => s.className = j < stepIdx ? "done" : j === stepIdx ? "now" : "");
+  [...$("steps").querySelectorAll(".step")].forEach((b, j) => { if (j === stepIdx) b.setAttribute("aria-current", "step"); else b.removeAttribute("aria-current"); });
+  $("prev").disabled = stepIdx === 0; $("next").disabled = stepIdx === sys.steps.length - 1;
+  if (stepIdx === sys.steps.length - 1) setPlaying(false);
+}
+function setPlaying(on) {
+  playing = on; clearInterval(timer);
+  $("play").textContent = on ? "❚❚ Pause" : "▶ Play";
+  if (on) {
+    if (stepIdx === sys.steps.length - 1) show(0);
+    timer = setInterval(() => show(stepIdx + 1), 3600);
+  }
+}
+
+function selectSystem(key, push = true) {
+  setPlaying(false); stopAnims();
+  const s = DATA.systems[key];
+  sys = { key, ...s };
+  sys.L = layout(sys); sys.E = edgesFor(sys, sys.L);
+  document.querySelectorAll(".tab").forEach((t) => t.setAttribute("aria-selected", t.dataset.key === key ? "true" : "false"));
+  $("how").textContent = HOW[key];
+  $("story").textContent = s.note || "Step through the replay to see what each agent did.";
+  const st = s.stats;
+  $("stats").innerHTML = `<span><span class="pill ${st.correct ? "pass" : "fail"}">${st.correct ? "PASS" : "FAIL"}</span>${!st.correct && st.side_effects ? " with side effects" : ""}</span>` +
+    `<span><b>${st.turns}</b> model calls</span><span><b>${st.tokens.toLocaleString()}</b> tokens</span>` +
+    `<span><b>${st.messages}</b> messages between agents</span><span><b>${Math.round(st.seconds)}</b> s</span><span class="mono">${esc(s.run)}</span>`;
+  drawDiagram();
+  $("progress").replaceChildren(...s.steps.map((_, j) => { const b = document.createElement("span"); b.title = `step ${j + 1}`; b.onclick = () => { setPlaying(false); show(j); }; return b; }));
+  $("steps").replaceChildren(...s.steps.map((stp, j) => {
+    const li = document.createElement("li"), b = document.createElement("button"), l = stepLabel(stp);
+    b.type = "button"; b.className = "step"; b.innerHTML = `<span class="r">${esc(l.r)}</span><span>${esc(l.text)}</span>`;
+    b.onclick = () => { setPlaying(false); show(j); window.scrollTo({ top: $("tabs").offsetTop - 8, behavior: REDUCED ? "auto" : "smooth" }); };
+    li.append(b); return li;
+  }));
+  show(0);
+  if (push) { try { history.replaceState(null, "", "#" + key); } catch (e) {} try { localStorage.setItem("replay-tab", key); } catch (e) {} }
+}
+
+function init() {
+  $("eyebrow").textContent = `WorkBench task ${DATA.task_id} · ${DATA.systems.single?.stats.model || "gpt-oss-20b"} · one run per system`;
+  $("task").innerHTML = `<b>The task</b>“${esc(DATA.task)}”`;
+  $("facts").innerHTML = `<div><dt>Correct answer</dt><dd>${DATA.expected.map((a) => `<code>${esc(a)}</code>`).join("<br>")}</dd></div>` +
+    (DATA.context ? `<div><dt>Why it's tricky</dt><dd>${esc(DATA.context)}</dd></div>` : "");
+  const keys = ORDER.filter((k) => DATA.systems[k]);
+  $("tabs").replaceChildren(...keys.map((k) => {
+    const b = document.createElement("button"), st = DATA.systems[k].stats;
+    b.type = "button"; b.className = "tab"; b.setAttribute("role", "tab"); b.dataset.key = k;
+    b.innerHTML = `${NAME[k]} <span class="pill ${st.correct ? "pass" : "fail"}">${st.correct ? "PASS" : "FAIL"}</span>`;
+    b.onclick = () => selectSystem(k);
+    return b;
+  }));
+  $("restart").onclick = () => { setPlaying(false); show(0); };
+  $("prev").onclick = () => { setPlaying(false); show(stepIdx - 1); };
+  $("next").onclick = () => { setPlaying(false); show(stepIdx + 1); };
+  $("play").onclick = () => setPlaying(!playing);
+  document.addEventListener("keydown", (e) => {
+    if (e.target.closest("input, textarea")) return;
+    if (e.key === "ArrowRight") { setPlaying(false); show(stepIdx + 1); }
+    if (e.key === "ArrowLeft") { setPlaying(false); show(stepIdx - 1); }
+  });
+  let start = location.hash.slice(1);
+  if (!keys.includes(start)) { try { start = localStorage.getItem("replay-tab"); } catch (e) { start = null; } }
+  selectSystem(keys.includes(start) ? start : (keys.includes("centralized") ? "centralized" : keys[0]), false);
+}
+init();
+</script>
