@@ -237,10 +237,12 @@ class Agent:
         self.messages.append(entry)
         return msg.content or ""
 
-    def ask(self, messages: list) -> str:
-        """One plain-text call on a standalone prompt, outside this agent's conversation."""
-        msg, _ = self._call(messages, use_tools=False)
-        return msg.content or ""
+    def ask(self, messages: list) -> tuple[str, str]:
+        """One plain-text call on a standalone prompt, outside this agent's conversation.
+
+        Returns the reply and the model's reasoning (empty if it gave none)."""
+        msg, entry = self._call(messages, use_tools=False)
+        return msg.content or "", entry.get("reasoning", "")
 
     def _call(self, messages, use_tools):
         started = time.time()

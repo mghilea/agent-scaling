@@ -264,9 +264,9 @@ class Team:
                               for name, (_, schema) in wb.Sandbox().tools.items())
             system = ORCHESTRATOR_SYSTEM.format(date=wb.SYSTEM_PROMPT, n=self.n, tools=tools, task=self.task)
             self.orchestrator = self.make_agent(name="orchestrator", tools={}, system_prompt=system)
-        reply = self.orchestrator.ask([{"role": "system", "content": self.orchestrator.system_prompt},
-                                       {"role": "user", "content": prompt}])
-        self.calls.append({"tag": tag, "prompt": prompt, "reply": reply})
+        reply, reasoning = self.orchestrator.ask([{"role": "system", "content": self.orchestrator.system_prompt},
+                                                  {"role": "user", "content": prompt}])
+        self.calls.append({"tag": tag, "prompt": prompt, "reasoning": reasoning, "reply": reply})
         return reply
 
     def findings(self):
@@ -284,7 +284,10 @@ class Team:
             "actions": actions, "stop": "final", **stats,
             "agents": len(self.workers), "rounds": self.rounds, "agent_messages": len(self.messages),
             "trace": {"topology": self.topology, **self.trace, "worker_errors": errors,
-                      "messages": self.messages, "orchestrator_calls": self.calls,
+                      "messages": self.messages,
+                      # Every orchestrator call is its system prompt plus one prompt from orchestrator_calls.
+                      "orchestrator_system": self.orchestrator.system_prompt if self.orchestrator else None,
+                      "orchestrator_calls": self.calls,
                       "conversations": {w.id: w.agent.messages for w in self.workers}},
         }
 
