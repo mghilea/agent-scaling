@@ -186,6 +186,9 @@ class Agent:
         self.messages = [{"role": "system", "content": system_prompt}]
         self.stats = new_stats()
         self._stats_lock = threading.Lock()  # an orchestrator's calls can run in parallel threads
+        # Optional: a function returning text that arrived while the agent was working (messages from
+        # teammates), or None. It is checked after each round of tool calls and added as a user message.
+        self.inbox = None
 
     def log(self, text):
         if self.verbose:
@@ -225,6 +228,10 @@ class Agent:
                 self.log(_block("output", out, YELLOW if failed else DIM, limit=800))
                 self.messages.append({"role": "tool", "tool_call_id": tc.id,
                                       "name": tc.function.name, "content": out})
+            arrived = self.inbox() if self.inbox else None
+            if arrived:
+                self.log(_block("arrived", arrived, DIM, limit=800))
+                self.messages.append({"role": "user", "content": arrived})
 
         self.log(_c(YELLOW, f"  {self.name or 'agent'} stopped: hit --max-turns ({self.max_turns}) "
                             "without a final answer"))
@@ -318,8 +325,13 @@ def main():
     ap.add_argument("--seed", type=int, default=0, help="workbench: which random sample --limit takes")
     ap.add_argument("--domain", action="append", help="workbench: only this domain (repeatable), e.g. email")
     ap.add_argument("--topology", default="single",
-                    choices=["single", "independent", "centralized", "decentralized", "hybrid"],
-                    help="one agent, or one of the paper's multi-agent systems (workbench only, see mas.py)")
+                    choices=["single", "independent", "centralized", "decentralized", "hybrid", "agent-driven"],
+                    help="one agent, one of the paper's multi-agent systems (mas.py), or an agent-driven team "
+                         "with no rounds and a shared workspace (agent_driven.py); workbench only")
+    ap.add_argument("--comm", default="all", choices=["all", "text", "a2a", "shared", "none"],
+                    help="agent-driven: channels the agents may use (all = free choice)")
+    ap.add_argument("--coordinate", action="store_true",
+                    help="agent-driven: ask agents to agree on who does what before changing anything")
     ap.add_argument("--agents", type=int, default=3, help="multi-agent: number of worker agents (paper: 3)")
     ap.add_argument("--rounds", type=int,
                     help="multi-agent: max rounds (default as in the paper: 5 centralized/hybrid, 3 decentralized)")
@@ -352,10 +364,14 @@ def main():
         args.model = client.models.list().data[0].id
 
     args.max_turns = args.max_turns or (20 if wb else 12)
-    if multi:
+    driven = args.topology == "agent-driven"
+    if multi and not driven:
         import mas
         args.rounds = args.rounds or mas.DEFAULT_ROUNDS[args.topology]
-    kind = "ask" if args.ask else ("sas" if not multi else args.topology) + ("-workbench" if wb else "")
+    if driven:
+        import agent_driven
+    topo_name = f"agent-driven-{args.comm}{'-coord' if args.coordinate else ''}" if driven else args.topology
+    kind = "ask" if args.ask else ("sas" if not multi else topo_name) + ("-workbench" if wb else "")
     run_dir = ROOT / "runs" / f"{datetime.now():%Y%m%d-%H%M%S}-{kind}-{args.model}"
     (run_dir / "traces").mkdir(parents=True)
     (run_dir / "config.json").write_text(json.dumps({"git_commit": git_commit(), **vars(args)}, indent=2))
@@ -374,7 +390,11 @@ def main():
         start = time.time()
         actions = []
         try:
-            if multi:
+            if driven:
+                r = agent_driven.run(t["question"], make_agent, args.agents, args.comm, log_message, seed=t["id"],
+                                     coordinate=args.coordinate)
+                actions = r["actions"]
+            elif multi:
                 r = mas.run(args.topology, t["question"], make_agent, args.agents, args.rounds, log_message)
                 actions = r["actions"]
             elif wb:
@@ -399,7 +419,8 @@ def main():
                "tool_calls": r["tool_calls"], "tool_errors": r["tool_errors"],
                "prompt_tokens": r["prompt_tokens"],
                "completion_tokens": r["completion_tokens"], "agent_messages": r.get("agent_messages", 0),
-               **{k: r[k] for k in ("agents", "rounds") if k in r}, "seconds": round(time.time() - start, 1)}
+               **{k: r[k] for k in ("agents", "rounds", "comm", "duplicate_changes") if k in r},
+               "seconds": round(time.time() - start, 1)}
         rows.append(row)
         # Multi-agent runs trace every agent, not one conversation.
         trace = r["trace"] if "trace" in r else r["messages"]
