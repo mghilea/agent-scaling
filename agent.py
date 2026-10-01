@@ -340,6 +340,8 @@ def main():
     ap.add_argument("--limit", type=int, help="workbench: run a random sample of this many tasks; "
                                                   "browsecomp: the first this many of the paper's 100")
     ap.add_argument("--seed", type=int, default=0, help="workbench: which random sample --limit takes")
+    ap.add_argument("--offset", type=int, default=0,
+                    help="browsecomp: skip this many questions first (to split a run across jobs with --limit)")
     ap.add_argument("--domain", action="append", help="workbench: only this domain (repeatable), e.g. email")
     ap.add_argument("--min-changes", type=int, default=0,
                     help="workbench: only tasks whose correct answer makes at least this many changes")
@@ -371,7 +373,7 @@ def main():
         tasks = wb.load_tasks(args.domain, args.limit, args.seed, args.min_changes)
     elif args.benchmark == "browsecomp":
         import browsecomp as bc
-        tasks = bc.load_tasks(args.limit)
+        tasks = bc.load_tasks(args.limit, offset=args.offset)
     else:
         tasks = [json.loads(line) for line in open(args.tasks) if line.strip()]
     if args.only:

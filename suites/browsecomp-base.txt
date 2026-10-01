@@ -1,0 +1,3 @@
+# BrowseComp-Plus baselines for the agent-driven comparison: single agent and the paper's independent.
+--benchmark browsecomp --topology single
+--benchmark browsecomp --topology independent

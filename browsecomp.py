@@ -62,7 +62,7 @@ def grader_prompt():
     return yaml.safe_load(open(PAPER_REPO / "prompts/eval/browsecomp-grader.yaml"))[0]["content"]
 
 
-def load_tasks(limit=None, sample="paper"):
+def load_tasks(limit=None, sample="paper", offset=0):
     """Questions as dicts: id, question, answer, gold_docs, evidence_docs.
 
     sample="paper" is the paper's 100 (in its order); "all" is every one of the 830.
@@ -75,6 +75,7 @@ def load_tasks(limit=None, sample="paper"):
         ids = sorted(rows, key=int)
     tasks = [{"id": f"bc-{i}", "question": rows[i]["query"], "answer": rows[i]["answer"],
               "gold_docs": rows[i]["gold_docs"], "evidence_docs": rows[i]["evidence_docs"]} for i in ids]
+    tasks = tasks[offset:]
     return tasks[:limit] if limit else tasks
 
 
