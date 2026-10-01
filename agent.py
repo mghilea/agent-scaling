@@ -317,11 +317,13 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--base-url", default="http://localhost:8000/v1")
     ap.add_argument("--model", help="vLLM's --served-model-name (default: whatever the server is running)")
-    ap.add_argument("--benchmark", default="toy", choices=["toy", "workbench"],
-                    help="toy: the task file (--tasks); workbench: WorkBench tasks, scored by its evaluator")
+    ap.add_argument("--benchmark", default="toy", choices=["toy", "workbench", "browsecomp"],
+                    help="toy: the task file (--tasks); workbench: WorkBench tasks, scored by its evaluator; "
+                         "browsecomp: BrowseComp-Plus questions (the paper's 100), graded by an LLM judge")
     ap.add_argument("--tasks", default=str(ROOT / "tasks.jsonl"))
     ap.add_argument("--only", help="run just the task with this id")
-    ap.add_argument("--limit", type=int, help="workbench: run a random sample of this many tasks")
+    ap.add_argument("--limit", type=int, help="workbench: run a random sample of this many tasks; "
+                                                  "browsecomp: the first this many of the paper's 100")
     ap.add_argument("--seed", type=int, default=0, help="workbench: which random sample --limit takes")
     ap.add_argument("--domain", action="append", help="workbench: only this domain (repeatable), e.g. email")
     ap.add_argument("--min-changes", type=int, default=0,
@@ -346,12 +348,15 @@ def main():
     ap.add_argument("--tag", help="suffix for the run directory, e.g. rep03, so parallel repeats get distinct names")
     args = ap.parse_args()
 
-    wb = None
+    wb = bc = None
     if args.ask:
         tasks = [{"id": "ask", "question": args.ask}]
     elif args.benchmark == "workbench":
         import workbench as wb
         tasks = wb.load_tasks(args.domain, args.limit, args.seed, args.min_changes)
+    elif args.benchmark == "browsecomp":
+        import browsecomp as bc
+        tasks = bc.load_tasks(args.limit)
     else:
         tasks = [json.loads(line) for line in open(args.tasks) if line.strip()]
     if args.only:
@@ -360,13 +365,13 @@ def main():
         sys.exit("no tasks to run")
     multi = args.topology != "single"
     if multi and not wb:
-        sys.exit("the multi-agent topologies run on WorkBench: add --benchmark workbench")
+        sys.exit("the multi-agent topologies run on WorkBench for now: add --benchmark workbench")
 
     client = OpenAI(base_url=args.base_url, api_key="EMPTY")
     if not args.model:
         args.model = client.models.list().data[0].id
 
-    args.max_turns = args.max_turns or (20 if wb else 12)
+    args.max_turns = args.max_turns or (20 if wb else 30 if bc else 12)
     driven = args.topology == "agent-driven"
     if multi and not driven:
         import mas
@@ -374,7 +379,7 @@ def main():
     if driven:
         import agent_driven
     topo_name = f"agent-driven-{args.comm}{'-coord' if args.coordinate else ''}" if driven else args.topology
-    kind = "ask" if args.ask else ("sas" if not multi else topo_name) + ("-workbench" if wb else "")
+    kind = "ask" if args.ask else ("sas" if not multi else topo_name) + ("-workbench" if wb else "-browsecomp" if bc else "")
     run_dir = ROOT / "runs" / f"{datetime.now():%Y%m%d-%H%M%S}-{kind}-{args.model}{'-' + args.tag if args.tag else ''}"
     (run_dir / "traces").mkdir(parents=True)
     (run_dir / "config.json").write_text(json.dumps({"git_commit": git_commit(), **vars(args)}, indent=2))
@@ -391,7 +396,7 @@ def main():
     for t in tasks:
         print(_c(BOLD, f"\n=== {t['id']} ===") + f"\n{t['question']}", flush=True)
         start = time.time()
-        actions = []
+        actions, session = [], None
         try:
             if driven:
                 r = agent_driven.run(t["question"], make_agent, args.agents, args.comm, log_message, seed=t["id"],
@@ -404,11 +409,21 @@ def main():
                 sandbox = wb.Sandbox()
                 r = make_agent(tools=sandbox.tools, system_prompt=wb.SYSTEM_PROMPT).run(t["question"])
                 actions = sandbox.actions
+            elif bc:
+                session = bc.Session()
+                r = make_agent(tools=session.tools, system_prompt=bc.SYSTEM_PROMPT).run(t["question"])
             else:
                 r = make_agent().run(t["question"])
         except Exception as e:
             r = {"final": "", "stop": f"error: {type(e).__name__}: {e}", "messages": [], **new_stats()}
-        if wb:
+        if bc:
+            # Graded on the done() answer (or, failing that, the last reply), even if the run hit a limit:
+            # running out of turns or context after answering still counts the answer.
+            response = bc.response_text(session, r["final"])
+            correct, judgment = bc.judge(client, args.model, t["question"], response, t["answer"])
+            verdict = {"judgment": judgment, **bc.retrieval_stats(session, t)}
+            answer, expected = response, t["answer"]
+        elif wb:
             # Scored on what the agents did (their tool calls), not on what they said.
             verdict = wb.score(actions, t["outcome"], error=r["stop"] != "final")
             correct, answer, expected = verdict["correct"], actions, t["outcome"]
@@ -431,7 +446,10 @@ def main():
         with open(run_dir / "results.jsonl", "a") as f:
             f.write(json.dumps(row) + "\n")
         mark = {True: _c(GREEN, "PASS"), False: _c(YELLOW, "FAIL"), None: "DONE"}[correct]
-        if wb:
+        if bc:
+            shown = (f"answer={answer.splitlines()[0][:80] if answer else ''!r}  searches={verdict['searches']} "
+                     f"reads={verdict['reads']} evidence_found={verdict['evidence_found']}")
+        elif wb:
             shown = f"actions={answer}  expected={expected}  side_effects={verdict['side_effects']}"
         else:
             shown = f"answer={answer!r}" + (f" expected={expected!r}" if "answer" in t else "")

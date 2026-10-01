@@ -10,7 +10,10 @@
 # Safe to re-run: each step is skipped if it's already done on this node.
 # In a second terminal on the same node, re-sourcing it just restores the environment.
 # Overrides: PORT (default 8000), TP (tensor-parallel size, default = GPUs allocated),
-# VLLM_VERSION (default 0.30.0, the version first tested on Neuronic), VLLM_LOG (log path).
+# VLLM_VERSION (default 0.30.0, the version first tested on Neuronic), VLLM_LOG (log path),
+# VLLM_GPU_UTIL (share of GPU memory for the model, default 0.9, or 0.7 with BROWSECOMP).
+# BROWSECOMP=1 also sets up BrowseComp-Plus (agent.py --benchmark browsecomp): its documents, search index and
+# questions in /scratch/$USER/browsecomp, and its query embedder as a second vLLM on port PORT+1 (EMBED_PORT).
 # For unattended runs, use run.sbatch instead, which sources this for you.
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
@@ -84,6 +87,9 @@ _agent_setup() {
             --local-dir "$model_dir" || { exec {lock}>&-; return 1; }
         touch "$model_dir/.complete"
     fi
+    if [[ -n "$BROWSECOMP" ]]; then
+        _browsecomp_data || { exec {lock}>&-; return 1; }
+    fi
     exec {lock}>&-  # closing the file releases the lock
 
     # ---- vLLM server ----
@@ -107,7 +113,7 @@ _agent_setup() {
             echo "    log: $log"
             # >| overwrites the old log even with noclobber on
             nohup vllm serve "$model_dir" --served-model-name "$name" --port "$port" \
-                --tensor-parallel-size "$tp" \
+                --tensor-parallel-size "$tp" --gpu-memory-utilization "${VLLM_GPU_UTIL:-$( [[ -n "$BROWSECOMP" ]] && echo 0.70 || echo 0.90 )}" \
                 --enable-auto-tool-choice --tool-call-parser openai >| "$log" 2>&1 &
             pid=$!
         fi
@@ -131,12 +137,62 @@ _agent_setup() {
         echo " ready ($(( SECONDS - start ))s)"
     fi
 
+    if [[ -n "$BROWSECOMP" ]]; then
+        export EMBED_PORT="${EMBED_PORT:-$((port + 1))}"
+        _browsecomp_embedder || return 1
+    fi
+
     echo
     echo "Model:  $name at http://localhost:$port/v1"
     if [[ -n "$SLURM_JOB_ID" ]]; then
         echo "Job:    $SLURM_JOB_ID on $(hostname -s), ends $(squeue -h -j "$SLURM_JOB_ID" -o %e)"
     fi
     echo "Next:   python ~/agent-scaling/agent.py"
+}
+
+# BrowseComp-Plus data: documents, the Qwen3-Embedding-4B index, the questions (decrypted on this node only),
+# the embedding model, and the paper's code for its 100-question sample and grader prompt.
+_browsecomp_data() {
+    export BROWSECOMP_DIR="$WORK/browsecomp" PAPER_REPO="$WORK/agent-scaling-paper"
+    local d="$BROWSECOMP_DIR"
+    mkdir -p "$d" || return 1
+    if [[ ! -f "$d/.complete" ]]; then
+        echo "==> Downloading BrowseComp-Plus (about 6 GB)"
+        hf download Tevatron/browsecomp-plus-corpus --repo-type dataset --local-dir "$d/corpus" || return 1
+        hf download Tevatron/browsecomp-plus-indexes --repo-type dataset --include "qwen3-embedding-4b/*" \
+            --local-dir "$d/indexes" || return 1
+        hf download Tevatron/browsecomp-plus --repo-type dataset --local-dir "$d/queries" || return 1
+        touch "$d/.complete"
+    fi
+    if [[ ! -f "$WORK/models/Qwen3-Embedding-4B/.complete" ]]; then
+        echo "==> Downloading Qwen/Qwen3-Embedding-4B"
+        hf download Qwen/Qwen3-Embedding-4B --local-dir "$WORK/models/Qwen3-Embedding-4B" || return 1
+        touch "$WORK/models/Qwen3-Embedding-4B/.complete"
+    fi
+    if [[ ! -d "$PAPER_REPO/.git" ]]; then
+        git clone -q https://github.com/ybkim95/agent-scaling.git "$PAPER_REPO" || return 1
+        git -C "$PAPER_REPO" checkout -q 6f3bfb7 || return 1
+    fi
+    python -c "import pyarrow" 2>/dev/null || uv pip install --python "$WORK/venv/bin/python" pyarrow || return 1
+    [[ -f "$d/questions.jsonl" ]] || python "$(dirname "${BASH_SOURCE[0]}")/browsecomp.py" || return 1
+}
+
+# The query embedder: Qwen3-Embedding-4B as a pooling model on the same GPU, next to the chat model.
+_browsecomp_embedder() {
+    local log="${VLLM_LOG:-$WORK/vllm.log}"
+    log="${log%.log}-embed.log"
+    if ! curl -sf "localhost:$EMBED_PORT/health" >/dev/null; then
+        echo "==> Starting the query embedder on port $EMBED_PORT"
+        nohup vllm serve "$WORK/models/Qwen3-Embedding-4B" --served-model-name qwen3-embedding-4b --port "$EMBED_PORT" \
+            --runner pooling --gpu-memory-utilization 0.25 --max-model-len 2048 >| "$log" 2>&1 &
+        local pid=$! start=$SECONDS
+        until curl -sf "localhost:$EMBED_PORT/health" >/dev/null; do
+            kill -0 "$pid" 2>/dev/null || { echo "embedder exited; see $log" >&2; tail -n 20 "$log" >&2; return 1; }
+            (( SECONDS - start > 900 )) && { echo "embedder not up after 15 minutes; see $log" >&2; return 1; }
+            sleep 5
+        done
+        echo "    embedder ready ($(( SECONDS - start ))s)"
+    fi
 }
 
 # Last command, so `source setup.sh || exit 1` sees whether setup succeeded
