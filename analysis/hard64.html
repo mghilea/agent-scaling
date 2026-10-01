@@ -110,31 +110,31 @@ ul.plain { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 15
 
 <div class="wrap">
   <header>
-    <p class="eyebrow">agent-scaling · WorkBench · gpt-oss-20b · 30 September 2026</p>
+    <p class="eyebrow">agent-scaling · WorkBench · gpt-oss-20b · 30 September–1 October 2026</p>
     <h1>Eight agent systems on WorkBench’s 64 hardest tasks</h1>
-    <p class="lede">Every WorkBench task whose correct answer makes 3 or more changes (37 need 3–4, 27 need 5–12), run once through a single agent, the scaling paper’s four multi-agent setups, and three agent-driven teams that share one workspace.</p>
+    <p class="lede">Every WorkBench task whose correct answer makes 3 or more changes (37 need 3–4, 27 need 5–12), run through a single agent, the scaling paper’s four multi-agent setups, and three agent-driven teams that share one workspace. Each system ran once on 30 September and ten more times overnight; the numbers below are the means of those ten.</p>
     <div class="cards" id="cards"></div>
   </header>
 
   <section>
     <div class="sectionhead">
-      <h2 id="resultshead">Results</h2>
-      <p id="resultsnote">One run per system on the same 64 tasks; the uncertainty on each accuracy is about ±12 points (±16 on the 27-task 5+ group).</p>
+      <h2 id="resultshead">Results over ten runs</h2>
+      <p id="resultsnote">Each system ran ten more times on the same 64 tasks; runs differ only in the model’s sampling. The interval is the 95% interval of the mean over those runs, and the range is the lowest and highest single run.</p>
     </div>
     <div class="tablewrap"><table id="results"></table></div>
     <div class="chartbox" id="stripbox" hidden>
       <div class="legend"><span><i style="background:var(--s1);opacity:.6"></i>one run</span><span><i style="background:var(--ink);border-radius:1px;width:4px"></i>mean, with its 95% interval</span><span><i style="border:2px solid var(--s2);background:transparent"></i>the first run (30 September)</span></div>
       <div id="strip"></div>
-      <figcaption id="stripcap"></figcaption>
+      <figcaption id="stripcap">Accuracy on all 64 tasks in each run. Decentralized’s runs range from 39% to 48%. The agent-driven text team’s first-run 42%, which topped the first night’s ranking, is above all ten of its reruns (30–39%).</figcaption>
     </div>
     <div class="chartbox">
       <div class="legend"><span><i style="background:var(--s1)"></i>Tasks needing 3–4 changes (37)</span><span><i style="background:var(--s2)"></i>Tasks needing 5+ changes (27)</span><span><i style="border:1px dashed var(--muted);background:transparent"></i>single agent</span></div>
       <div id="dumbbell"></div>
-      <figcaption id="dumbcap">Accuracy by task size. Every system drops sharply on 5+ tasks. Decentralized leads on 3–4 changes; the agent-driven teams lead on 5+.</figcaption>
+      <figcaption id="dumbcap">Accuracy by task size, mean of ten runs. Decentralized leads on 3–4 changes (65%). On 5+ changes every team lands between 6% and 16%, and the single agent at 4%.</figcaption>
     </div>
     <div class="chartbox">
       <div id="scatter"></div>
-      <figcaption id="scattercap">Accuracy on all 64 tasks against tokens per task. The agent-driven text team matches decentralized at about half the tokens; centralized and hybrid cost the most and score below the single agent.</figcaption>
+      <figcaption id="scattercap">Mean accuracy against tokens per task. Decentralized is the most accurate at 350k tokens per task; the agent-driven all-channels team reaches 39% at 247k and independent 37% at 192k. Centralized and hybrid cost the most and score below the single agent.</figcaption>
     </div>
   </section>
 
@@ -146,7 +146,7 @@ ul.plain { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 15
     <div class="chartbox">
       <div class="legend"><span><i style="background:var(--s1)"></i>Not cap-bound (39 tasks)</span><span><i style="background:var(--s2)"></i>Cap-bound (25 tasks)</span><span>whiskers: 95% interval of the mean over runs</span></div>
       <div id="capchart"></div>
-      <figcaption id="capcap"></figcaption>
+      <figcaption id="capcap">On the 39 tasks that aren’t cap-bound, the no-channels team does no better than the single agent (47% against 46%), while one agent working alone with the independent setup’s prompt reaches 56%. On the 25 cap-bound tasks the single agent never succeeds and every team reaches 6–13%.</figcaption>
     </div>
     <h3>Head to head</h3>
     <div class="tablewrap"><table id="h2h"></table></div>
@@ -161,11 +161,11 @@ ul.plain { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 15
     <div class="chartbox">
       <div class="legend"><span><i style="background:var(--s1)"></i>Our systems (gpt-oss-20b)</span><span><i style="background:var(--pub)"></i>Published single agents</span></div>
       <div id="leader"></div>
-      <figcaption>Three gpt-oss-20b agents messaging each other (22%) tie Claude Sonnet 4.6 and sit just under GPT-5 (26%), above o3, GPT-5.4 and GPT-4o. The five frontier models (74–100%) are far ahead. Parameter counts are “undisclosed” for every closed model: their makers don’t publish them.</figcaption>
+      <figcaption>Our systems are means over ten runs; the published models ran once each. Our best teams (14–16%) sit above the 11% group (o3, Claude Haiku 4.5, DeepSeek V4 Pro, Kimi K2.6, GPT-5.4) and below Claude Sonnet 4.6 (22%) and GPT-5 (26%). The five frontier models (74–100%) are far ahead. Parameter counts are “undisclosed” for every closed model: their makers don’t publish them.</figcaption>
     </div>
     <h3>Against the open-weight models, by size</h3>
     <div class="tablewrap"><table id="openw"></table></div>
-    <p class="note">Mixture-of-experts models use only some of their parameters for each token; “active” is that share, and it drives compute per token, while the total sets how much memory the weights need. gpt-oss-20b fits on one of the cluster’s 46 GB L40s, and the three-agent teams share that one server, so the teams cost three times the tokens, not three times the weights. The published models ran in WorkBench’s own single-agent harness, one run each; 6 tasks against 3 is within the noise of a single run on 27 tasks, so read this as “level with open models up to 76 times its size”, not “better than them”.</p>
+    <p class="note">Mixture-of-experts models use only some of their parameters for each token; “active” is that share, and it drives compute per token, while the total sets how much memory the weights need. gpt-oss-20b fits on one of the cluster’s 46 GB L40s, and the three-agent teams share that one server, so the teams cost three times the tokens, not three times the weights. The published models ran in WorkBench’s own single-agent harness, one run each. Our teams average about 4 of the 27 tasks against their 3, which one run of theirs can’t separate, so read this as “level with open models up to 76 times its size”, not “better than them”.</p>
   </section>
 
   <section>
@@ -188,7 +188,7 @@ ul.plain { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 15
   <section>
     <div class="sectionhead">
       <h2>How each system fails</h2>
-      <p>Each task-run sorted by comparing its changes with the correct ones. “Stopped at the 5-result cap” means the main action (deletions, updates) was done exactly 5 times when more were needed: WorkBench’s search tools return at most 5 records.</p>
+      <p>Each task-run sorted by comparing its changes with the correct ones, averaged over the ten runs. “Stopped at the 5-result cap” means the main action (deletions, updates) was done exactly 5 times when more were needed: WorkBench’s search tools return at most 5 records.</p>
     </div>
     <div class="tablewrap"><table id="fails"></table></div>
     <p class="note">Published column: all 1,536 runs of the 24 models on these 64 tasks. WorkBench’s 2026 write-up names the cap failure itself: “When five … come back, the model assumes it has seen them all and stops, rather than re-querying.” In our traces the single agent trusts the first 5 and replies “All of Lena’s leads have been deleted”; the orchestrator setups instead fail by adding changes nobody asked for.</p>
@@ -196,11 +196,11 @@ ul.plain { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 15
 
   <section>
     <div class="sectionhead">
-      <h2>Why the shared-workspace teams win on 5+ tasks</h2>
-      <p>When agents share one workspace, a second agent’s search runs after the first agent’s deletions and returns the next 5 records, so the team gets past the cap without anyone planning it. Communication decides whether that turns into duplicate work.</p>
+      <h2>How the shared-workspace teams get past the cap</h2>
+      <p>When agents share one workspace, a second agent’s search runs after the first agent’s deletions and returns the next 5 records, so the team gets past the cap without anyone planning it. Communication decides whether that turns into duplicate work, and it also makes agents divide the task, which removes many of those second searches.</p>
     </div>
     <div class="tablewrap"><table id="driven"></table></div>
-    <p class="note">Got past the cap: tasks where the system made more than 5 of the main action, of the 25 tasks needing more than 5. Duplicate work: tasks where two or more agents changed the same record or chart. With no channels, agents get past the cap most often but duplicate the most work; text messages keep most of the benefit and cut duplicates from 13 tasks to 5.</p>
+    <p class="note">Got past the cap: tasks per run where the system made more than 5 of the main action, of the 25 tasks needing more than 5. Duplicate work: tasks per run where two or more agents changed the same record or chart. Means of ten runs, except the last column (first run). With no channels, agents get past the cap most often (18 of 25) and duplicate the most work (11 tasks); text messages cut duplicates to 8 but also get past the cap less often (12), so on 5+ tasks the two teams score about the same (14% and 16%).</p>
     <div class="quotes">
       <div class="quote"><h3>Each agent sees a different 5</h3><p>On multi_domain-147 two agents posted different batches of Raj’s leads to the shared board: the second search ran after the first agent’s deletions.</p>
         <div class="ex"><span>17.5 s agent_3 · raj_leads_deleted</span>['00000154','00000149','00000032','00000194','00000129']<span>26.7 s agent_2 · raj_leads_to_delete</span>["00000149","00000197","00000142","00000038","00000135"]</div></div>
@@ -210,13 +210,13 @@ ul.plain { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 15
         <div class="ex"><span>35.0 s agent_2 → all</span>Team, the CRM shows 5 leads reassigned to Lena: IDs 00000070, 00000095, 00000147, 00000080, 00000068…<span>84.4 s agent_1 → all</span>I confirm that customers 00000044 and 00000001 have been reassigned to Lena. I couldn’t locate customers 00000080 or 00000068 in the CRM…</div></div>
     </div>
     <div class="tablewrap"><table id="acts"></table></div>
-    <p class="note">Every communication act from the two agent-driven teams with channels, labeled by gpt-oss-20b. The all-channels team’s count includes its 100 shared-state writes (82 reads, 10 stale writes refused, 3 of them “create only if absent” claims).</p>
+    <p class="note">Every communication act from the two agent-driven teams with channels in the first run, labeled by gpt-oss-20b. The all-channels team’s count includes its 100 shared-state writes (82 reads, 10 stale writes refused, 3 of them “create only if absent” claims). Over the ten reruns the text team averaged 4.5 communication acts per task and the all-channels team 3.3.</p>
   </section>
 
   <section>
     <div class="sectionhead">
       <h2>How independent are the agents’ mistakes?</h2>
-      <p>For the two setups whose workers each act in a private copy, each worker’s changes scored on their own. More agents only help a vote if some of them are right when others are wrong.</p>
+      <p>From the first run. For the two setups whose workers each act in a private copy, each worker’s changes scored on their own. More agents only help a vote if some of them are right when others are wrong.</p>
     </div>
     <div class="tablewrap"><table id="workers"></table></div>
     <p class="note">The last column takes any two workers on the same task: of the pairs where at least one was wrong, how often were both wrong, against what independent mistakes would give at the same error rate. On small tasks decentralized’s vote always reached the “at least one right” ceiling; on these tasks it falls 7 points short, and independent’s union of everyone’s changes falls 14 short.</p>
@@ -231,16 +231,17 @@ ul.plain { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 15
   <section>
     <div class="sectionhead"><h2>What this says</h2></div>
     <ol class="next">
-      <li><b>On hard tasks, teams beat the single agent.</b><span>Decentralized and the agent-driven text team reach 41–42% on all 64 against the single agent’s 27%, the reverse of the small tasks, where the single agent matched or beat almost every team.</span></li>
-      <li><b>Agent-driven messaging is the most efficient team.</b><span>The text team ties decentralized at 193k tokens per task against 339k, and leads on 5+ tasks (22% against 11%).</span></li>
-      <li><b>Orchestrators hurt.</b><span>Centralized and hybrid score 17%, below the single agent, at 7–8 times its tokens, mostly by applying changes nobody asked for.</span></li>
-      <li><b>The 5+ gain rests partly on a tool quirk.</b><span>Teams get past the 5-result cap because a second agent searches after the first one’s deletions. A single agent told to keep searching until a query returns fewer than 5 results is the comparison that separates “more agents” from “search again”.</span></li>
-      <li><b>Mistakes are still highly correlated.</b><span>Three copies of the same model mostly fail together, which caps what voting or debate can recover; checks against the workspace don’t depend on that.</span></li>
+      <li><b>Over ten runs, decentralized debate is the best system.</b><span>It averages 44% against the single agent’s 28%, leads on tasks needing 3–4 changes (65%), and ties the agent-driven teams on 5+ tasks (15%).</span></li>
+      <li><b>One run per system was not enough.</b><span>The first night put the agent-driven text team on top at 42%. Its ten reruns average 35% and never reach 42%; a single run on 64 tasks moves by several points either way.</span></li>
+      <li><b>Free communication in a shared workspace adds little.</b><span>Text messages add 1 point over the same team without channels, inside the run-to-run noise; offering all three channels adds 5, mostly on tasks that aren’t cap-bound. What messages change most is how the work is divided: fewer duplicates, and fewer accidental second searches.</span></li>
+      <li><b>The teams’ 5+ gain comes from the 5-result cap.</b><span>On the 25 cap-bound tasks the single agent never succeeds, and the shared-workspace teams reach 10–13% largely because someone searches again after records were changed. On the other 39 tasks the no-channels team is no better than the single agent.</span></li>
+      <li><b>Part of the gap is the single agent’s prompt.</b><span>One agent working alone with the independent setup’s “work thoroughly and systematically” prompt solves 56% of the tasks that aren’t cap-bound, against 46% for our single agent. A single agent with that prompt, and one told to search again until a search returns fewer than 5 results, are the controls to run next.</span></li>
+      <li><b>Orchestrators hurt.</b><span>Centralized and hybrid score 18%, below the single agent, at 6–8 times its tokens, mostly by applying changes nobody asked for (21–23 tasks per run).</span></li>
     </ol>
   </section>
 
   <footer>
-    <p>Runs: <code>sbatch suite.sbatch 20b suites/hard-a.txt</code> and <code>hard-b.txt</code> (jobs 4045929 and 4045930, 30 September 2026), one run per system. Analysis: <code>analysis/hard64.py</code>; page: <code>analysis/build_hard64_page.py</code>. Published results: WorkBench’s per-task results file, 2026 re-run. Message kinds are labeled automatically by gpt-oss-20b.</p>
+    <p>Runs: <code>sbatch suite.sbatch 20b suites/hard-a.txt</code> and <code>hard-b.txt</code> (jobs 4045929 and 4045930, 30 September 2026), then ten more runs per system with <code>--tag rep01</code> … <code>rep10</code> (jobs 4046630–4046649, 1 October 2026). Analysis: <code>analysis/hard64.py</code> (first run) and <code>analysis/hard64_repeats.py</code> (repeats); page: <code>analysis/build_hard64_page.py</code>. Published results: WorkBench’s per-task results file, 2026 re-run. Message kinds are labeled automatically by gpt-oss-20b.</p>
     <p>Parameter counts: the makers’ announcements and model cards (DeepSeek V4 Pro 1.6T / 49B active; Kimi K2.6 1T / 32B; GLM-4.6 357B / 32B; Mistral Small 4 119B / 6.5B; Mistral Medium 3.5 128B dense; Qwen 3.5 Flash is Alibaba’s hosted Qwen3.5-35B-A3B; gpt-oss-20b 21B / 3.6B). Claude, Gemini and OpenAI’s API models don’t publish theirs.</p>
   </footer>
 </div>
@@ -283,15 +284,15 @@ const ci = (m) => `${pct(m.lo)}–${pct(m.hi)}`;
 // takeaway cards
 const sg = V["Single agent"], at = V["Agent-driven, text + coordinate"], dc = V["Decentralized"], ce = V["Centralized"], hy = V["Hybrid"];
 document.getElementById("cards").innerHTML = [
-  ["Teams beat one agent on hard tasks", `Decentralized ${pct(dc.accuracy)} and the agent-driven text team ${pct(at.accuracy)} against the single agent’s ${pct(sg.accuracy)} on all 64.`],
-  ["Messaging is the efficient team", `The agent-driven text team matches decentralized at ${Math.round(at.tokens / 1000)}k tokens per task against ${Math.round(dc.tokens / 1000)}k, and leads on 5+ tasks (${pct(at.acc_5)}).`],
-  ["Orchestrators do worse than one agent", `Centralized ${pct(ce.accuracy)}, hybrid ${pct(hy.accuracy)}: they add changes nobody asked for in ${ce.fail_kinds["right changes plus extras"]} and ${hy.fail_kinds["right changes plus extras"]} of 64 tasks.`],
-  ["5+ tasks: mid-tier, not frontier", `Our best team solves ${pct(at.acc_5)} of the 27 tasks needing 5+ changes, level with Claude Sonnet 4.6 and ahead of every open-weight model tested, up to 1.6T parameters; frontier models solve 74–100%.`],
+  ["Decentralized debate is the best team", `${pct(dc.accuracy)} on all 64 over ten runs, against the single agent’s ${pct(sg.accuracy)}, and ${pct(dc.acc_34)} on tasks needing 3–4 changes.`],
+  ["The first night’s winner was a lucky run", `The agent-driven text team scored ${pct(S["Agent-driven, text + coordinate"].accuracy)} on 30 September; its ten reruns average ${pct(at.accuracy)} and never reach that.`],
+  ["Talking adds little in a shared workspace", `Text messages add about 1 point over the same team with no channels (${pct(V["Agent-driven, no channels"].accuracy)} → ${pct(at.accuracy)}); all channels reach ${pct(V["Agent-driven, all channels + coordinate"].accuracy)}.`],
+  ["The 5+ gain is the 5-result cap", `On the 25 cap-bound tasks the single agent never succeeds; the no-channels team’s whole lead over it sits on those tasks.`],
 ].map(([b, p]) => `<div class="card"><b>${esc(b)}</b><p>${esc(p)}</p></div>`).join("");
 
 // results table
 document.getElementById("results").innerHTML = `<tr><th>System</th><th class="n">All 64${RP ? ` (mean of ${NR} runs)` : ""}</th>${RP ? '<th class="n">95% interval</th><th class="n">Range over runs</th>' : ""}<th class="n">3–4 changes (${sg.n_34})</th><th class="n">5+ changes (${sg.n_5})</th><th class="n">Side effects</th><th class="n">Tokens per task</th><th class="n">Seconds per task</th><th class="n">Messages per task</th></tr>` +
-  sysNames.map((s) => { const v = V[s], m = RP && RP[s] ? RP[s].metrics.acc_all : null; const b = s === "Agent-driven, text + coordinate" ? ' class="best"' : "";
+  sysNames.map((s) => { const v = V[s], m = RP && RP[s] ? RP[s].metrics.acc_all : null; const b = s === (RP ? "Decentralized" : "Agent-driven, text + coordinate") ? ' class="best"' : "";
     return `<tr${b}><td>${esc(s)}</td><td class="n"><b>${pct(v.accuracy)}</b></td>${m ? `<td class="n">${ci(m)}</td><td class="n">${pct(m.min)}–${pct(m.max)}</td>` : ""}<td class="n">${pct(v.acc_34)}</td><td class="n">${pct(v.acc_5)}</td><td class="n">${pct(v.side_effects)}</td><td class="n">${Math.round(v.tokens / 1000)}k</td><td class="n">${Math.round(v.seconds)}</td><td class="n">${v.comm_acts != null ? v.comm_acts.toFixed(1) : v.messages ? v.messages.toFixed(0) + " (fixed)" : "0"}</td></tr>`; }).join("");
 
 // dumbbell: 3-4 vs 5+ per system
