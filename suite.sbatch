@@ -20,7 +20,7 @@ size="${1:-20b}"
 suite="$2"
 [[ -f "$suite" ]] || { echo "no suite file: $suite" >&2; exit 1; }
 extra=("${@:3}")
-export PORT=$((20000 + SLURM_JOB_ID % 20000))
+export PORT=$((20000 + SLURM_JOB_ID % 10000 * 2))  # even, so PORT+1 (BrowseComp's embedder) is never another job's PORT
 
 export VLLM_LOG="$SLURM_SUBMIT_DIR/logs/vllm-$SLURM_JOB_ID.log"
 source ./setup.sh "$size" || exit 1

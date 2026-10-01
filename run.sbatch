@@ -23,7 +23,7 @@ size="${1:-20b}"
 [[ $# -gt 0 ]] && shift
 
 export VLLM_LOG="$SLURM_SUBMIT_DIR/logs/vllm-$SLURM_JOB_ID.log"
-export PORT=$((20000 + SLURM_JOB_ID % 20000))  # a port of its own, so jobs can share a node
+export PORT=$((20000 + SLURM_JOB_ID % 10000 * 2))  # even, so PORT+1 (BrowseComp's embedder) is never another job's PORT  # a port of its own, so jobs can share a node
 source ./setup.sh "$size" || exit 1
 
 python agent.py "$@" --base-url "http://localhost:$PORT/v1"

@@ -181,7 +181,14 @@ _browsecomp_data() {
 _browsecomp_embedder() {
     local log="${VLLM_LOG:-$WORK/vllm.log}"
     log="${log%.log}-embed.log"
-    if ! curl -sf "localhost:$EMBED_PORT/health" >/dev/null; then
+    if curl -sf "localhost:$EMBED_PORT/health" >/dev/null; then
+        # Something already answers on this port: use it only if it is the embedder.
+        if ! curl -s "localhost:$EMBED_PORT/v1/models" | grep -q '"qwen3-embedding-4b"'; then
+            echo "Port $EMBED_PORT is serving something other than the query embedder. Set EMBED_PORT to a free port." >&2
+            return 1
+        fi
+        echo "==> The query embedder is already running on port $EMBED_PORT"
+    else
         echo "==> Starting the query embedder on port $EMBED_PORT"
         nohup vllm serve "$WORK/models/Qwen3-Embedding-4B" --served-model-name qwen3-embedding-4b --port "$EMBED_PORT" \
             --runner pooling --gpu-memory-utilization 0.25 --max-model-len 2048 >| "$log" 2>&1 &
