@@ -74,6 +74,8 @@ def summary(rows):
         for k in ("messages", "a2a_tasks", "state_writes", "team_answers", "docs_seen_by_several", "repeated_queries"):
             out[k] = st.mean(c.get(k, 0) for c in comms)
         out["questions_with_messages"] = sum(c.get("messages", 0) > 0 for c in comms)
+        out["submitted"] = sum(c.get("answer_rule") == "submitted" for c in comms)
+        out["voted"] = sum(c.get("answer_rule") == "vote" for c in comms)
     return out
 
 
@@ -87,7 +89,8 @@ def main():
     for name, s in sorted(table.items()):
         print(f"{name:52s} {s['n']:3d} {s['correct']:3d} ({s['correct'] / s['n']:.0%})"[:66].ljust(66)
               + f"{s['lenient']:4d} {s['answer_in_response']:6d} {s['seconds']:5.0f} {s['tokens'] / 1000:6.0f}k {s['searches']:6.1f}"
-              + (f" {s['messages']:5.1f} {s['questions_with_messages']:9d} {s['team_answers']:8.1f} {s['docs_seen_by_several']:11.1f}" if "messages" in s else ""))
+              + (f" {s['messages']:5.1f} {s['questions_with_messages']:9d} {s['team_answers']:8.1f} {s['docs_seen_by_several']:11.1f}"
+                 + (f"  submitted {s['submitted']}, voted {s['voted']}" if s["submitted"] or s["voted"] else "") if "messages" in s else ""))
     # Question by question, on the questions every run with 10+ answers has in common.
     full = {f"{k}/{t}": rows for (k, t), rows in groups.items() if len(rows) >= 10}
     common = sorted(set.intersection(*(set(r) for r in full.values())), key=lambda i: int(i.split("-")[1])) if full else []
