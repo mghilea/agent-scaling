@@ -1,0 +1,5 @@
+# All 64 WorkBench tasks whose correct answer makes 3+ changes. Split across two jobs by expected tokens.
+--benchmark workbench --min-changes 3 --topology hybrid
+--benchmark workbench --min-changes 3 --topology independent
+--benchmark workbench --min-changes 3 --topology agent-driven --comm text --coordinate
+--benchmark workbench --min-changes 3 --topology agent-driven --comm all --coordinate
