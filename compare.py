@@ -18,7 +18,10 @@ def load(run_dir):
     run_dir = Path(run_dir)
     config = json.loads((run_dir / "config.json").read_text())
     rows = [json.loads(line) for line in open(run_dir / "results.jsonl")]
-    return config.get("topology", "single"), {r["id"]: r for r in rows}
+    name = config.get("topology", "single")
+    if name == "agent-driven":  # one label per channel condition
+        name = f"driven/{config.get('comm', 'all')}{'+coord' if config.get('coordinate') else ''}"
+    return name, {r["id"]: r for r in rows}
 
 
 def latest_runs():
@@ -64,9 +67,10 @@ def main():
             ("turn_ovh", "{:+.0%}"), ("token_ovh", "{:+.0%}"), ("messages", "{:.1f}"), ("density", "{:.2f}"),
             ("err_amp", "{:.2f}"), ("effic", "{:.2f}"), ("seconds", "{:.0f}")]
     cols = [(k, f) for k, f in cols if any(k in s for s in stats.values())]
-    print(f"{'topology':<14}" + "".join(f"{k:>11}" for k, _ in cols))
+    width = max(14, max(len(t) for t in stats) + 2)
+    print(f"{'topology':<{width}}" + "".join(f"{k:>11}" for k, _ in cols))
     for topology, s in stats.items():
-        print(f"{topology:<14}" + "".join(f"{f.format(s[k]) if k in s else '-':>11}" for k, f in cols))
+        print(f"{topology:<{width}}" + "".join(f"{f.format(s[k]) if k in s else '-':>11}" for k, f in cols))
     print("\nper task (+ = correct):")
     print(f"{'task':<36}" + "".join(f"{t[:12]:>13}" for t, _ in runs))
     for i in sorted(common):

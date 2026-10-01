@@ -324,6 +324,8 @@ def main():
     ap.add_argument("--limit", type=int, help="workbench: run a random sample of this many tasks")
     ap.add_argument("--seed", type=int, default=0, help="workbench: which random sample --limit takes")
     ap.add_argument("--domain", action="append", help="workbench: only this domain (repeatable), e.g. email")
+    ap.add_argument("--min-changes", type=int, default=0,
+                    help="workbench: only tasks whose correct answer makes at least this many changes")
     ap.add_argument("--topology", default="single",
                     choices=["single", "independent", "centralized", "decentralized", "hybrid", "agent-driven"],
                     help="one agent, one of the paper's multi-agent systems (mas.py), or an agent-driven team "
@@ -348,7 +350,7 @@ def main():
         tasks = [{"id": "ask", "question": args.ask}]
     elif args.benchmark == "workbench":
         import workbench as wb
-        tasks = wb.load_tasks(args.domain, args.limit, args.seed)
+        tasks = wb.load_tasks(args.domain, args.limit, args.seed, args.min_changes)
     else:
         tasks = [json.loads(line) for line in open(args.tasks) if line.strip()]
     if args.only:

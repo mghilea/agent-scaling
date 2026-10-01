@@ -141,6 +141,42 @@ def show_multi(p, t):
         print(yellow(f"  worker errors: {t['worker_errors']}"))
 
 
+def show_driven(p, t):
+    """Agent-driven runs have no rounds: print every event in time order."""
+    print(dim(f"channels: {t['comm']}" + ("  (asked to coordinate)" if t.get("coordinate") else "")))
+    print(bold("\nTIMELINE") + dim("  (seconds since start)"))
+    for e in t["events"]:
+        k, who = e["kind"], f"{e['t']:6.1f}s  {e['agent']:<8} "
+        if k == "tool":
+            tag = yellow(" [CHANGE]") if e.get("changes") else ""
+            args = ", ".join(f"{a}={json.dumps(v, ensure_ascii=False)}" for a, v in e["args"].items())
+            p.block(0, who + cyan(f"{e['tool']}({p.short(args, 150)})") + tag, dim("→ ") + p.short(e["out"], 120), limit=10_000)
+        elif k == "message":
+            p.block(0, who + green(f"message → {', '.join(e['to'])}:"), e["text"], 500)
+        elif k == "a2a_send":
+            p.block(0, who + green(f"A2A task {e['task_id']} → {e['to'][0]}:"),
+                    e["instruction"] + (dim(f"  data={json.dumps(e['data'])}") if e.get("data") else ""), 500)
+        elif k == "a2a_update":
+            p.block(0, who + green(f"A2A {e['task_id']} → {e['state']}:"),
+                    e.get("text", "") + (dim(f"  data={json.dumps(e['data'])}") if e.get("data") else ""), 500)
+        elif k == "state_write":
+            p.block(0, who + green(f"shared state {'created' if e['created'] else 'updated'} \"{e['key']}\" v{e['version']}:"), e["value"], 400)
+        elif k in ("state_read", "a2a_get"):
+            print(who + dim(f"{k.replace('_', ' ')} {e.get('key') or ''}"))
+        elif k == "state_conflict":
+            print(who + yellow(f"write conflict on \"{e['key']}\" (expected v{e['expected']}, was v{e['actual']})"))
+        elif k == "idle":
+            p.block(0, who + dim("idle, says:"), e["reply"], 200)
+        elif k == "active" and e["wake"] > 1:
+            print(who + dim(f"woken up (#{e['wake']})"))
+        elif k == "error":
+            print(who + yellow(f"error: {e['error']}"))
+    if t.get("shared_state"):
+        print(bold("\nFINAL SHARED STATE"))
+        for key, v in t["shared_state"].items():
+            p.block(2, f"{key} (v{v['version']}, by {v['by']}):", v["value"], 300)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("run")
@@ -159,14 +195,16 @@ def main():
     topology = t["topology"] if isinstance(t, dict) else "single"
     verdict = green("PASS") if row["correct"] else yellow("FAIL") + (" (side effects)" if row.get("side_effects") else "")
     print(bold(f"=== {topology} · {args.task} · ") + verdict + bold(" ==="))
-    first_user = next(m["content"] for m in (t["conversations"]["agent_1"] if isinstance(t, dict) else t)
-                      if m["role"] == "user")
+    first_user = t.get("task") if isinstance(t, dict) and t.get("task") else next(
+        m["content"] for m in (t["conversations"]["agent_1"] if isinstance(t, dict) else t) if m["role"] == "user")
     task = first_user.split("Here is the task for the team to work on:\n", 1)[-1].split("\n\nTo start,")[0]
     print(f"Task: {task}")
     print(dim("Expected changes: ") + ("; ".join(a.replace(".func(", "(", 1) for a in row["expected"]) or "(none)"))
     print(dim(f"turns={row['turns']}  tokens={row['prompt_tokens'] + row['completion_tokens']:,}  "
               f"messages between agents={row.get('agent_messages', 0)}"))
-    if isinstance(t, dict):
+    if isinstance(t, dict) and t.get("topology") == "agent-driven":
+        show_driven(p, t)
+    elif isinstance(t, dict):
         show_multi(p, t)
     else:
         print(bold("\nAGENT"))

@@ -71,7 +71,7 @@ def show(action: str) -> str:
     return action.replace(".func(", "(", 1)
 
 
-def load_tasks(domains=None, limit=None, seed=0):
+def load_tasks(domains=None, limit=None, seed=0, min_changes=0):
     """Tasks as dicts: id (e.g. email-17), question, outcome (ground-truth action strings), template.
 
     With limit, returns a seeded random sample, so the same --limit and --seed give the same tasks.
@@ -82,6 +82,8 @@ def load_tasks(domains=None, limit=None, seed=0):
         for i, row in df.iterrows():
             tasks.append({"id": f"{domain}-{i}", "question": row["task"],
                           "outcome": ast.literal_eval(row["outcome"]), "template": row["base_template"]})
+    # Task size: how many changes the correct answer makes (78% of tasks need 0 or 1).
+    tasks = [t for t in tasks if len(t["outcome"]) >= min_changes]
     if limit:
         tasks = random.Random(seed).sample(tasks, min(limit, len(tasks)))
     return tasks
