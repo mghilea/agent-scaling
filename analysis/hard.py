@@ -51,5 +51,5 @@ lanes = json.load(open(SP / "swimlanes.json"))
 html = (SP / "agent-driven.html").read_text()
 html = html.replace("const LANES = /*LANES*/[];", "const LANES = " + json.dumps(lanes, ensure_ascii=False).replace("</", "<\\/") + ";")
 html = html.replace("const HARD = /*HARD*/null;", "const HARD = " + (json.dumps(hard, ensure_ascii=False) if len(sys.argv) < 2 else "null") + ";")
-(SP / "agent-driven-final.html").write_text(html)
+(SP / "agent-driven-final.html").write_text(html)  # pass any argument to leave the hard-slice table out
 print("written", len(html) // 1024, "KB")

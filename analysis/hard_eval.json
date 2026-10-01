@@ -1,0 +1,601 @@
+{
+ "sets": {
+  "small": {
+   "n": 10,
+   "systems": {
+    "Single agent": {
+     "run": "20260923-203411-sas-workbench-gpt-oss-20b",
+     "n": 10,
+     "accuracy": 0.6,
+     "side_effects": 0.3,
+     "tokens": 32961.8,
+     "seconds": 14.16,
+     "turns": 4.6
+    },
+    "Decentralized (paper rounds)": {
+     "run": "20260923-205237-decentralized-workbench-gpt-oss-20b",
+     "n": 10,
+     "accuracy": 0.8,
+     "side_effects": 0.2,
+     "tokens": 227931.5,
+     "seconds": 76.96000000000001,
+     "turns": 31.4
+    },
+    "Agent-driven, text only + coordinate": {
+     "run": "20260930-193802-agent-driven-text-coord-workbench-gpt-oss-20b",
+     "n": 10,
+     "accuracy": 0.6,
+     "side_effects": 0.2,
+     "tokens": 121586.7,
+     "seconds": 32.480000000000004,
+     "turns": 16.1,
+     "comm_acts": 4.0,
+     "kinds": {
+      "message": 4.0,
+      "a2a_send": 0.0,
+      "a2a_update": 0.0,
+      "state_write": 0.0
+     },
+     "tasks_with_overlap": 4,
+     "agents_changing": 1.3,
+     "top_agent_share": 0.75,
+     "before_first_change": 0.8888888888888888,
+     "speech_acts": {
+      "claim or assignment": 9,
+      "status or result report": 8,
+      "question or request": 6,
+      "plan": 13,
+      "acknowledgment or agreement": 4
+     }
+    },
+    "Agent-driven, all channels + coordinate": {
+     "run": "20260930-193800-agent-driven-all-coord-workbench-gpt-oss-20b",
+     "n": 10,
+     "accuracy": 0.4,
+     "side_effects": 0.4,
+     "tokens": 140839.3,
+     "seconds": 36.730000000000004,
+     "turns": 17.0,
+     "comm_acts": 1.4,
+     "kinds": {
+      "message": 0.8,
+      "a2a_send": 0.0,
+      "a2a_update": 0.0,
+      "state_write": 0.6
+     },
+     "tasks_with_overlap": 3,
+     "agents_changing": 1.4,
+     "top_agent_share": 0.7083333333333334,
+     "before_first_change": 0.5,
+     "speech_acts": {
+      "information or data": 2,
+      "question or request": 4,
+      "status or result report": 3,
+      "claim or assignment": 5
+     }
+    }
+   }
+  },
+  "3plus": {
+   "n": 12,
+   "systems": {
+    "Single agent": {
+     "run": "20260930-200028-sas-workbench-gpt-oss-20b",
+     "n": 12,
+     "accuracy": 0.25,
+     "side_effects": 0.5833333333333334,
+     "tokens": 52008.166666666664,
+     "seconds": 15.116666666666667,
+     "turns": 6.666666666666667
+    },
+    "Decentralized (paper rounds)": {
+     "run": "20260930-200030-decentralized-workbench-gpt-oss-20b",
+     "n": 12,
+     "accuracy": 0.4166666666666667,
+     "side_effects": 0.5833333333333334,
+     "tokens": 438793.0833333333,
+     "seconds": 61.68333333333334,
+     "turns": 51.666666666666664
+    },
+    "Agent-driven, text only + coordinate": {
+     "run": "20260930-200032-agent-driven-text-coord-workbench-gpt-oss-20b",
+     "n": 12,
+     "accuracy": 0.3333333333333333,
+     "side_effects": 0.6666666666666666,
+     "tokens": 218567.41666666666,
+     "seconds": 28.05,
+     "turns": 27.666666666666668,
+     "comm_acts": 4.833333333333333,
+     "kinds": {
+      "message": 4.833333333333333,
+      "a2a_send": 0.0,
+      "a2a_update": 0.0,
+      "state_write": 0.0
+     },
+     "tasks_with_overlap": 1,
+     "agents_changing": 1.5833333333333333,
+     "top_agent_share": 0.7999999999999999,
+     "before_first_change": 0.8181818181818182,
+     "speech_acts": {
+      "plan": 13,
+      "question or request": 17,
+      "claim or assignment": 12,
+      "status or result report": 11,
+      "acknowledgment or agreement": 4,
+      "other": 1
+     }
+    },
+    "Agent-driven, all channels + coordinate": {
+     "run": "20260930-200034-agent-driven-all-coord-workbench-gpt-oss-20b",
+     "n": 12,
+     "accuracy": 0.4166666666666667,
+     "side_effects": 0.5833333333333334,
+     "tokens": 296261.75,
+     "seconds": 35.34166666666667,
+     "turns": 33.5,
+     "comm_acts": 4.75,
+     "kinds": {
+      "message": 1.1666666666666667,
+      "a2a_send": 0.6666666666666666,
+      "a2a_update": 0.6666666666666666,
+      "state_write": 2.25
+     },
+     "tasks_with_overlap": 1,
+     "agents_changing": 1.8333333333333333,
+     "top_agent_share": 0.7396664008506114,
+     "before_first_change": 0.09090909090909091,
+     "speech_acts": {
+      "claim or assignment": 12,
+      "status or result report": 36,
+      "information or data": 5,
+      "question or request": 2,
+      "plan": 1,
+      "acknowledgment or agreement": 1
+     }
+    }
+   }
+  },
+  "5plus": {
+   "n": 12,
+   "systems": {
+    "Single agent": {
+     "run": "20260930-201650-sas-workbench-gpt-oss-20b",
+     "n": 12,
+     "accuracy": 0.0,
+     "side_effects": 0.75,
+     "tokens": 66049.08333333333,
+     "seconds": 25.71666666666667,
+     "turns": 7.833333333333333
+    },
+    "Decentralized (paper rounds)": {
+     "run": "20260930-201652-decentralized-workbench-gpt-oss-20b",
+     "n": 12,
+     "accuracy": 0.16666666666666666,
+     "side_effects": 0.8333333333333334,
+     "tokens": 422376.75,
+     "seconds": 71.84166666666667,
+     "turns": 49.666666666666664
+    },
+    "Agent-driven, text only + coordinate": {
+     "run": "20260930-201654-agent-driven-text-coord-workbench-gpt-oss-20b",
+     "n": 12,
+     "accuracy": 0.08333333333333333,
+     "side_effects": 0.9166666666666666,
+     "tokens": 215093.91666666666,
+     "seconds": 32.550000000000004,
+     "turns": 25.916666666666668,
+     "comm_acts": 3.8333333333333335,
+     "kinds": {
+      "message": 3.8333333333333335,
+      "a2a_send": 0.0,
+      "a2a_update": 0.0,
+      "state_write": 0.0
+     },
+     "tasks_with_overlap": 1,
+     "agents_changing": 2.0,
+     "top_agent_share": 0.678872053872054,
+     "before_first_change": 0.6666666666666666,
+     "speech_acts": {
+      "plan": 14,
+      "question or request": 10,
+      "status or result report": 3,
+      "claim or assignment": 10,
+      "information or data": 3,
+      "acknowledgment or agreement": 5,
+      "other": 1
+     }
+    },
+    "Agent-driven, all channels + coordinate": {
+     "run": "20260930-201656-agent-driven-all-coord-workbench-gpt-oss-20b",
+     "n": 12,
+     "accuracy": 0.08333333333333333,
+     "side_effects": 0.9166666666666666,
+     "tokens": 262829.6666666667,
+     "seconds": 33.233333333333334,
+     "turns": 29.75,
+     "comm_acts": 1.5833333333333333,
+     "kinds": {
+      "message": 0.5,
+      "a2a_send": 0.25,
+      "a2a_update": 0.08333333333333333,
+      "state_write": 0.75
+     },
+     "tasks_with_overlap": 4,
+     "agents_changing": 2.25,
+     "top_agent_share": 0.5980339105339105,
+     "before_first_change": 0.14285714285714285,
+     "speech_acts": {
+      "status or result report": 8,
+      "information or data": 4,
+      "claim or assignment": 2,
+      "question or request": 3,
+      "other": 1,
+      "plan": 1
+     }
+    }
+   }
+  }
+ },
+ "tasks": {
+  "analytics-110": {
+   "changes": 2,
+   "set": "small",
+   "published_solve": 0.875,
+   "template": "If we got more traffic from {traffic_source_1} than {traffic_source_2} during the last {n_weeks} weeks, make bar charts of both over that period",
+   "results": {
+    "Single agent": false,
+    "Decentralized (paper rounds)": true,
+    "Agent-driven, text only + coordinate": false,
+    "Agent-driven, all channels + coordinate": false
+   }
+  },
+  "analytics-65": {
+   "changes": 1,
+   "set": "small",
+   "published_solve": 1.0,
+   "template": "If {natural_language_metric} is more than {natural_language_growth_threshold} {higher_or_lower} than {natural_language_date}, make a line plot of it since then",
+   "results": {
+    "Single agent": true,
+    "Decentralized (paper rounds)": true,
+    "Agent-driven, text only + coordinate": false,
+    "Agent-driven, all channels + coordinate": false
+   }
+  },
+  "customer_relationship_manager-14": {
+   "changes": 1,
+   "set": "small",
+   "published_solve": 1.0,
+   "template": "Delete {current_customer_name} from the crm",
+   "results": {
+    "Single agent": true,
+    "Decentralized (paper rounds)": true,
+    "Agent-driven, text only + coordinate": true,
+    "Agent-driven, all channels + coordinate": true
+   }
+  },
+  "customer_relationship_manager-30": {
+   "changes": 1,
+   "set": "small",
+   "published_solve": 0.7916666666666666,
+   "template": "Reassign {current_customer_name} to {assigned_to_first_name} in the crm",
+   "results": {
+    "Single agent": true,
+    "Decentralized (paper rounds)": true,
+    "Agent-driven, text only + coordinate": true,
+    "Agent-driven, all channels + coordinate": true
+   }
+  },
+  "email-41": {
+   "changes": 2,
+   "set": "small",
+   "published_solve": 0.6666666666666666,
+   "template": "Forward all the emails from {name} last week about '{subject}' to {recipient_name}",
+   "results": {
+    "Single agent": false,
+    "Decentralized (paper rounds)": true,
+    "Agent-driven, text only + coordinate": true,
+    "Agent-driven, all channels + coordinate": false
+   }
+  },
+  "multi_domain-17": {
+   "changes": 1,
+   "set": "small",
+   "published_solve": 0.20833333333333334,
+   "template": " Add {new_customer_name} as a new lead in the crm and assign them to the person with the fewest tasks assigned to them",
+   "results": {
+    "Single agent": false,
+    "Decentralized (paper rounds)": false,
+    "Agent-driven, text only + coordinate": false,
+    "Agent-driven, all channels + coordinate": false
+   }
+  },
+  "multi_domain-43": {
+   "changes": 1,
+   "set": "small",
+   "published_solve": 0.9166666666666666,
+   "template": "If {sender_name} hasn't sent me any emails in the past {days} days, schedule a 30 minute meeting with them for {day_of_week} at {natural_language_time} called 'Catch up with {sender_name}'",
+   "results": {
+    "Single agent": true,
+    "Decentralized (paper rounds)": true,
+    "Agent-driven, text only + coordinate": true,
+    "Agent-driven, all channels + coordinate": false
+   }
+  },
+  "multi_domain-8": {
+   "changes": 0,
+   "set": "small",
+   "published_solve": 0.625,
+   "template": "If we haven't spoke to {current_customer_name} in the past fortnight book a 30-minute meeting with whoever is assigned to them called 'Update on {current_customer_name}' at the first time I'm free tomorrow",
+   "results": {
+    "Single agent": true,
+    "Decentralized (paper rounds)": true,
+    "Agent-driven, text only + coordinate": true,
+    "Agent-driven, all channels + coordinate": true
+   }
+  },
+  "project_management-46": {
+   "changes": 0,
+   "set": "small",
+   "published_solve": 0.9583333333333334,
+   "template": "{name_1} is sick so reassign their in progress tasks to {name_2}.",
+   "results": {
+    "Single agent": true,
+    "Decentralized (paper rounds)": true,
+    "Agent-driven, text only + coordinate": true,
+    "Agent-driven, all channels + coordinate": true
+   }
+  },
+  "project_management-74": {
+   "changes": 1,
+   "set": "small",
+   "published_solve": 0.0,
+   "template": "Take {name_1}'s most urgent task and reassign it to {name_2}.",
+   "results": {
+    "Single agent": false,
+    "Decentralized (paper rounds)": false,
+    "Agent-driven, text only + coordinate": false,
+    "Agent-driven, all channels + coordinate": false
+   }
+  },
+  "customer_relationship_manager-40": {
+   "changes": 3,
+   "set": "3plus",
+   "published_solve": 0.2916666666666667,
+   "template": "Reassign all of {assigned_to_first_name}'s leads that are interested in {natural_language_product_interest} to {new_assigned_to_first_name} in the crm.",
+   "results": {
+    "Single agent": false,
+    "Decentralized (paper rounds)": false,
+    "Agent-driven, text only + coordinate": false,
+    "Agent-driven, all channels + coordinate": false
+   }
+  },
+  "customer_relationship_manager-43": {
+   "changes": 3,
+   "set": "3plus",
+   "published_solve": 0.25,
+   "template": "Reassign all of {assigned_to_first_name}'s leads that are interested in {natural_language_product_interest} to {new_assigned_to_first_name} in the crm.",
+   "results": {
+    "Single agent": false,
+    "Decentralized (paper rounds)": false,
+    "Agent-driven, text only + coordinate": false,
+    "Agent-driven, all channels + coordinate": false
+   }
+  },
+  "customer_relationship_manager-49": {
+   "changes": 3,
+   "set": "3plus",
+   "published_solve": 0.5833333333333334,
+   "template": "Reassign all of {assigned_to_first_name}'s leads that are interested in {natural_language_product_interest} to {new_assigned_to_first_name} in the crm.",
+   "results": {
+    "Single agent": false,
+    "Decentralized (paper rounds)": false,
+    "Agent-driven, text only + coordinate": false,
+    "Agent-driven, all channels + coordinate": false
+   }
+  },
+  "customer_relationship_manager-51": {
+   "changes": 3,
+   "set": "3plus",
+   "published_solve": 0.7916666666666666,
+   "template": "Give {new_assigned_to_first_name} all of {assigned_to_first_name}'s customers that are interested in {natural_language_product_interest} and are either qualified or in proposal in the crm",
+   "results": {
+    "Single agent": true,
+    "Decentralized (paper rounds)": true,
+    "Agent-driven, text only + coordinate": true,
+    "Agent-driven, all channels + coordinate": true
+   }
+  },
+  "email-19": {
+   "changes": 3,
+   "set": "3plus",
+   "published_solve": 0.9583333333333334,
+   "template": "Delete all my emails from {name} from the last {days} days",
+   "results": {
+    "Single agent": false,
+    "Decentralized (paper rounds)": true,
+    "Agent-driven, text only + coordinate": true,
+    "Agent-driven, all channels + coordinate": true
+   }
+  },
+  "multi_domain-147": {
+   "changes": 10,
+   "set": "3plus",
+   "published_solve": 0.20833333333333334,
+   "template": "If {natural_language_metric} was {more_or_less} than {threshold} at any time since {natural_language_date} delete all {assigned_to_first_name}'s leads in the CRM",
+   "results": {
+    "Single agent": false,
+    "Decentralized (paper rounds)": false,
+    "Agent-driven, text only + coordinate": false,
+    "Agent-driven, all channels + coordinate": false
+   }
+  },
+  "multi_domain-148": {
+   "changes": 8,
+   "set": "3plus",
+   "published_solve": 0.16666666666666666,
+   "template": "If {natural_language_metric} was {more_or_less} than {threshold} at any time since {natural_language_date} delete all {assigned_to_first_name}'s leads in the CRM",
+   "results": {
+    "Single agent": false,
+    "Decentralized (paper rounds)": false,
+    "Agent-driven, text only + coordinate": false,
+    "Agent-driven, all channels + coordinate": false
+   }
+  },
+  "multi_domain-149": {
+   "changes": 6,
+   "set": "3plus",
+   "published_solve": 0.20833333333333334,
+   "template": "If {natural_language_metric} was {more_or_less} than {threshold} at any time since {natural_language_date} delete all {assigned_to_first_name}'s leads in the CRM",
+   "results": {
+    "Single agent": false,
+    "Decentralized (paper rounds)": true,
+    "Agent-driven, text only + coordinate": true,
+    "Agent-driven, all channels + coordinate": true
+   }
+  },
+  "multi_domain-183": {
+   "changes": 7,
+   "set": "3plus",
+   "published_solve": 0.16666666666666666,
+   "template": "If {natural_language_metric} was {more_or_less} than {threshold} at any time since {natural_language_date} delete {assigned_to_first_name}'s new leads in the CRM and send them an email titled 'Reprioritising'saying '{natural_language_metric} looks good, so we no longer need you finding new leads'.If not say in the email 'We need you to improve {natural_language_metric} - TBD.'",
+   "results": {
+    "Single agent": false,
+    "Decentralized (paper rounds)": false,
+    "Agent-driven, text only + coordinate": false,
+    "Agent-driven, all channels + coordinate": false
+   }
+  },
+  "multi_domain-186": {
+   "changes": 9,
+   "set": "3plus",
+   "published_solve": 0.16666666666666666,
+   "template": "If {natural_language_metric} was {more_or_less} than {threshold} at any time since {natural_language_date} delete {assigned_to_first_name}'s new leads in the CRM and send them an email titled 'Reprioritising'saying '{natural_language_metric} looks good, so we no longer need you finding new leads'.If not say in the email 'We need you to improve {natural_language_metric} - TBD.'",
+   "results": {
+    "Single agent": false,
+    "Decentralized (paper rounds)": false,
+    "Agent-driven, text only + coordinate": false,
+    "Agent-driven, all channels + coordinate": false
+   }
+  },
+  "project_management-34": {
+   "changes": 4,
+   "set": "3plus",
+   "published_solve": 0.8333333333333334,
+   "template": "Move any of {name}'s tasks that are in review to completed",
+   "results": {
+    "Single agent": true,
+    "Decentralized (paper rounds)": true,
+    "Agent-driven, text only + coordinate": true,
+    "Agent-driven, all channels + coordinate": true
+   }
+  },
+  "project_management-39": {
+   "changes": 4,
+   "set": "3plus",
+   "published_solve": 0.7916666666666666,
+   "template": "Move any of {name}'s tasks that are in review to completed",
+   "results": {
+    "Single agent": true,
+    "Decentralized (paper rounds)": true,
+    "Agent-driven, text only + coordinate": true,
+    "Agent-driven, all channels + coordinate": true
+   }
+  },
+  "calendar-89": {
+   "changes": 6,
+   "set": "5plus",
+   "published_solve": 0.16666666666666666,
+   "template": "Cancel all future meetings with {name}",
+   "results": {
+    "Single agent": false,
+    "Decentralized (paper rounds)": true,
+    "Agent-driven, text only + coordinate": false,
+    "Agent-driven, all channels + coordinate": false
+   }
+  },
+  "multi_domain-141": {
+   "changes": 6,
+   "set": "5plus",
+   "published_solve": 0.125,
+   "template": "If {natural_language_metric} was {more_or_less} than {threshold} at any time since {natural_language_date} delete all {assigned_to_first_name}'s leads in the CRM",
+   "results": {
+    "Single agent": false,
+    "Decentralized (paper rounds)": false,
+    "Agent-driven, text only + coordinate": false,
+    "Agent-driven, all channels + coordinate": false
+   }
+  },
+  "multi_domain-144": {
+   "changes": 11,
+   "set": "5plus",
+   "published_solve": 0.25,
+   "template": "If {natural_language_metric} was {more_or_less} than {threshold} at any time since {natural_language_date} delete all {assigned_to_first_name}'s leads in the CRM",
+   "results": {
+    "Single agent": false,
+    "Decentralized (paper rounds)": false,
+    "Agent-driven, text only + coordinate": false,
+    "Agent-driven, all channels + coordinate": false
+   }
+  },
+  "multi_domain-145": {
+   "changes": 11,
+   "set": "5plus",
+   "published_solve": 0.20833333333333334,
+   "template": "If {natural_language_metric} was {more_or_less} than {threshold} at any time since {natural_language_date} delete all {assigned_to_first_name}'s leads in the CRM",
+   "results": {
+    "Single agent": false,
+    "Decentralized (paper rounds)": false,
+    "Agent-driven, text only + coordinate": false,
+    "Agent-driven, all channels + coordinate": false
+   }
+  },
+  "multi_domain-182": {
+   "changes": 7,
+   "set": "5plus",
+   "published_solve": 0.20833333333333334,
+   "template": "If {natural_language_metric} was {more_or_less} than {threshold} at any time since {natural_language_date} delete {assigned_to_first_name}'s new leads in the CRM and send them an email titled 'Reprioritising'saying '{natural_language_metric} looks good, so we no longer need you finding new leads'.If not say in the email 'We need you to improve {natural_language_metric} - TBD.'",
+   "results": {
+    "Single agent": false,
+    "Decentralized (paper rounds)": false,
+    "Agent-driven, text only + coordinate": false,
+    "Agent-driven, all channels + coordinate": false
+   }
+  },
+  "multi_domain-187": {
+   "changes": 8,
+   "set": "5plus",
+   "published_solve": 0.20833333333333334,
+   "template": "If {natural_language_metric} was {more_or_less} than {threshold} at any time since {natural_language_date} delete {assigned_to_first_name}'s new leads in the CRM and send them an email titled 'Reprioritising'saying '{natural_language_metric} looks good, so we no longer need you finding new leads'.If not say in the email 'We need you to improve {natural_language_metric} - TBD.'",
+   "results": {
+    "Single agent": false,
+    "Decentralized (paper rounds)": false,
+    "Agent-driven, text only + coordinate": false,
+    "Agent-driven, all channels + coordinate": false
+   }
+  },
+  "multi_domain-203": {
+   "changes": 12,
+   "set": "5plus",
+   "published_solve": 0.25,
+   "template": "If {natural_language_metric} was {more_or_less} than {threshold} at any time since {natural_language_date} make a backlog task called 'Improve {natural_language_metric}' for {name} on the front-end board with a deadline of next Friday and book a half-hour meeting for us called 'Discuss {natural_language_metric}' at the earliest time I'm free tomorrow. otherwise send them an email titled 'New leads for you' saying '{natural_language_metric} looks good, so there are new leads for you' and then give them all {assigned_to_first_name}'s leads in the CRM",
+   "results": {
+    "Single agent": false,
+    "Decentralized (paper rounds)": false,
+    "Agent-driven, text only + coordinate": false,
+    "Agent-driven, all channels + coordinate": false
+   }
+  },
+  "multi_domain-206": {
+   "changes": 9,
+   "set": "5plus",
+   "published_solve": 0.25,
+   "template": "If {natural_language_metric} was {more_or_less} than {threshold} at any time since {natural_language_date} make a backlog task called 'Improve {natural_language_metric}' for {name} on the front-end board with a deadline of next Friday and book a half-hour meeting for us called 'Discuss {natural_language_metric}' at the earliest time I'm free tomorrow. otherwise send them an email titled 'New leads for you' saying '{natural_language_metric} looks good, so there are new leads for you' and then give them all {assigned_to_first_name}'s leads in the CRM",
+   "results": {
+    "Single agent": false,
+    "Decentralized (paper rounds)": false,
+    "Agent-driven, text only + coordinate": false,
+    "Agent-driven, all channels + coordinate": false
+   }
+  }
+ }
+}

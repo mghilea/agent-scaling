@@ -1,0 +1,240 @@
+<title>Hard Task Evaluation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root {
+  --ground: #f3f5f8; --surface: #fbfcfd; --sunken: #e7ebf1; --ink: #16202e; --ink-2: #3e4a5c; --muted: #5d6879; --line: #d2d9e3; --grid: #e3e8ee;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --pass: #22784a; --pass-soft: #dcf1e5; --fail: #b3261e; --fail-soft: #fbe2df;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  --cond: "IBM Plex Sans Condensed", "IBM Plex Sans", "Arial Narrow", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, "Courier New", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground: #0e131a; --surface: #151c26; --sunken: #1d2632; --ink: #e5eaf1; --ink-2: #c3ccd8; --muted: #9aa7b8; --line: #2e3a4a; --grid: #232d3a;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --pass: #53c487; --pass-soft: #163527; --fail: #f2786d; --fail-soft: #3d1c1a;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #0e131a; --surface: #151c26; --sunken: #1d2632; --ink: #e5eaf1; --ink-2: #c3ccd8; --muted: #9aa7b8; --line: #2e3a4a; --grid: #232d3a;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --pass: #53c487; --pass-soft: #163527; --fail: #f2786d; --fail-soft: #3d1c1a;
+}
+* { box-sizing: border-box; }
+body { background: var(--ground); color: var(--ink); font: 16px/1.6 var(--sans); }
+.wrap { max-width: 1120px; margin: 0 auto; padding-inline: 20px; padding-block: 36px 60px; display: grid; gap: 50px; }
+header { display: grid; gap: 14px; }
+.eyebrow { margin: 0; font: 600 12px/1.4 var(--sans); letter-spacing: .1em; text-transform: uppercase; color: var(--s1); }
+h1 { margin: 0; font: 600 clamp(30px, 4.4vw, 46px)/1.1 var(--cond); text-wrap: balance; max-width: 24ch; }
+h2 { margin: 0; font: 600 clamp(23px, 3vw, 30px)/1.2 var(--cond); text-wrap: balance; }
+h3 { margin: 0; font: 600 19px/1.3 var(--cond); }
+p { margin: 0; }
+.lede { font-size: 18px; color: var(--muted); max-width: 72ch; }
+code, .code { font-family: var(--mono); font-size: 13.5px; background: var(--sunken); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+section { display: grid; gap: 18px; }
+.sectionhead { display: grid; gap: 6px; }
+.sectionhead p { color: var(--muted); max-width: 74ch; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; gap: 6px; align-content: start; }
+.card p { color: var(--muted); font-size: 15px; }
+.tablewrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+table { border-collapse: collapse; width: 100%; min-width: 680px; font-size: 14.5px; font-variant-numeric: tabular-nums; }
+th, td { padding: 9px 13px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 600 12px/1.4 var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); background: var(--sunken); }
+td.n, th.n { text-align: right; } td.c, th.c { text-align: center; }
+tr:last-child td { border-bottom: none; }
+.note { font-size: 14px; color: var(--muted); max-width: 84ch; }
+figure { margin: 0; display: grid; gap: 8px; }
+figcaption { font-size: 14px; color: var(--muted); max-width: 84ch; }
+.chartbox { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; gap: 10px; }
+.chartbox svg { display: block; width: 100%; height: auto; overflow: visible; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13.5px; color: var(--ink-2); }
+.legend i { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+.lbl { fill: var(--muted); font: 12px var(--sans); }
+.val { fill: var(--ink-2); font: 500 12px var(--sans); font-variant-numeric: tabular-nums; }
+.cat { fill: var(--ink); font: 500 13px var(--sans); }
+.gridline { stroke: var(--grid); stroke-width: 1; }
+.tip { position: fixed; z-index: 10; pointer-events: none; max-width: 320px; background: var(--ink); color: var(--surface); font: 13px/1.45 var(--sans); padding: 8px 10px; border-radius: 8px; }
+.quote { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; gap: 8px; align-content: start; }
+.quote p { font-size: 15px; color: var(--ink-2); }
+.ex { font: 13px/1.5 var(--mono); background: var(--sunken); border-radius: 8px; padding: 8px 10px; overflow-wrap: anywhere; display: grid; gap: 4px; }
+.ex span { color: var(--muted); }
+.quotes { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 14px; }
+.mark { display: inline-block; min-width: 46px; text-align: center; padding: 0 6px; border-radius: 999px; font: 600 12px/1.7 var(--sans); }
+.mark.y { background: var(--pass-soft); color: var(--pass); }
+.mark.n { background: var(--sunken); color: var(--muted); }
+.q { color: var(--muted); font-size: 13px; display: block; max-width: 52ch; }
+ol.next { margin: 0; padding-left: 22px; display: grid; gap: 10px; max-width: 84ch; }
+ol.next li span { display: block; color: var(--muted); font-size: 15px; }
+footer { font-size: 14px; color: var(--muted); display: grid; gap: 6px; border-top: 1px solid var(--line); padding-top: 18px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">agent-scaling · WorkBench · gpt-oss-20b · 30 September 2026</p>
+    <h1>Hard tasks: where a single agent breaks, and why</h1>
+    <p class="lede">Most WorkBench tasks need one change. We reran four systems on tasks whose correct answer makes 3 or more changes, and on tasks that need 5 or more, to see whether teams of agents help when there is real work to divide.</p>
+    <div class="cards">
+      <div class="card"><b>Every system falls with task size</b><p>The single agent goes from 60% on small tasks to 25% on 3+ and 0% on 5+ change tasks. The best team, decentralized, goes 80% → 42% → 17%.</p></div>
+      <div class="card"><b>The main cause is a search cap</b><p>WorkBench’s search tools return at most 5 records. In the published runs of 24 models, 47% of attempts at 5+ tasks stopped after exactly 5 of the main action.</p></div>
+      <div class="card"><b>Teams get past the cap by accident</b><p>On 5+ tasks the single agent never made more than 5 of the main action; agent-driven teams did in 7 and 9 of 12 tasks, as later searches found what earlier ones missed.</p></div>
+      <div class="card"><b>Getting past it isn’t enough</b><p>Teams still finished few 5+ tasks: wrong records (all of Lena’s customers instead of her leads), extras and duplicates sank the rest.</p></div>
+    </div>
+  </header>
+
+  <section>
+    <div class="sectionhead">
+      <h2>Accuracy by task size</h2>
+      <p>Small: our 10-task sample (0–2 changes). 3+: 12 tasks sampled from the 64 needing 3 or more changes. 5+: 12 tasks sampled from the 27 needing 5 or more (6–12 each). One run per system per set.</p>
+    </div>
+    <figure class="chartbox">
+      <div class="legend" id="legend"></div>
+      <div id="sizechart"></div>
+      <figcaption>Gaps under about 25 points are noise at 10–12 tasks. The single agent and the teams start close on small tasks and separate as tasks grow.</figcaption>
+    </figure>
+    <div class="tablewrap"><table id="sizetable"></table></div>
+  </section>
+
+  <section>
+    <div class="sectionhead">
+      <h2>Why the single agent fails</h2>
+      <p>Two of our single agent’s failures, traced step by step, and how often the same failure appears across WorkBench’s 24 published models.</p>
+    </div>
+    <div class="quotes">
+      <div class="quote"><h3>multi_domain-145 · 11 deletions needed</h3><p>“…if engaged users were less than 11 at any time since September 18, delete all Lena’s leads.” It checked the condition correctly, then trusted a capped search and read “leads” as every customer.</p>
+        <div class="ex"><span>search_customers(assigned_to_email="lena.schmidt@atlas.com")</span>→ 5 customers (the tool’s maximum)<span>delete_customer × 5</span>00000189, 00000187, 00000141, 00000009, 00000161 (only 00000187 was one of the 11)<span>final reply</span>“All of Lena’s leads have been deleted.”</div></div>
+      <div class="quote"><h3>multi_domain-148 · 8 deletions needed</h3><p>“…if engaged users were less than 1 at any time since September 12, delete all Akira’s leads.” It read “at any time” as “always” and did nothing. A teammate in the text-only team caught the zero days.</p>
+        <div class="ex"><span>its reasoning</span>“If less than 1 at any time: presumably all values 0? … We see engaged users &gt;0 many days … condition isn’t met.”<span>teammate, same task</span>“I confirm the engaged users count fell below 1 on 2023‑10‑01 and 2023‑10‑25.”</div></div>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <tr><th>Published runs on the 27 tasks needing 5+ changes</th><th class="n">All 24 models</th><th class="n">Frontier (5)</th><th class="n">Mid-tier (11)</th><th class="n">Small or older (8)</th></tr>
+        <tr><td>Correct</td><td class="n">24%</td><td class="n">87%</td><td class="n">12%</td><td class="n">2%</td></tr>
+        <tr><td>Stopped after exactly 5 of the main action (the search cap)</td><td class="n"><b>47%</b></td><td class="n">11%</td><td class="n"><b>72%</b></td><td class="n">36%</td></tr>
+        <tr><td>Made no changes (often a misjudged condition)</td><td class="n">12%</td><td class="n">0%</td><td class="n">6%</td><td class="n">28%</td></tr>
+        <tr><td>Changed only wrong records</td><td class="n">10%</td><td class="n">1%</td><td class="n">5%</td><td class="n">22%</td></tr>
+        <tr><td>Some needed changes missing, or a mix</td><td class="n">7%</td><td class="n">1%</td><td class="n">5%</td><td class="n">11%</td></tr>
+      </table>
+    </div>
+    <p class="note">648 runs (27 tasks × 24 models) from WorkBench’s per-task results, classified by comparing each model’s changes with the correct ones. Frontier: Claude Fable 5, Gemini 3.1 Pro, Claude Opus 4.8, GPT-5.5, Gemini 3.5 Flash. Mid-tier includes GPT-4o, o3, GPT-4.1, GPT-5, GPT-5.4, Claude Sonnet 4.6, Qwen 3.5 Flash and DeepSeek V4 Pro. WorkBench’s own 2026 write-up names the failure: “Search tools return at most five results, and the docstring says so. When five … come back, the model assumes it has seen them all and stops, rather than re-querying” (appendix B.3).</p>
+  </section>
+
+  <section>
+    <div class="sectionhead">
+      <h2>How the teams handled big tasks</h2>
+      <p>Agent-driven teams share one workspace, so a later search runs after a teammate’s deletions and returns the records that were cut off before.</p>
+    </div>
+    <div class="tablewrap"><table id="teamtable"></table></div>
+    <p class="note">“Got past the cap”: tasks where the system made more than 5 of the main action (deletions, updates), out of the tasks that needed more than 5. Agents making changes and the busiest agent’s share are averages per task.</p>
+    <div class="quotes">
+      <div class="quote"><h3>A teammate finds what the cap hid</h3><div class="ex"><span>44.2 s agent_3 → agent_1</span>Task T1 still has pending leads. Could you delete the remaining Sofia-assigned leads: 00000051, 00000021, 00000013?<span>62.9 s agent_1 → agent_3</span>Leads 00000051, 00000021, 00000013 were already deleted earlier in the workflow.</div></div>
+      <div class="quote"><h3>Handing over data</h3><div class="ex"><span>16.6 s agent_1 → agent_3</span>Here are the customer IDs to reassign: 00000076, 00000183, 00000078, 00000011, 00000199. Please update each assigned_to_email to akira.sato@atlas.com.</div></div>
+      <div class="quote"><h3>A plan with named roles</h3><div class="ex"><span>11.5 s agent_2 → all</span>Plan for assigning Akira’s software leads to Lena: 1. Agent_3: Use directory.find_email_address("Akira") and ("Lena") … 2. Agent_1: Once we have A[kira’s and Lena’s emails], perform the reassignments…</div></div>
+      <div class="quote"><h3>The team collapses into one worker</h3><div class="ex"><span>17.7 s agent_1 → all</span>Plan for today’s task: 1) Query engaged users … 2) If any count &lt; 11, find Sofia’s email … 3) Search CRM for leads assigned to Sofia, delete each…<span>26.0 s agent_3 → all</span>Got it. I’ll stay on standby and not perform any actions so Agent_1 can handle the steps as outlined.</div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sectionhead">
+      <h2>Task by task</h2>
+      <p>Each task with the number of changes it needs and the share of WorkBench’s 24 published models that solved it.</p>
+    </div>
+    <div class="tablewrap"><table id="grid5"></table></div>
+    <div class="tablewrap"><table id="grid3"></table></div>
+  </section>
+
+  <section>
+    <div class="sectionhead"><h2>What this means for the communication question</h2></div>
+    <ol class="next">
+      <li><b>Teams look better on big tasks partly because of one tool quirk.</b><span>The cap punishes an agent that trusts its first search. Several agents in one workspace search again by accident. A fair comparison needs a single-agent baseline told to re-search until a query returns fewer than 5 results, or a search tool with a higher limit.</span></li>
+      <li><b>On big tasks, communication changes character.</b><span>Messages start carrying lists of IDs and requests to act on them, and work spreads across agents (2.0–2.2 agents making changes on 5+ tasks against 1.3–1.4 on small ones). That is the setting where agent-driven communication can earn its cost.</span></li>
+      <li><b>Remaining failures are reading errors, not coordination errors.</b><span>“Leads” read as all customers, “at any time” read as “always”, guessed addresses. More agents don’t fix a misreading they all share.</span></li>
+    </ol>
+  </section>
+
+  <footer>
+    <p>Runs of 30 September 2026, gpt-oss-20b on vLLM, one run per system per set. Code: <code>agent.py --min-changes 3|5</code>; analysis in <code>analysis/hard_eval.py</code> and <code>analysis/build_hard_page.py</code>. Two batch jobs (4045929, 4045930) are running all 64 tasks needing 3+ changes through the five paper systems and three agent-driven conditions.</p>
+  </footer>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script>
+(function () {
+const DATA = {"eval": {"small": {"n": 10, "systems": {"Single agent": {"run": "20260923-203411-sas-workbench-gpt-oss-20b", "n": 10, "accuracy": 0.6, "side_effects": 0.3, "tokens": 32961.8, "seconds": 14.16, "turns": 4.6}, "Decentralized (paper rounds)": {"run": "20260923-205237-decentralized-workbench-gpt-oss-20b", "n": 10, "accuracy": 0.8, "side_effects": 0.2, "tokens": 227931.5, "seconds": 76.96000000000001, "turns": 31.4}, "Agent-driven, text only + coordinate": {"run": "20260930-193802-agent-driven-text-coord-workbench-gpt-oss-20b", "n": 10, "accuracy": 0.6, "side_effects": 0.2, "tokens": 121586.7, "seconds": 32.480000000000004, "turns": 16.1, "comm_acts": 4.0, "kinds": {"message": 4.0, "a2a_send": 0.0, "a2a_update": 0.0, "state_write": 0.0}, "tasks_with_overlap": 4, "agents_changing": 1.3, "top_agent_share": 0.75, "before_first_change": 0.8888888888888888, "speech_acts": {"claim or assignment": 9, "status or result report": 8, "question or request": 6, "plan": 13, "acknowledgment or agreement": 4}}, "Agent-driven, all channels + coordinate": {"run": "20260930-193800-agent-driven-all-coord-workbench-gpt-oss-20b", "n": 10, "accuracy": 0.4, "side_effects": 0.4, "tokens": 140839.3, "seconds": 36.730000000000004, "turns": 17.0, "comm_acts": 1.4, "kinds": {"message": 0.8, "a2a_send": 0.0, "a2a_update": 0.0, "state_write": 0.6}, "tasks_with_overlap": 3, "agents_changing": 1.4, "top_agent_share": 0.7083333333333334, "before_first_change": 0.5, "speech_acts": {"information or data": 2, "question or request": 4, "status or result report": 3, "claim or assignment": 5}}}}, "3plus": {"n": 12, "systems": {"Single agent": {"run": "20260930-200028-sas-workbench-gpt-oss-20b", "n": 12, "accuracy": 0.25, "side_effects": 0.5833333333333334, "tokens": 52008.166666666664, "seconds": 15.116666666666667, "turns": 6.666666666666667}, "Decentralized (paper rounds)": {"run": "20260930-200030-decentralized-workbench-gpt-oss-20b", "n": 12, "accuracy": 0.4166666666666667, "side_effects": 0.5833333333333334, "tokens": 438793.0833333333, "seconds": 61.68333333333334, "turns": 51.666666666666664}, "Agent-driven, text only + coordinate": {"run": "20260930-200032-agent-driven-text-coord-workbench-gpt-oss-20b", "n": 12, "accuracy": 0.3333333333333333, "side_effects": 0.6666666666666666, "tokens": 218567.41666666666, "seconds": 28.05, "turns": 27.666666666666668, "comm_acts": 4.833333333333333, "kinds": {"message": 4.833333333333333, "a2a_send": 0.0, "a2a_update": 0.0, "state_write": 0.0}, "tasks_with_overlap": 1, "agents_changing": 1.5833333333333333, "top_agent_share": 0.7999999999999999, "before_first_change": 0.8181818181818182, "speech_acts": {"plan": 13, "question or request": 17, "claim or assignment": 12, "status or result report": 11, "acknowledgment or agreement": 4, "other": 1}}, "Agent-driven, all channels + coordinate": {"run": "20260930-200034-agent-driven-all-coord-workbench-gpt-oss-20b", "n": 12, "accuracy": 0.4166666666666667, "side_effects": 0.5833333333333334, "tokens": 296261.75, "seconds": 35.34166666666667, "turns": 33.5, "comm_acts": 4.75, "kinds": {"message": 1.1666666666666667, "a2a_send": 0.6666666666666666, "a2a_update": 0.6666666666666666, "state_write": 2.25}, "tasks_with_overlap": 1, "agents_changing": 1.8333333333333333, "top_agent_share": 0.7396664008506114, "before_first_change": 0.09090909090909091, "speech_acts": {"claim or assignment": 12, "status or result report": 36, "information or data": 5, "question or request": 2, "plan": 1, "acknowledgment or agreement": 1}}}}, "5plus": {"n": 12, "systems": {"Single agent": {"run": "20260930-201650-sas-workbench-gpt-oss-20b", "n": 12, "accuracy": 0.0, "side_effects": 0.75, "tokens": 66049.08333333333, "seconds": 25.71666666666667, "turns": 7.833333333333333}, "Decentralized (paper rounds)": {"run": "20260930-201652-decentralized-workbench-gpt-oss-20b", "n": 12, "accuracy": 0.16666666666666666, "side_effects": 0.8333333333333334, "tokens": 422376.75, "seconds": 71.84166666666667, "turns": 49.666666666666664}, "Agent-driven, text only + coordinate": {"run": "20260930-201654-agent-driven-text-coord-workbench-gpt-oss-20b", "n": 12, "accuracy": 0.08333333333333333, "side_effects": 0.9166666666666666, "tokens": 215093.91666666666, "seconds": 32.550000000000004, "turns": 25.916666666666668, "comm_acts": 3.8333333333333335, "kinds": {"message": 3.8333333333333335, "a2a_send": 0.0, "a2a_update": 0.0, "state_write": 0.0}, "tasks_with_overlap": 1, "agents_changing": 2.0, "top_agent_share": 0.678872053872054, "before_first_change": 0.6666666666666666, "speech_acts": {"plan": 14, "question or request": 10, "status or result report": 3, "claim or assignment": 10, "information or data": 3, "acknowledgment or agreement": 5, "other": 1}}, "Agent-driven, all channels + coordinate": {"run": "20260930-201656-agent-driven-all-coord-workbench-gpt-oss-20b", "n": 12, "accuracy": 0.08333333333333333, "side_effects": 0.9166666666666666, "tokens": 262829.6666666667, "seconds": 33.233333333333334, "turns": 29.75, "comm_acts": 1.5833333333333333, "kinds": {"message": 0.5, "a2a_send": 0.25, "a2a_update": 0.08333333333333333, "state_write": 0.75}, "tasks_with_overlap": 4, "agents_changing": 2.25, "top_agent_share": 0.5980339105339105, "before_first_change": 0.14285714285714285, "speech_acts": {"status or result report": 8, "information or data": 4, "claim or assignment": 2, "question or request": 3, "other": 1, "plan": 1}}}}}, "cap": {"3plus": {"Single agent": [0, 5], "Decentralized (paper rounds)": [2, 5], "Agent-driven, text only + coordinate": [5, 5], "Agent-driven, all channels + coordinate": [5, 5]}, "5plus": {"Single agent": [0, 12], "Decentralized (paper rounds)": [4, 12], "Agent-driven, text only + coordinate": [7, 12], "Agent-driven, all channels + coordinate": [9, 12]}}, "grids": {"3plus": [{"id": "multi_domain-147", "changes": 10, "solve": 0.20833333333333334, "question": "I think engaged users might have been more than 1 at any time since September 19. Can you check and if so, delete all Raj's leads in the CRM", "results": {"Single agent": false, "Decentralized (paper rounds)": false, "Agent-driven, text only + coordinate": false, "Agent-driven, all channels + coordinate": false}}, {"id": "multi_domain-186", "changes": 9, "solve": 0.16666666666666666, "question": "Was total visits more than 10 at any time since November 6? If so, delete all Akira's leads in the CRM and then send them an email titled 'Reprioritising' saying 'total visits looks good, so we no longer need you finding new leads'. If not say in the email 'We need you to improve total visits - TBD.'", "results": {"Single agent": false, "Decentralized (paper rounds)": false, "Agent-driven, text only + coordinate": false, "Agent-driven, all channels + coordinate": false}}, {"id": "multi_domain-148", "changes": 8, "solve": 0.16666666666666666, "question": "I think engaged users might have been less than 1 at any time since September 12. Can you check and if so, delete all Akira's leads in the CRM", "results": {"Single agent": false, "Decentralized (paper rounds)": false, "Agent-driven, text only + coordinate": false, "Agent-driven, all channels + coordinate": false}}, {"id": "multi_domain-183", "changes": 7, "solve": 0.16666666666666666, "question": "can you check if engaged users was less than 11 at any time since September 22? If so, delete all the leads assigned to Sofia's in the CRM and send them an email titled 'Reprioritising' saying 'engaged users looks good, so we no longer need you finding new leads'. If not say 'We need you to improve engaged users - TBD.'", "results": {"Single agent": false, "Decentralized (paper rounds)": false, "Agent-driven, text only + coordinate": false, "Agent-driven, all channels + coordinate": false}}, {"id": "multi_domain-149", "changes": 6, "solve": 0.20833333333333334, "question": "can you check if total visits was more than 10 at any time since September 8? If so, delete all the leads assigned to Sofia in the CRM", "results": {"Single agent": false, "Decentralized (paper rounds)": true, "Agent-driven, text only + coordinate": false, "Agent-driven, all channels + coordinate": true}}, {"id": "project_management-34", "changes": 4, "solve": 0.8333333333333334, "question": "Move any of luis's tasks that are in review to completed", "results": {"Single agent": true, "Decentralized (paper rounds)": true, "Agent-driven, text only + coordinate": true, "Agent-driven, all channels + coordinate": true}}, {"id": "project_management-39", "changes": 4, "solve": 0.7916666666666666, "question": "Move any of nia's tasks that are in review to completed", "results": {"Single agent": true, "Decentralized (paper rounds)": true, "Agent-driven, text only + coordinate": true, "Agent-driven, all channels + coordinate": true}}, {"id": "customer_relationship_manager-40", "changes": 3, "solve": 0.2916666666666667, "question": "Akira is taking over all of Lena's leads that are interested in software. Can you reassign them in the crm?", "results": {"Single agent": false, "Decentralized (paper rounds)": false, "Agent-driven, text only + coordinate": false, "Agent-driven, all channels + coordinate": false}}, {"id": "customer_relationship_manager-43", "changes": 3, "solve": 0.25, "question": "Lena is taking over all of Akira's leads that are interested in software. Can you reassign them in the crm?", "results": {"Single agent": false, "Decentralized (paper rounds)": false, "Agent-driven, text only + coordinate": false, "Agent-driven, all channels + coordinate": false}}, {"id": "customer_relationship_manager-49", "changes": 3, "solve": 0.5833333333333334, "question": "Reassign all of Lena's leads that are interested in services to Sofia in the crm.", "results": {"Single agent": false, "Decentralized (paper rounds)": false, "Agent-driven, text only + coordinate": false, "Agent-driven, all channels + coordinate": false}}, {"id": "customer_relationship_manager-51", "changes": 3, "solve": 0.7916666666666666, "question": "Raj is taking over all of Sofia's customers that are interested in training and are either qualified or in proposal. Can you reassign them in the crm?", "results": {"Single agent": true, "Decentralized (paper rounds)": true, "Agent-driven, text only + coordinate": true, "Agent-driven, all channels + coordinate": true}}, {"id": "email-19", "changes": 3, "solve": 0.9583333333333334, "question": "Delete all my emails from amir from the last 6 days", "results": {"Single agent": false, "Decentralized (paper rounds)": true, "Agent-driven, text only + coordinate": true, "Agent-driven, all channels + coordinate": true}}], "5plus": [{"id": "multi_domain-203", "changes": 12, "solve": 0.25, "question": "can you check if engaged users was more than 5 at any time since November 29? If so, make a task for santiago on the backlog called 'Improve engaged users' on the front-end board that's due next Friday and book a half-hour meeting for us called 'Discuss engaged users' at the earliest time I can do tomorrow. otherwise send them an email titled 'New leads for you' saying 'engaged users looks good, so there are new leads for you' and then give them all Lena's leads in the CRM", "results": {"Single agent": false, "Decentralized (paper rounds)": false, "Agent-driven, text only + coordinate": false, "Agent-driven, all channels + coordinate": false}}, {"id": "multi_domain-144", "changes": 11, "solve": 0.25, "question": "I think engaged users might have been less than 5 at any time since October 24. Can you check and if so, delete all Lena's leads in the CRM", "results": {"Single agent": false, "Decentralized (paper rounds)": false, "Agent-driven, text only + coordinate": false, "Agent-driven, all channels + coordinate": false}}, {"id": "multi_domain-145", "changes": 11, "solve": 0.20833333333333334, "question": "I think engaged users might have been less than 11 at any time since September 18. Can you check and if so, delete all Lena's leads in the CRM", "results": {"Single agent": false, "Decentralized (paper rounds)": false, "Agent-driven, text only + coordinate": false, "Agent-driven, all channels + coordinate": false}}, {"id": "multi_domain-147", "changes": 10, "solve": 0.20833333333333334, "question": "I think engaged users might have been more than 1 at any time since September 19. Can you check and if so, delete all Raj's leads in the CRM", "results": {"Single agent": false, "Decentralized (paper rounds)": false, "Agent-driven, text only + coordinate": false, "Agent-driven, all channels + coordinate": false}}, {"id": "multi_domain-206", "changes": 9, "solve": 0.25, "question": "can you check if average session duration was less than 2 at any time since October 15? If so, make a task for nia on the backlog called 'Improve average session duration' on the front-end board that's due next Friday and book a half-hour meeting for us called 'Discuss average session duration' at the earliest time I can do tomorrow. otherwise send them an email titled 'New leads for you' saying 'average session duration looks good, so there are new leads for you' and then give them all Akira's leads in the CRM", "results": {"Single agent": false, "Decentralized (paper rounds)": false, "Agent-driven, text only + coordinate": false, "Agent-driven, all channels + coordinate": false}}, {"id": "multi_domain-148", "changes": 8, "solve": 0.16666666666666666, "question": "I think engaged users might have been less than 1 at any time since September 12. Can you check and if so, delete all Akira's leads in the CRM", "results": {"Single agent": false, "Decentralized (paper rounds)": false, "Agent-driven, text only + coordinate": false, "Agent-driven, all channels + coordinate": false}}, {"id": "multi_domain-187", "changes": 8, "solve": 0.20833333333333334, "question": "Was engaged users less than 5 at any time since November 17? If so, delete all Nadia's leads in the CRM and then send them an email titled 'Reprioritising' saying 'engaged users looks good, so we no longer need you finding new leads'. If not say in the email 'We need you to improve engaged users - TBD.'", "results": {"Single agent": false, "Decentralized (paper rounds)": false, "Agent-driven, text only + coordinate": false, "Agent-driven, all channels + coordinate": false}}, {"id": "multi_domain-182", "changes": 7, "solve": 0.20833333333333334, "question": "If total visits was less than 21 at any time since October 30 delete Sofia's new leads in the CRM and send them an email titled 'Reprioritising'saying 'total visits looks good, so we no longer need you finding new leads'.If not say in the email 'We need you to improve total visits - TBD.'", "results": {"Single agent": false, "Decentralized (paper rounds)": false, "Agent-driven, text only + coordinate": false, "Agent-driven, all channels + coordinate": false}}, {"id": "multi_domain-183", "changes": 7, "solve": 0.16666666666666666, "question": "can you check if engaged users was less than 11 at any time since September 22? If so, delete all the leads assigned to Sofia's in the CRM and send them an email titled 'Reprioritising' saying 'engaged users looks good, so we no longer need you finding new leads'. If not say 'We need you to improve engaged users - TBD.'", "results": {"Single agent": false, "Decentralized (paper rounds)": false, "Agent-driven, text only + coordinate": false, "Agent-driven, all channels + coordinate": false}}, {"id": "calendar-89", "changes": 6, "solve": 0.16666666666666666, "question": "Cancel all future meetings with amir", "results": {"Single agent": false, "Decentralized (paper rounds)": true, "Agent-driven, text only + coordinate": false, "Agent-driven, all channels + coordinate": false}}, {"id": "multi_domain-141", "changes": 6, "solve": 0.125, "question": "If average session duration was more than 41 at any time since November 9 delete all Sofia's leads in the CRM", "results": {"Single agent": false, "Decentralized (paper rounds)": false, "Agent-driven, text only + coordinate": false, "Agent-driven, all channels + coordinate": false}}, {"id": "multi_domain-149", "changes": 6, "solve": 0.20833333333333334, "question": "can you check if total visits was more than 10 at any time since September 8? If so, delete all the leads assigned to Sofia in the CRM", "results": {"Single agent": false, "Decentralized (paper rounds)": true, "Agent-driven, text only + coordinate": true, "Agent-driven, all channels + coordinate": true}}]}, "systems": ["Single agent", "Decentralized (paper rounds)", "Agent-driven, text only + coordinate", "Agent-driven, all channels + coordinate"]};
+const NS = "http://www.w3.org/2000/svg";
+const COLORS = ["var(--s1)", "var(--s2)", "var(--s3)", "var(--s4)"];
+const SHORT = ["Single agent", "Decentralized", "Agent-driven, text", "Agent-driven, all"];
+const SETS = [["small", "Small (0–2)"], ["3plus", "3+ changes"], ["5plus", "5+ changes"]];
+const sys = DATA.systems;
+const tip = document.getElementById("tip");
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+function el(tag, attrs, text) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text !== undefined) e.textContent = text; return e; }
+function hover(node, html) {
+  const move = (e) => { tip.style.left = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8) + "px"; tip.style.top = Math.min(e.clientY + 14, innerHeight - tip.offsetHeight - 8) + "px"; };
+  node.addEventListener("pointerenter", (e) => { tip.innerHTML = html; tip.hidden = false; move(e); });
+  node.addEventListener("pointermove", move); node.addEventListener("pointerleave", () => { tip.hidden = true; });
+}
+const pct = (v) => Math.round(v * 100) + "%";
+
+// legend
+document.getElementById("legend").innerHTML = sys.map((s, i) => `<span><i style="background:${COLORS[i]}"></i>${esc(s)}</span>`).join("");
+
+// accuracy by size: one line per system
+(function () {
+  const W = 760, H = 300, left = 46, right = 150, top = 14, bottom = 36;
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Accuracy by task size for four systems" });
+  const x = (i) => left + (W - left - right) * i / (SETS.length - 1), y = (v) => top + (H - top - bottom) * (1 - v);
+  [0, 0.25, 0.5, 0.75, 1].forEach((v) => { svg.append(el("line", { x1: left, x2: W - right, y1: y(v), y2: y(v), class: "gridline" })); svg.append(el("text", { x: left - 8, y: y(v) + 4, "text-anchor": "end", class: "lbl" }, pct(v))); });
+  SETS.forEach(([, name], i) => svg.append(el("text", { x: x(i), y: H - 12, "text-anchor": "middle", class: "cat" }, name)));
+  const ends = [];
+  sys.forEach((s, k) => {
+    const pts = SETS.map(([key], i) => [x(i), y(DATA.eval[key].systems[s].accuracy)]);
+    svg.append(el("polyline", { points: pts.map((p) => p.join(",")).join(" "), fill: "none", stroke: COLORS[k], "stroke-width": 2 }));
+    pts.forEach(([px, py], i) => {
+      const v = DATA.eval[SETS[i][0]].systems[s];
+      svg.append(el("circle", { cx: px, cy: py, r: 5, fill: COLORS[k], stroke: "var(--surface)", "stroke-width": 2 }));
+      const hit = el("circle", { cx: px, cy: py, r: 12, fill: "transparent" });
+      hover(hit, `<b>${esc(s)}</b><br>${esc(SETS[i][1])}: ${pct(v.accuracy)} correct (${Math.round(v.accuracy * v.n)} of ${v.n})`);
+      svg.append(hit);
+    });
+    ends.push([pts[pts.length - 1][1], k]);
+  });
+  // direct labels at the right end, nudged apart
+  ends.sort((a, b) => a[0] - b[0]);
+  let last = -99;
+  ends.forEach(([py, k]) => { const yy = Math.max(py, last + 16); last = yy;
+    svg.append(el("text", { x: W - right + 10, y: yy + 4, class: "val" }, `${SHORT[k]} ${pct(DATA.eval["5plus"].systems[sys[k]].accuracy)}`)); });
+  document.getElementById("sizechart").append(svg);
+})();
+
+// table view of the chart
+document.getElementById("sizetable").innerHTML = `<tr><th>System</th>${SETS.map(([, n]) => `<th class="n">${esc(n)}</th>`).join("")}<th class="n">Tokens per task (5+)</th><th class="n">Seconds per task (5+)</th></tr>` +
+  sys.map((s) => `<tr><td>${esc(s)}</td>${SETS.map(([k]) => { const v = DATA.eval[k].systems[s]; return `<td class="n">${pct(v.accuracy)} <span style="color:var(--muted)">(${Math.round(v.accuracy * v.n)}/${v.n})</span></td>`; }).join("")}<td class="n">${Math.round(DATA.eval["5plus"].systems[s].tokens / 1000)}k</td><td class="n">${Math.round(DATA.eval["5plus"].systems[s].seconds)}</td></tr>`).join("");
+
+// team table
+(function () {
+  const rows = sys.map((s) => {
+    const e3 = DATA.eval["3plus"].systems[s], e5 = DATA.eval["5plus"].systems[s], es = DATA.eval.small.systems[s];
+    const c3 = DATA.cap["3plus"][s], c5 = DATA.cap["5plus"][s];
+    // Decentralized workers act in private copies and a vote picks one answer, so these don't apply.
+    const dec = s.startsWith("Decentralized");
+    const agents = (e) => dec ? "–" : e.agents_changing == null ? "1" : e.agents_changing.toFixed(1);
+    const share = (e) => dec ? "–" : e.top_agent_share == null ? "100%" : pct(e.top_agent_share);
+    const comm = (e) => e.comm_acts == null ? (s.startsWith("Decentralized") ? "12 (fixed)" : "–") : e.comm_acts.toFixed(1);
+    return `<tr><td>${esc(s)}</td><td class="n">${c3[0]} of ${c3[1]}</td><td class="n">${c5[0]} of ${c5[1]}</td><td class="n">${agents(es)} → ${agents(e5)}</td><td class="n">${share(e5)}</td><td class="n">${comm(e3)} / ${comm(e5)}</td></tr>`;
+  });
+  document.getElementById("teamtable").innerHTML = `<tr><th>System</th><th class="n">Got past the cap, 3+ set</th><th class="n">Got past the cap, 5+ set</th><th class="n">Agents making changes, small → 5+</th><th class="n">Busiest agent’s share of changes, 5+</th><th class="n">Communication acts per task, 3+ / 5+</th></tr>` + rows.join("");
+})();
+
+// task grids
+function grid(id, key, title) {
+  const g = DATA.grids[key];
+  document.getElementById(id).innerHTML = `<tr><th>${esc(title)}</th><th class="n">Changes</th><th class="n">Published models solving</th>${SHORT.map((s) => `<th class="c">${esc(s)}</th>`).join("")}</tr>` +
+    g.map((t) => `<tr><td><span class="code">${esc(t.id)}</span><span class="q">${esc(t.question.slice(0, 160))}${t.question.length > 160 ? "…" : ""}</span></td><td class="n">${t.changes}</td><td class="n">${t.solve == null ? "–" : pct(t.solve)}</td>${sys.map((s) => t.results[s] ? `<td class="c"><span class="mark y">pass</span></td>` : `<td class="c"><span class="mark n">fail</span></td>`).join("")}</tr>`).join("");
+}
+grid("grid5", "5plus", "5+ changes (12 tasks)");
+grid("grid3", "3plus", "3+ changes (12 tasks)");
+})();
+</script>
