@@ -2,6 +2,7 @@
 
     python compare.py runs/A runs/B ...    # these runs
     python compare.py                      # the latest WorkBench run of each topology
+    python compare.py runs/A runs/B --split 5   # also accuracy for tasks needing <5 and 5+ changes
 
 Only tasks that every run completed are compared, so pass runs of the same task sample.
 Overhead, error amplification and efficiency are relative to the single-agent run, if there is one.
@@ -33,7 +34,12 @@ def latest_runs():
 
 
 def main():
-    runs = [load(d) for d in (sys.argv[1:] or latest_runs())]
+    args, split = sys.argv[1:], None
+    if "--split" in args:  # task size: how many changes the correct answer makes
+        i = args.index("--split")
+        split = int(args[i + 1])
+        args = args[:i] + args[i + 2:]
+    runs = [load(d) for d in (args or latest_runs())]
     if not runs:
         sys.exit("no runs found")
     common = set.intersection(*(set(rows) for _, rows in runs))
@@ -71,6 +77,15 @@ def main():
     print(f"{'topology':<{width}}" + "".join(f"{k:>11}" for k, _ in cols))
     for topology, s in stats.items():
         print(f"{topology:<{width}}" + "".join(f"{f.format(s[k]) if k in s else '-':>11}" for k, f in cols))
+    if split is not None:
+        size = {i: len(runs[0][1][i]["expected"]) for i in common}
+        small = [i for i in common if size[i] < split]
+        big = [i for i in common if size[i] >= split]
+        print(f"\naccuracy by task size (changes the correct answer makes):")
+        print(f"{'topology':<{width}}{f'<{split} ({len(small)} tasks)':>18}{f'{split}+ ({len(big)} tasks)':>18}")
+        for topology, rows in runs:
+            a = lambda ids: f"{sum(bool(rows[i]['correct']) for i in ids) / len(ids):.0%}" if ids else "-"  # noqa: E731
+            print(f"{topology:<{width}}{a(small):>18}{a(big):>18}")
     print("\nper task (+ = correct):")
     print(f"{'task':<36}" + "".join(f"{t[:12]:>13}" for t, _ in runs))
     for i in sorted(common):
