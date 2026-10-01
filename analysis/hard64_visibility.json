@@ -1,0 +1,58 @@
+{
+ "Decentralized": {
+  "task_runs": 640,
+  "items": 5.9484375,
+  "chars": 9796.1484375,
+  "share_with_any": 1,
+  "tool_calls": 26.303125
+ },
+ "Centralized": {
+  "task_runs": 640,
+  "items": 12.4828125,
+  "chars": 12066.3828125,
+  "share_with_any": 1,
+  "tool_calls": 30.69375
+ },
+ "Single agent": {
+  "task_runs": 640,
+  "items": 0.003125,
+  "chars": 0.1890625,
+  "share_with_any": 0.003125,
+  "tool_calls": 6.29375
+ },
+ "Agent-driven, no channels": {
+  "task_runs": 640,
+  "items": 0,
+  "chars": 0,
+  "share_with_any": 0,
+  "tool_calls": 20.184375
+ },
+ "Hybrid": {
+  "task_runs": 640,
+  "items": 18.540625,
+  "chars": 18644.1046875,
+  "share_with_any": 1,
+  "tool_calls": 32.4734375
+ },
+ "Independent": {
+  "task_runs": 640,
+  "items": 0,
+  "chars": 0,
+  "share_with_any": 0,
+  "tool_calls": 20.84375
+ },
+ "Agent-driven, text + coordinate": {
+  "task_runs": 640,
+  "items": 4.4765625,
+  "chars": 773.9421875,
+  "share_with_any": 0.9546875,
+  "tool_calls": 18.8890625
+ },
+ "Agent-driven, all channels + coordinate": {
+  "task_runs": 640,
+  "items": 3.2921875,
+  "chars": 315.6828125,
+  "share_with_any": 0.7578125,
+  "tool_calls": 23.759375
+ }
+}

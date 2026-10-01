@@ -11,6 +11,8 @@ data["frontier"] = json.load(open(HERE / "frontier5.json"))
 data["ex"] = json.load(open(HERE / "hard64_examples.json"))  # from hard64_examples.py
 if (HERE / "hard64_repeats.json").exists():  # from hard64_repeats.py, once the repeated runs are in
     data["rep"] = json.load(open(HERE / "hard64_repeats.json"))
+if (HERE / "hard64_visibility.json").exists():  # from hard64_visibility.py: what a user could see of each run
+    data["vis"] = json.load(open(HERE / "hard64_visibility.json"))
 data.pop("examples", None)  # used to pick the quotes on the page, not needed in it
 html = (HERE / "hard64.html").read_text().replace("/*DATA*/null", json.dumps(data, ensure_ascii=False).replace("</", "<\\/"))
 (HERE / "hard64-final.html").write_text(html)
