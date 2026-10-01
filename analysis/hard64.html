@@ -118,19 +118,39 @@ ul.plain { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 15
 
   <section>
     <div class="sectionhead">
-      <h2>Results</h2>
-      <p>One run per system on the same 64 tasks; the uncertainty on each accuracy is about ±12 points (±16 on the 27-task 5+ group).</p>
+      <h2 id="resultshead">Results</h2>
+      <p id="resultsnote">One run per system on the same 64 tasks; the uncertainty on each accuracy is about ±12 points (±16 on the 27-task 5+ group).</p>
     </div>
     <div class="tablewrap"><table id="results"></table></div>
+    <div class="chartbox" id="stripbox" hidden>
+      <div class="legend"><span><i style="background:var(--s1);opacity:.6"></i>one run</span><span><i style="background:var(--ink);border-radius:1px;width:4px"></i>mean, with its 95% interval</span><span><i style="border:2px solid var(--s2);background:transparent"></i>the first run (30 September)</span></div>
+      <div id="strip"></div>
+      <figcaption id="stripcap"></figcaption>
+    </div>
     <div class="chartbox">
       <div class="legend"><span><i style="background:var(--s1)"></i>Tasks needing 3–4 changes (37)</span><span><i style="background:var(--s2)"></i>Tasks needing 5+ changes (27)</span><span><i style="border:1px dashed var(--muted);background:transparent"></i>single agent</span></div>
       <div id="dumbbell"></div>
-      <figcaption>Accuracy by task size. Every system drops sharply on 5+ tasks. Decentralized leads on 3–4 changes; the agent-driven teams lead on 5+.</figcaption>
+      <figcaption id="dumbcap">Accuracy by task size. Every system drops sharply on 5+ tasks. Decentralized leads on 3–4 changes; the agent-driven teams lead on 5+.</figcaption>
     </div>
     <div class="chartbox">
       <div id="scatter"></div>
-      <figcaption>Accuracy on all 64 tasks against tokens per task. The agent-driven text team matches decentralized at about half the tokens; centralized and hybrid cost the most and score below the single agent.</figcaption>
+      <figcaption id="scattercap">Accuracy on all 64 tasks against tokens per task. The agent-driven text team matches decentralized at about half the tokens; centralized and hybrid cost the most and score below the single agent.</figcaption>
     </div>
+  </section>
+
+  <section id="capsection" hidden>
+    <div class="sectionhead">
+      <h2>Is it the 5-result cap?</h2>
+      <p>WorkBench’s searches return at most 5 records. On 25 of the 64 tasks the main action (deleting, reassigning, moving) is needed more than 5 times, so no single search can list every record: we call these cap-bound. If the teams only win because a second agent searches again after the first one’s changes, their lead should sit on the cap-bound tasks and vanish on the other 39.</p>
+    </div>
+    <div class="chartbox">
+      <div class="legend"><span><i style="background:var(--s1)"></i>Not cap-bound (39 tasks)</span><span><i style="background:var(--s2)"></i>Cap-bound (25 tasks)</span><span>whiskers: 95% interval of the mean over runs</span></div>
+      <div id="capchart"></div>
+      <figcaption id="capcap"></figcaption>
+    </div>
+    <h3>Head to head</h3>
+    <div class="tablewrap"><table id="h2h"></table></div>
+    <p class="note" id="h2hnote">Difference: mean accuracy of the first system minus the second, with a 95% interval over runs. Share of run pairs: of all pairings of one run of each, how often the first system’s run scored higher (ties count half).</p>
   </section>
 
   <section>
@@ -244,9 +264,24 @@ function hover(node, html) {
   node.addEventListener("pointermove", move); node.addEventListener("pointerleave", () => { tip.hidden = true; });
 }
 const best = (k) => sysNames.reduce((a, b) => (S[b][k] > S[a][k] ? b : a));
+// With repeats (analysis/hard64_repeats.json), every headline number is a mean over the repeated runs;
+// the speech acts, worker comparison and examples stay from the first run.
+const RP = D.rep && D.rep.systems && Object.keys(D.rep.systems).length ? D.rep.systems : null;
+const NR = RP ? Math.min(...Object.values(RP).map((r) => r.metrics.acc_all.n)) : 1;
+const V = {};
+sysNames.forEach((s) => {
+  if (!RP || !RP[s]) { V[s] = S[s]; return; }
+  const m = RP[s].metrics, mean = (k) => (m[k] ? m[k].mean : null);
+  V[s] = { ...S[s], accuracy: mean("acc_all"), acc_34: mean("acc_3-4"), acc_5: mean("acc_5+"), side_effects: mean("side_effects"),
+    tokens: mean("tokens"), seconds: mean("seconds"), cap: [mean("cap_passed"), RP[s].cap_tasks], fail_kinds: RP[s].fail_kinds,
+    comm_acts: m.comm_acts ? m.comm_acts.mean : null, tasks_with_overlap: m.duplicate_tasks ? m.duplicate_tasks.mean : null,
+    agents_changing: m.agents_changing ? m.agents_changing.mean : null };
+});
+const f1 = (v) => (Math.round(v * 10) / 10).toString();
+const ci = (m) => `${pct(m.lo)}–${pct(m.hi)}`;
 
 // takeaway cards
-const sg = S["Single agent"], at = S["Agent-driven, text + coordinate"], dc = S["Decentralized"], ce = S["Centralized"], hy = S["Hybrid"];
+const sg = V["Single agent"], at = V["Agent-driven, text + coordinate"], dc = V["Decentralized"], ce = V["Centralized"], hy = V["Hybrid"];
 document.getElementById("cards").innerHTML = [
   ["Teams beat one agent on hard tasks", `Decentralized ${pct(dc.accuracy)} and the agent-driven text team ${pct(at.accuracy)} against the single agent’s ${pct(sg.accuracy)} on all 64.`],
   ["Messaging is the efficient team", `The agent-driven text team matches decentralized at ${Math.round(at.tokens / 1000)}k tokens per task against ${Math.round(dc.tokens / 1000)}k, and leads on 5+ tasks (${pct(at.acc_5)}).`],
@@ -255,9 +290,9 @@ document.getElementById("cards").innerHTML = [
 ].map(([b, p]) => `<div class="card"><b>${esc(b)}</b><p>${esc(p)}</p></div>`).join("");
 
 // results table
-document.getElementById("results").innerHTML = `<tr><th>System</th><th class="n">All 64</th><th class="n">3–4 changes (${sg.n_34})</th><th class="n">5+ changes (${sg.n_5})</th><th class="n">Side effects</th><th class="n">Tokens per task</th><th class="n">Seconds per task</th><th class="n">Messages per task</th></tr>` +
-  sysNames.map((s) => { const v = S[s]; const b = s === "Agent-driven, text + coordinate" ? ' class="best"' : "";
-    return `<tr${b}><td>${esc(s)}</td><td class="n"><b>${pct(v.accuracy)}</b></td><td class="n">${pct(v.acc_34)}</td><td class="n">${pct(v.acc_5)}</td><td class="n">${pct(v.side_effects)}</td><td class="n">${Math.round(v.tokens / 1000)}k</td><td class="n">${Math.round(v.seconds)}</td><td class="n">${v.comm_acts != null ? v.comm_acts.toFixed(1) : v.messages ? v.messages.toFixed(0) + " (fixed)" : "0"}</td></tr>`; }).join("");
+document.getElementById("results").innerHTML = `<tr><th>System</th><th class="n">All 64${RP ? ` (mean of ${NR} runs)` : ""}</th>${RP ? '<th class="n">95% interval</th><th class="n">Range over runs</th>' : ""}<th class="n">3–4 changes (${sg.n_34})</th><th class="n">5+ changes (${sg.n_5})</th><th class="n">Side effects</th><th class="n">Tokens per task</th><th class="n">Seconds per task</th><th class="n">Messages per task</th></tr>` +
+  sysNames.map((s) => { const v = V[s], m = RP && RP[s] ? RP[s].metrics.acc_all : null; const b = s === "Agent-driven, text + coordinate" ? ' class="best"' : "";
+    return `<tr${b}><td>${esc(s)}</td><td class="n"><b>${pct(v.accuracy)}</b></td>${m ? `<td class="n">${ci(m)}</td><td class="n">${pct(m.min)}–${pct(m.max)}</td>` : ""}<td class="n">${pct(v.acc_34)}</td><td class="n">${pct(v.acc_5)}</td><td class="n">${pct(v.side_effects)}</td><td class="n">${Math.round(v.tokens / 1000)}k</td><td class="n">${Math.round(v.seconds)}</td><td class="n">${v.comm_acts != null ? v.comm_acts.toFixed(1) : v.messages ? v.messages.toFixed(0) + " (fixed)" : "0"}</td></tr>`; }).join("");
 
 // dumbbell: 3-4 vs 5+ per system
 (function () {
@@ -267,7 +302,7 @@ document.getElementById("results").innerHTML = `<tr><th>System</th><th class="n"
   [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7].forEach((v) => { svg.append(el("line", { x1: x(v), x2: x(v), y1: top, y2: H - 24, class: "gridline" })); svg.append(el("text", { x: x(v), y: H - 8, "text-anchor": "middle", class: "lbl" }, pct(v))); });
   [sg.acc_34, sg.acc_5].forEach((v) => svg.append(el("line", { x1: x(v), x2: x(v), y1: top, y2: H - 24, class: "refline" })));
   sysNames.forEach((s, i) => {
-    const y = top + i * rowH + rowH / 2, v = S[s];
+    const y = top + i * rowH + rowH / 2, v = V[s];
     svg.append(el("text", { x: left - 10, y: y + 4, "text-anchor": "end", class: "cat" }, s));
     svg.append(el("line", { x1: x(v.acc_5), x2: x(v.acc_34), y1: y, y2: y, stroke: "var(--line)", "stroke-width": 3 }));
     [["acc_5", "var(--s2)", "5+ changes"], ["acc_34", "var(--s1)", "3–4 changes"]].forEach(([k, c, n]) => {
@@ -291,7 +326,7 @@ document.getElementById("results").innerHTML = `<tr><th>System</th><th class="n"
   svg.append(el("text", { x: (left + W - right) / 2, y: H - 2, "text-anchor": "middle", class: "lbl" }, "tokens per task"));
   const offs = { "Agent-driven, no channels": [10, 14], "Independent": [10, -8], "Agent-driven, all channels + coordinate": [10, 4], "Centralized": [-10, -10], "Hybrid": [-10, 16] };
   sysNames.forEach((s) => {
-    const v = S[s], cx = x(v.tokens / 1000), cy = y(v.accuracy);
+    const v = V[s], cx = x(v.tokens / 1000), cy = y(v.accuracy);
     svg.append(el("circle", { cx, cy, r: 7, fill: "var(--s1)", stroke: "var(--surface)", "stroke-width": 2 }));
     const [dx, dy] = offs[s] || [10, 4];
     svg.append(el("text", { x: cx + dx, y: cy + dy, "text-anchor": dx < 0 ? "end" : "start", class: "val" }, `${s} ${pct(v.accuracy)}`));
@@ -299,6 +334,66 @@ document.getElementById("results").innerHTML = `<tr><th>System</th><th class="n"
   });
   document.getElementById("scatter").append(svg);
 })();
+
+// repeats: one dot per run, the mean and its 95% interval, and the first run
+if (RP) (function () {
+  document.getElementById("stripbox").hidden = false;
+  document.getElementById("capsection").hidden = false;
+  const W = 760, rowH = 36, left = 250, right = 30, top = 10, H = top + sysNames.length * rowH + 28, xmax = 0.6;
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": `Accuracy on all 64 tasks in each of ${NR} runs, per system` });
+  const x = (v) => left + (W - left - right) * v / xmax;
+  [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6].forEach((v) => { svg.append(el("line", { x1: x(v), x2: x(v), y1: top, y2: H - 24, class: "gridline" })); svg.append(el("text", { x: x(v), y: H - 8, "text-anchor": "middle", class: "lbl" }, pct(v))); });
+  sysNames.forEach((s, i) => {
+    const y = top + i * rowH + rowH / 2, m = RP[s].metrics.acc_all;
+    svg.append(el("text", { x: left - 10, y: y + 4, "text-anchor": "end", class: "cat" }, s));
+    svg.append(el("rect", { x: x(m.lo), y: y - 3, width: Math.max(1, x(m.hi) - x(m.lo)), height: 6, rx: 3, fill: "var(--ink)", opacity: 0.25 }));
+    const counts = {};
+    m.values.forEach((v) => { const k = Math.round(v * 64); const j = (counts[k] = (counts[k] || 0) + 1) - 1;
+      svg.append(el("circle", { cx: x(v), cy: y - 9 + (j % 4) * 6 - (j >= 4 ? 3 : 0), r: 3.6, fill: "var(--s1)", opacity: 0.6 })); });
+    svg.append(el("line", { x1: x(m.mean), x2: x(m.mean), y1: y - 13, y2: y + 13, stroke: "var(--ink)", "stroke-width": 2.5 }));
+    svg.append(el("circle", { cx: x(RP[s].original.acc_all), cy: y, r: 6, fill: "none", stroke: "var(--s2)", "stroke-width": 2 }));
+    svg.append(el("text", { x: Math.max(x(m.max), x(RP[s].original.acc_all)) + 12, y: y + 4, class: "val" }, `${pct(m.mean)} (${pct(m.min)}–${pct(m.max)})`));
+    const hit = el("rect", { x: left, y: y - rowH / 2, width: W - left, height: rowH, fill: "transparent" });
+    hover(hit, `<b>${esc(s)}</b><br>mean ${pct(m.mean)}, 95% interval ${ci(m)}<br>runs: ${m.values.map(pct).join(", ")}<br>first run: ${pct(RP[s].original.acc_all)}`); svg.append(hit);
+  });
+  document.getElementById("strip").append(svg);
+
+  // cap-bound vs not, per system, plus one agent alone (Independent's workers scored on their own)
+  const rows = sysNames.map((s) => [s, RP[s].metrics.acc_not_cap, RP[s].metrics.acc_cap, false]);
+  const lone = RP["Independent"] && RP["Independent"].lone;
+  if (lone) rows.push([`One agent alone (Independent’s workers, ${NR * 3} attempts per task)`, { mean: lone.not_cap }, { mean: lone.cap }, true]);
+  const W2 = 760, rowH2 = 34, H2 = top + rows.length * rowH2 + 28, xmax2 = 0.8;
+  const svg2 = el("svg", { viewBox: `0 0 ${W2} ${H2}`, role: "img", "aria-label": "Accuracy on cap-bound and other tasks per system" });
+  const x2 = (v) => left + (W2 - left - right) * v / xmax2;
+  [0, 0.2, 0.4, 0.6, 0.8].forEach((v) => { svg2.append(el("line", { x1: x2(v), x2: x2(v), y1: top, y2: H2 - 24, class: "gridline" })); svg2.append(el("text", { x: x2(v), y: H2 - 8, "text-anchor": "middle", class: "lbl" }, pct(v))); });
+  rows.forEach(([name, nc, cp, ref], i) => {
+    const y = top + i * rowH2 + rowH2 / 2;
+    svg2.append(el("text", { x: left - 10, y: y + 4, "text-anchor": "end", class: "cat" }, ref ? "One agent alone" : name));
+    svg2.append(el("line", { x1: x2(cp.mean), x2: x2(nc.mean), y1: y, y2: y, stroke: "var(--line)", "stroke-width": 3 }));
+    [[nc, "var(--s1)", "not cap-bound"], [cp, "var(--s2)", "cap-bound"]].forEach(([m, c, n]) => {
+      if (m.lo != null) svg2.append(el("line", { x1: x2(m.lo), x2: x2(m.hi), y1: y, y2: y, stroke: c, "stroke-width": 2 }));
+      svg2.append(el("circle", { cx: x2(m.mean), cy: y, r: 6.5, fill: ref ? "var(--surface)" : c, stroke: ref ? c : "var(--surface)", "stroke-width": 2 }));
+      const hit = el("circle", { cx: x2(m.mean), cy: y, r: 12, fill: "transparent" });
+      hover(hit, `<b>${esc(name)}</b><br>${n}: ${pct(m.mean)}${m.lo != null ? ` (95% interval ${ci(m)})` : ""}`); svg2.append(hit);
+    });
+    svg2.append(el("text", { x: x2(Math.max(nc.mean, nc.hi || 0)) + 10, y: y + 4, class: "val" }, pct(nc.mean)));
+    svg2.append(el("text", { x: x2(Math.min(cp.mean, cp.lo == null ? cp.mean : cp.lo)) - 10, y: y + 4, "text-anchor": "end", class: "val" }, pct(cp.mean)));
+  });
+  document.getElementById("capchart").append(svg2);
+
+  // head to head on all tasks, the 39 not cap-bound and the 25 cap-bound
+  const pairs = [["Agent-driven, text + coordinate", "Single agent"], ["Agent-driven, no channels", "Single agent"], ["Agent-driven, all channels + coordinate", "Single agent"],
+    ["Decentralized", "Single agent"], ["Independent", "Single agent"], ["Agent-driven, text + coordinate", "Decentralized"], ["Agent-driven, text + coordinate", "Agent-driven, no channels"]]
+    .filter(([a, b]) => RP[a] && RP[b]);
+  const keys = [["acc_all", "All 64"], ["acc_not_cap", "Not cap-bound (39)"], ["acc_cap", "Cap-bound (25)"]];
+  const diff = (a, b, k) => { const A = RP[a].metrics[k], B = RP[b].metrics[k], d = A.mean - B.mean;
+    const se = Math.sqrt(A.sd ** 2 / A.n + B.sd ** 2 / B.n), h = 2.1 * se; return [d, d - h, d + h]; };
+  const sgn = (v) => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(Math.round(v * 100));
+  document.getElementById("h2h").innerHTML = `<tr><th>First system</th><th>Second system</th>${keys.map(([, n]) => `<th class="n">${esc(n)}: difference</th><th class="n">share of run pairs</th>`).join("")}</tr>` +
+    pairs.map(([a, b]) => `<tr><td>${esc(a)}</td><td>${esc(b)}</td>${keys.map(([k]) => { const [d, lo, hi] = diff(a, b, k), p = D.rep.beats[k][`${a} | ${b}`];
+      const strong = lo > 0 || hi < 0; return `<td class="n">${strong ? "<b>" : ""}${sgn(d)} pts${strong ? "</b>" : ""} <span style="color:var(--muted)">(${sgn(lo)} to ${sgn(hi)})</span></td><td class="n">${pct(p)}</td>`; }).join("")}</tr>`).join("");
+})();
+
 
 // leaderboard on 5+ tasks: published models + ours, with parameter counts.
 // Sizes from the makers' model cards; closed models don't publish theirs.
@@ -313,11 +408,12 @@ const MODELS = {
   "qwen-3.5-flash": ["Qwen 3.5 Flash", 35, 3, "hosted Qwen3.5-35B-A3B"],
 };
 const OURS = [21, 3.6];  // gpt-oss-20b
+const ourFrac = (s) => (RP && RP[s] ? `mean of ${NR} runs, ${pct(RP[s].metrics["acc_5+"].min)}–${pct(RP[s].metrics["acc_5+"].max)}` : `${Math.round(S[s].acc_5 * S[s].n_5)}/${S[s].n_5}`);
 const gb = (v) => (v >= 1000 ? v / 1000 + "T" : v + "B");
 const size = (total, active) => (total == null ? "undisclosed" : total === active ? `${gb(total)} dense` : `${gb(total)} · ${gb(active)} active`);
 (function () {
   const rows = D.frontier.models.map(([m, acc, s, n]) => { const [name, total, active] = MODELS[m] || [m]; return [name, acc, `${s}/${n}`, false, size(total, active)]; })
-    .concat(sysNames.map((s) => [s + " (ours)", S[s].acc_5, `${Math.round(S[s].acc_5 * S[s].n_5)}/${S[s].n_5}`, true, size(...OURS)]))
+    .concat(sysNames.map((s) => [s + " (ours)", V[s].acc_5, ourFrac(s), true, size(...OURS)]))
     .sort((a, b) => b[1] - a[1] || b[3] - a[3]);
   const W = 860, rowH = 21, nameX = 266, sizeX = 278, left = 420, right = 70, top = 22, H = top + rows.length * rowH + 24;
   const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Accuracy on 5+ change tasks with parameter counts, published models and our systems" });
@@ -339,7 +435,7 @@ const size = (total, active) => (total == null ? "undisclosed" : total === activ
   const open = D.frontier.models.filter(([m]) => MODELS[m] && MODELS[m][1] != null)
     .map(([m, acc, s, n]) => { const [name, total, active, note] = MODELS[m]; return { name, total, active, note, acc, frac: `${s}/${n}` }; })
     .concat(["Agent-driven, text + coordinate", "Agent-driven, no channels", "Single agent"].map((s) =>
-      ({ name: `gpt-oss-20b: ${s.toLowerCase()} (ours)`, total: OURS[0], active: OURS[1], acc: S[s].acc_5, frac: `${Math.round(S[s].acc_5 * S[s].n_5)}/${S[s].n_5}`, ours: true,
+      ({ name: `gpt-oss-20b: ${s.toLowerCase()} (ours)`, total: OURS[0], active: OURS[1], acc: V[s].acc_5, frac: ourFrac(s), ours: true,
          note: s === "Single agent" ? "one agent, our harness" : "3 agents on one server" })))
     .sort((a, b) => b.total - a.total || b.acc - a.acc);
   document.getElementById("openw").innerHTML = `<tr><th>Model</th><th class="n">Total parameters</th><th class="n">Active per token</th><th class="n">Times our model’s total</th><th class="n">5+ correct</th></tr>` +
@@ -351,7 +447,7 @@ const size = (total, active) => (total == null ? "undisclosed" : total === activ
   const kinds = ["correct", "stopped at the 5-result cap", "no changes", "only wrong changes", "right changes plus extras", "some changes missing", "mix of right, wrong and missing"];
   const names = { "correct": "Correct", "stopped at the 5-result cap": "Stopped at the 5-result cap", "no changes": "Made no changes", "only wrong changes": "Only wrong changes",
     "right changes plus extras": "Right changes plus unrequested extras", "some changes missing": "Some needed changes missing", "mix of right, wrong and missing": "Mix of right, wrong and missing" };
-  const cols = sysNames.map((s) => [SHORT[s], S[s].fail_kinds, S[s].n]).concat([["Published", D.published.fail_kinds, D.published.runs]]);
+  const cols = sysNames.map((s) => [SHORT[s], V[s].fail_kinds, S[s].n]).concat([["Published", D.published.fail_kinds, D.published.runs]]);
   document.getElementById("fails").innerHTML = `<tr><th>Outcome (share of task-runs)</th>${cols.map(([n]) => `<th class="n">${esc(n)}</th>`).join("")}</tr>` +
     kinds.map((k) => `<tr><td>${esc(names[k])}</td>${cols.map(([, f, n]) => { const v = (f[k] || 0) / n; return `<td class="n"><span class="cellbar"><i style="width:${Math.round(44 * v)}px"></i>${pct(v)}</span></td>`; }).join("")}</tr>`).join("");
 })();
@@ -359,9 +455,9 @@ const size = (total, active) => (total == null ? "undisclosed" : total === activ
 // agent-driven table
 (function () {
   const rows = sysNames.map((s) => {
-    const v = S[s], dr = v.comm_acts != null;
-    const dup = dr ? `${v.tasks_with_overlap} of ${v.n}` : "–";
-    return `<tr><td>${esc(s)}</td><td class="n">${pct(v.acc_5)}</td><td class="n">${v.cap[0]} of ${v.cap[1]}</td><td class="n">${dup}</td><td class="n">${dr ? v.agents_changing.toFixed(1) : "–"}</td><td class="n">${dr ? v.comm_acts.toFixed(1) : "–"}</td><td class="n">${dr && v.before_first_change != null ? pct(v.before_first_change) : "–"}</td></tr>`;
+    const v = V[s], dr = v.comm_acts != null;
+    const dup = dr ? `${RP ? f1(v.tasks_with_overlap) : v.tasks_with_overlap} of ${v.n}` : "–";
+    return `<tr><td>${esc(s)}</td><td class="n">${pct(v.acc_5)}</td><td class="n">${RP ? f1(v.cap[0]) : v.cap[0]} of ${v.cap[1]}</td><td class="n">${dup}</td><td class="n">${dr ? v.agents_changing.toFixed(1) : "–"}</td><td class="n">${dr ? v.comm_acts.toFixed(1) : "–"}</td><td class="n">${dr && v.before_first_change != null ? pct(v.before_first_change) : "–"}</td></tr>`;
   });
   document.getElementById("driven").innerHTML = `<tr><th>System</th><th class="n">5+ correct</th><th class="n">Got past the cap</th><th class="n">Duplicate work</th><th class="n">Agents making changes</th><th class="n">Communication acts per task</th><th class="n">Coordinated before the first change</th></tr>` + rows.join("");
 })();
@@ -419,11 +515,15 @@ document.getElementById("workers").innerHTML = `<tr><th>Setup</th><th class="n">
     return `<div class="tl">` + rows.map((r) => `<div class="r ${r.kind}"><div class="t">${fmtT(r)}</div><div><div class="who"><i style="background:${AG[r.agent]}"></i>${esc(r.agent)}${r.to ? ` → ${esc(r.to)}` : ""} <span class="k ${r.kind}">${KIND[r.kind]}</span></div><div class="x">${esc(r.text)}</div>${r.data ? `<div class="d">data: ${esc(JSON.stringify(r.data))}</div>` : ""}</div></div>`).join("") + `</div>`;
   }
   function stats(t) {
-    const v = S[t.sys], u = EX.usage[t.key], n = u.tasks;
-    const items = [[pct(v.accuracy), "correct on all 64"], [pct(v.acc_5), "on 5+ tasks"], [`${v.cap[0]}/${v.cap[1]}`, "got past the cap"], [v.tasks_with_overlap, "tasks with duplicate work"], [v.agents_changing.toFixed(1), "agents making changes per task"]];
+    const v = V[t.sys], u = EX.usage[t.key], n = u.tasks;
+    const items = [[pct(v.accuracy), "correct on all 64"], [pct(v.acc_5), "on 5+ tasks"], [`${RP ? f1(v.cap[0]) : v.cap[0]}/${v.cap[1]}`, "got past the cap"], [RP ? f1(v.tasks_with_overlap) : v.tasks_with_overlap, "tasks with duplicate work"], [v.agents_changing.toFixed(1), "agents making changes per task"]];
+    const first = items.length;
     if (t.key === "text") items.push([`${u.message}/${n}`, "tasks with messages"], [v.kinds.message.toFixed(1), "messages per task"], [pct(v.before_first_change), "of the tasks with communication talked before the first change"]);
     if (t.key === "all") items.push([`${u.message}/${n}`, "tasks with messages"], [`${u.shared}/${n}`, "with shared state"], [`${u.a2a}/${n}`, "with A2A"], [v.state.writes, "state writes"], [v.state.conflicts, "writes refused"], [pct(v.before_first_change), "of the tasks with communication talked before the first change"]);
-    return `<div class="stats">${items.map(([a, b]) => `<span><b>${esc(a)}</b>${esc(b)}</span>`).join("")}</div>`;
+    const span = ([a, b]) => `<span><b>${esc(a)}</b>${esc(b)}</span>`;
+    if (!RP) return `<div class="stats">${items.map(span).join("")}</div>`;
+    return `<p class="note">Mean of ${NR} runs:</p><div class="stats">${items.slice(0, first).map(span).join("")}</div>` +
+      (items.length > first ? `<p class="note">In the first run, where the examples below come from:</p><div class="stats">${items.slice(first).map(span).join("")}</div>` : "");
   }
   const tabs = document.getElementById("teamtabs"), panels = document.getElementById("teampanels");
   TEAMS.forEach((t, i) => {
@@ -452,10 +552,16 @@ document.getElementById("workers").innerHTML = `<tr><th>Setup</th><th class="n">
 })();
 
 // task grids
+function cell(tid, t, s) {
+  const r = D.rep && D.rep.tasks[tid];
+  if (!r || r.runs[s] == null) return t.results[s] ? `<td class="c"><span class="mark y">pass</span></td>` : `<td class="c"><span class="mark n">fail</span></td>`;
+  const k = r.solved[s], n = r.runs[s];
+  return `<td class="c"><span class="mark" style="background:color-mix(in srgb, var(--s1) ${Math.round(85 * k / n)}%, var(--sunken));color:${k / n > 0.55 ? "#fff" : "var(--ink-2)"}">${k}/${n}</span></td>`;
+}
 function grid(id, test) {
   const ts = Object.entries(D.tasks).filter(([, t]) => test(t.changes)).sort((a, b) => b[1].changes - a[1].changes || a[0].localeCompare(b[0]));
   document.getElementById(id).innerHTML = `<tr><th>Task</th><th class="n">Changes</th><th class="n">Published solving</th>${sysNames.map((s) => `<th class="c">${esc(SHORT[s])}</th>`).join("")}</tr>` +
-    ts.map(([tid, t]) => `<tr><td><span class="code">${esc(tid)}</span><span class="q">${esc(t.question.slice(0, 150))}${t.question.length > 150 ? "…" : ""}</span></td><td class="n">${t.changes}</td><td class="n">${t.solve == null ? "–" : pct(t.solve)}</td>${sysNames.map((s) => t.results[s] ? `<td class="c"><span class="mark y">pass</span></td>` : `<td class="c"><span class="mark n">fail</span></td>`).join("")}</tr>`).join("");
+    ts.map(([tid, t]) => `<tr><td><span class="code">${esc(tid)}</span><span class="q">${esc(t.question.slice(0, 150))}${t.question.length > 150 ? "…" : ""}</span></td><td class="n">${t.changes}</td><td class="n">${t.solve == null ? "–" : pct(t.solve)}</td>${sysNames.map((s) => cell(tid, t, s)).join("")}</tr>`).join("");
 }
 grid("grid5", (c) => c >= 5);
 grid("grid34", (c) => c < 5);
