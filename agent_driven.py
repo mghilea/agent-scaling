@@ -42,6 +42,8 @@ A2A_STATES = ["working", "input-required", "completed", "failed", "rejected", "c
 TURN_BUDGET = 30        # model calls per agent for the whole task
 TURNS_PER_WAKE = 12     # model calls per activation before the agent must pause
 TIME_LIMIT = 900        # seconds per task
+# BrowseComp-Plus: each agent gets the single agent's 30 calls, usable in one go (research takes many searches).
+TURN_BUDGET_BC = TURNS_PER_WAKE_BC = 30
 
 TEAM_PROMPT = """You are {me}, one of {n} agents on a team; your teammates are {others}. You all received the same request from the user, and you all work in one shared workspace: the same email, calendar, CRM, project board and analytics. Every change any of you makes happens once in that workspace and everyone can see it, so a change made twice happens twice.
 
@@ -304,10 +306,10 @@ class Team:
         message = self.bc.task_prompt(self.task) if self.bc else f"Request from the user: {self.task}"
         try:
             while True:
-                left = TURN_BUDGET - agent.stats["turns"]
+                left = (TURN_BUDGET_BC if self.bc else TURN_BUDGET) - agent.stats["turns"]
                 if left <= 0 or self.expired():
                     break
-                agent.max_turns = min(TURNS_PER_WAKE, left)
+                agent.max_turns = min(TURNS_PER_WAKE_BC if self.bc else TURNS_PER_WAKE, left)
                 self.wakes[me] += 1
                 self.event(me, "active", wake=self.wakes[me])
                 r = agent.send(message)
@@ -344,6 +346,12 @@ class Team:
             th.start()
         for th in threads:
             th.join(TIME_LIMIT + 60)
+        if self.bc and self.team_answer is None and not any(
+                e["kind"] == "idle" and e["reply"].strip() for e in self.events):
+            # Nobody submitted or said anything: one tool-free call to the first agent, as the single agent gets.
+            first = self.agents[self.ids[0]]
+            reply = first.reply("The team stopped without submitting an answer. " + self.bc.OUT_OF_TURNS)
+            self.event(self.ids[0], "idle", reply=reply[:800], stop="fallback_answer")
         return self.result()
 
     def result(self):

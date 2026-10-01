@@ -161,6 +161,9 @@ def _show_args(arguments: str) -> str:
 
 # ---- agent ------------------------------------------------------------------
 
+MALFORMED_CALL = re.compile(r"<\|(start|channel|call|message)\|>|\bto=functions\.")
+
+
 def new_stats():
     return {"turns": 0, "tool_calls": 0, "tool_errors": 0, "prompt_tokens": 0, "completion_tokens": 0}
 
@@ -173,7 +176,7 @@ class Agent:
     """
 
     def __init__(self, client, model, tools=TOOLS, system_prompt=SYSTEM_PROMPT, max_turns=12,
-                 reasoning_effort="medium", verbose=True, show_reasoning=False, name=""):
+                 reasoning_effort="medium", verbose=True, show_reasoning=False, name="", retry_malformed=False):
         self.client = client
         self.model = model
         self.tools = tools
@@ -183,6 +186,9 @@ class Agent:
         self.verbose = verbose
         self.show_reasoning = show_reasoning
         self.name = name  # shown in logs when several agents run at once
+        # Retry tool calls written out as text instead of taking them as the answer. Off for WorkBench, so its
+        # runs stay comparable with the ones made before this existed.
+        self.retry_malformed = retry_malformed
         self.messages = [{"role": "system", "content": system_prompt}]
         self.stats = new_stats()
         self._stats_lock = threading.Lock()  # an orchestrator's calls can run in parallel threads
@@ -205,6 +211,15 @@ class Agent:
         self.messages.append({"role": "user", "content": text})
         for _ in range(self.max_turns):
             msg, entry = self._call(self.messages, use_tools=True)
+            if not msg.tool_calls and self.retry_malformed and MALFORMED_CALL.search(msg.content or ""):
+                # gpt-oss sometimes writes a tool call out as text (raw "<|channel|>... to=functions.x"),
+                # which vLLM doesn't parse. That isn't an answer: say so and let it call again.
+                self.messages.append(entry)
+                self.messages.append({"role": "user", "content": "Your last tool call was not in the right "
+                                      "format and did not run. Call the tool again."})
+                with self._stats_lock:
+                    self.stats["tool_errors"] += 1
+                continue
             if not msg.tool_calls:
                 self.messages.append(entry)
                 self.log(_block("answer", msg.content, GREEN))
@@ -386,7 +401,7 @@ def main():
 
     def make_agent(**kwargs):
         return Agent(client, args.model, max_turns=args.max_turns, reasoning_effort=args.reasoning_effort,
-                     verbose=not args.quiet, show_reasoning=args.show_reasoning, **kwargs)
+                     verbose=not args.quiet, show_reasoning=args.show_reasoning, retry_malformed=bool(bc), **kwargs)
 
     def log_message(label, text):  # messages between agents, in multi-agent runs
         if not args.quiet:
