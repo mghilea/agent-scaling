@@ -169,6 +169,32 @@ footer { font-size: 14px; color: var(--muted); display: grid; gap: 6px; border-t
 
   <section>
     <div class="sectionhead">
+      <h2>Why the agent-driven teams scored below independent</h2>
+      <p>With no messages, both agent-driven teams were in effect three agents searching in parallel, which is what independent is too. The difference is in how a team’s answer is chosen, plus noise.</p>
+    </div>
+    <div class="tablewrap"><table id="foundtable" style="min-width:520px"></table></div>
+    <ul class="list">
+      <li><b>How the final answer is chosen.</b><span>Independent hands the judge all three workers’ answers pasted together, so a right answer anywhere can earn credit. The agent-driven teams keep whichever agent replied last. On two questions the text team had the right answer and lost it; on one of them, two of the three agents had it and the third, which was wrong, replied last.</span></li>
+      <li><b>Noise.</b><span>Independent’s workers also found the answer more often. On 10 questions and one run that can easily be luck, and their prompt differs: they get the paper’s “work thoroughly” worker instructions.</span></li>
+      <li><b>A fairer rule for agent-driven teams.</b><span>A majority vote over the agents’ answers, or agents that actually use the shared answer slot, would have kept the right answers the text team lost.</span></li>
+    </ul>
+  </section>
+
+  <section>
+    <div class="sectionhead">
+      <h2>Next to published models</h2>
+      <p>The BrowseComp-Plus authors’ main results (August 2025, all 830 questions). The models had either keyword search (BM25) or a stronger embedding search (Qwen3-Embedding-8B); our runs use the 4B version of that embedding search, as the scaling paper did.</p>
+    </div>
+    <div class="chartbox">
+      <div class="legend"><span><i style="background:var(--s1)"></i>With embedding search</span><span><i style="background:var(--s1-soft)"></i>With keyword search</span><span><i style="background:var(--s2)"></i>Ours</span></div>
+      <div id="pubchart"></div>
+      <figcaption>Our single agent’s 22% sits at about half of gpt-oss-120b on high reasoning, between Qwen3-32B and the 2025 Claude and Gemini models. Every model gains 10–20 points from the stronger search.</figcaption>
+    </div>
+    <p class="note">Not a like-for-like comparison: they grade with Qwen3-32B and use the 8B index over all 830 questions; we grade with gpt-oss-20b, use the 4B index and the paper’s 100. The official leaderboard is a live app on Hugging Face, and scores for 2026 models aren’t in the published table. Sources: <a href="https://arxiv.org/abs/2508.06600">BrowseComp-Plus paper (arXiv 2508.06600)</a>, <a href="https://github.com/texttron/BrowseComp-Plus">BrowseComp-Plus on GitHub</a>, <a href="https://huggingface.co/spaces/Tevatron/BrowseComp-Plus">leaderboard on Hugging Face</a>.</p>
+  </section>
+
+  <section>
+    <div class="sectionhead">
       <h2>How much to trust the judge</h2>
       <p id="judgenote"></p>
     </div>
@@ -224,7 +250,7 @@ footer { font-size: 14px; color: var(--muted); display: grid; gap: 6px; border-t
 
 <script>
 (function () {
-const D = {"systems": [{"n": 10, "correct": 2, "lenient": 2, "answer_in_response": 2, "seconds": 202.93, "tokens": 236442.3, "searches": 17.4, "reads": 0.5, "label": "Single agent", "solved_ids": ["bc-235", "bc-503"], "lenient_ids": [], "judge_vs_match": 0}, {"n": 10, "correct": 4, "lenient": 4, "answer_in_response": 6, "seconds": 213.15, "tokens": 735229.2, "searches": 49.5, "reads": 2.2, "label": "Independent", "solved_ids": ["bc-1225", "bc-235", "bc-503", "bc-852"], "lenient_ids": [], "judge_vs_match": 2}, {"n": 10, "correct": 4, "lenient": 5, "answer_in_response": 5, "seconds": 333.1, "tokens": 1524225.2, "searches": 65.1, "reads": 5.1, "label": "Centralized", "solved_ids": ["bc-1225", "bc-235", "bc-503", "bc-535"], "lenient_ids": ["bc-852"], "judge_vs_match": 1}, {"n": 10, "correct": 4, "lenient": 4, "answer_in_response": 4, "seconds": 298.88, "tokens": 1290161.7, "searches": 58.9, "reads": 3.5, "label": "Decentralized", "solved_ids": ["bc-235", "bc-503", "bc-535", "bc-852"], "lenient_ids": [], "judge_vs_match": 0}, {"n": 10, "correct": 4, "lenient": 5, "answer_in_response": 5, "seconds": 354.69, "tokens": 1463234.2, "searches": 64.7, "reads": 5.1, "label": "Hybrid", "solved_ids": ["bc-1225", "bc-235", "bc-503", "bc-535"], "lenient_ids": ["bc-852"], "judge_vs_match": 1}, {"n": 10, "correct": 3, "lenient": 3, "answer_in_response": 3, "seconds": 59.02, "tokens": 523355.9, "searches": 43, "reads": 1.6, "messages": 0, "a2a_tasks": 0, "state_writes": 0, "team_answers": 0, "docs_seen_by_several": 29, "repeated_queries": 0.1, "questions_with_messages": 0, "label": "Agent-driven, no channels", "solved_ids": ["bc-1225", "bc-235", "bc-503"], "lenient_ids": [], "judge_vs_match": 0}, {"n": 10, "correct": 2, "lenient": 3, "answer_in_response": 3, "seconds": 70.35, "tokens": 635544, "searches": 47.1, "reads": 1.9, "messages": 0.2, "a2a_tasks": 0, "state_writes": 0, "team_answers": 0, "docs_seen_by_several": 26.7, "repeated_queries": 0.1, "questions_with_messages": 1, "label": "Agent-driven, text + coordinate", "solved_ids": ["bc-235", "bc-535"], "lenient_ids": ["bc-1225"], "judge_vs_match": 1}], "grid": {"questions": ["bc-116", "bc-1225", "bc-100", "bc-67", "bc-235", "bc-852", "bc-535", "bc-1091", "bc-503", "bc-228"], "columns": [{"label": "Single agent", "cells": {"bc-116": "no", "bc-1225": "no", "bc-100": "no", "bc-67": "no", "bc-235": "yes", "bc-852": "no", "bc-535": "no", "bc-1091": "no", "bc-503": "yes", "bc-228": "no"}}, {"label": "Single agent, 100-question run", "cells": {"bc-116": "no", "bc-1225": "yes", "bc-100": "no", "bc-67": "no", "bc-235": "yes", "bc-852": "no", "bc-535": "no", "bc-1091": "no", "bc-503": "yes", "bc-228": "no"}}, {"label": "Independent", "cells": {"bc-116": "no", "bc-1225": "yes", "bc-100": "no", "bc-67": "no", "bc-235": "yes", "bc-852": "yes", "bc-535": "no", "bc-1091": "no", "bc-503": "yes", "bc-228": "no"}}, {"label": "Centralized", "cells": {"bc-116": "no", "bc-1225": "yes", "bc-100": "no", "bc-67": "no", "bc-235": "yes", "bc-852": "lenient", "bc-535": "yes", "bc-1091": "no", "bc-503": "yes", "bc-228": "no"}}, {"label": "Decentralized", "cells": {"bc-116": "no", "bc-1225": "no", "bc-100": "no", "bc-67": "no", "bc-235": "yes", "bc-852": "yes", "bc-535": "yes", "bc-1091": "no", "bc-503": "yes", "bc-228": "no"}}, {"label": "Hybrid", "cells": {"bc-116": "no", "bc-1225": "yes", "bc-100": "no", "bc-67": "no", "bc-235": "yes", "bc-852": "lenient", "bc-535": "yes", "bc-1091": "no", "bc-503": "yes", "bc-228": "no"}}, {"label": "Agent-driven, no channels", "cells": {"bc-116": "no", "bc-1225": "yes", "bc-100": "no", "bc-67": "no", "bc-235": "yes", "bc-852": "no", "bc-535": "no", "bc-1091": "no", "bc-503": "yes", "bc-228": "no"}}, {"label": "Agent-driven, text + coordinate", "cells": {"bc-116": "no", "bc-1225": "lenient", "bc-100": "no", "bc-67": "no", "bc-235": "yes", "bc-852": "no", "bc-535": "yes", "bc-1091": "no", "bc-503": "no", "bc-228": "no"}}]}, "trial": {"n": 100, "correct": 22, "lenient": 23, "answer_in_response": 22, "seconds": 36.42, "tokens": 193345.75, "searches": 14.8, "reads": 0.86, "median_seconds": 30.4, "max_seconds": 591.2, "hit_turn_limit": 3, "judge_vs_match": 2, "first10": 3}};
+const D = {"systems": [{"n": 10, "correct": 2, "lenient": 2, "answer_in_response": 2, "seconds": 202.93, "tokens": 236442.3, "searches": 17.4, "reads": 0.5, "label": "Single agent", "solved_ids": ["bc-235", "bc-503"], "lenient_ids": [], "judge_vs_match": 0}, {"n": 10, "correct": 4, "lenient": 4, "answer_in_response": 6, "seconds": 213.15, "tokens": 735229.2, "searches": 49.5, "reads": 2.2, "label": "Independent", "solved_ids": ["bc-1225", "bc-235", "bc-503", "bc-852"], "lenient_ids": [], "judge_vs_match": 2}, {"n": 10, "correct": 4, "lenient": 5, "answer_in_response": 5, "seconds": 333.1, "tokens": 1524225.2, "searches": 65.1, "reads": 5.1, "label": "Centralized", "solved_ids": ["bc-1225", "bc-235", "bc-503", "bc-535"], "lenient_ids": ["bc-852"], "judge_vs_match": 1}, {"n": 10, "correct": 4, "lenient": 4, "answer_in_response": 4, "seconds": 298.88, "tokens": 1290161.7, "searches": 58.9, "reads": 3.5, "label": "Decentralized", "solved_ids": ["bc-235", "bc-503", "bc-535", "bc-852"], "lenient_ids": [], "judge_vs_match": 0}, {"n": 10, "correct": 4, "lenient": 5, "answer_in_response": 5, "seconds": 354.69, "tokens": 1463234.2, "searches": 64.7, "reads": 5.1, "label": "Hybrid", "solved_ids": ["bc-1225", "bc-235", "bc-503", "bc-535"], "lenient_ids": ["bc-852"], "judge_vs_match": 1}, {"n": 10, "correct": 3, "lenient": 3, "answer_in_response": 3, "seconds": 59.02, "tokens": 523355.9, "searches": 43, "reads": 1.6, "messages": 0, "a2a_tasks": 0, "state_writes": 0, "team_answers": 0, "docs_seen_by_several": 29, "repeated_queries": 0.1, "questions_with_messages": 0, "label": "Agent-driven, no channels", "solved_ids": ["bc-1225", "bc-235", "bc-503"], "lenient_ids": [], "judge_vs_match": 0}, {"n": 10, "correct": 2, "lenient": 3, "answer_in_response": 3, "seconds": 70.35, "tokens": 635544, "searches": 47.1, "reads": 1.9, "messages": 0.2, "a2a_tasks": 0, "state_writes": 0, "team_answers": 0, "docs_seen_by_several": 26.7, "repeated_queries": 0.1, "questions_with_messages": 1, "label": "Agent-driven, text + coordinate", "solved_ids": ["bc-235", "bc-535"], "lenient_ids": ["bc-1225"], "judge_vs_match": 1}], "grid": {"questions": ["bc-116", "bc-1225", "bc-100", "bc-67", "bc-235", "bc-852", "bc-535", "bc-1091", "bc-503", "bc-228"], "columns": [{"label": "Single agent", "cells": {"bc-116": "no", "bc-1225": "no", "bc-100": "no", "bc-67": "no", "bc-235": "yes", "bc-852": "no", "bc-535": "no", "bc-1091": "no", "bc-503": "yes", "bc-228": "no"}}, {"label": "Single agent, 100-question run", "cells": {"bc-116": "no", "bc-1225": "yes", "bc-100": "no", "bc-67": "no", "bc-235": "yes", "bc-852": "no", "bc-535": "no", "bc-1091": "no", "bc-503": "yes", "bc-228": "no"}}, {"label": "Independent", "cells": {"bc-116": "no", "bc-1225": "yes", "bc-100": "no", "bc-67": "no", "bc-235": "yes", "bc-852": "yes", "bc-535": "no", "bc-1091": "no", "bc-503": "yes", "bc-228": "no"}}, {"label": "Centralized", "cells": {"bc-116": "no", "bc-1225": "yes", "bc-100": "no", "bc-67": "no", "bc-235": "yes", "bc-852": "lenient", "bc-535": "yes", "bc-1091": "no", "bc-503": "yes", "bc-228": "no"}}, {"label": "Decentralized", "cells": {"bc-116": "no", "bc-1225": "no", "bc-100": "no", "bc-67": "no", "bc-235": "yes", "bc-852": "yes", "bc-535": "yes", "bc-1091": "no", "bc-503": "yes", "bc-228": "no"}}, {"label": "Hybrid", "cells": {"bc-116": "no", "bc-1225": "yes", "bc-100": "no", "bc-67": "no", "bc-235": "yes", "bc-852": "lenient", "bc-535": "yes", "bc-1091": "no", "bc-503": "yes", "bc-228": "no"}}, {"label": "Agent-driven, no channels", "cells": {"bc-116": "no", "bc-1225": "yes", "bc-100": "no", "bc-67": "no", "bc-235": "yes", "bc-852": "no", "bc-535": "no", "bc-1091": "no", "bc-503": "yes", "bc-228": "no"}}, {"label": "Agent-driven, text + coordinate", "cells": {"bc-116": "no", "bc-1225": "lenient", "bc-100": "no", "bc-67": "no", "bc-235": "yes", "bc-852": "no", "bc-535": "yes", "bc-1091": "no", "bc-503": "no", "bc-228": "no"}}]}, "trial": {"n": 100, "correct": 22, "lenient": 23, "answer_in_response": 22, "seconds": 36.42, "tokens": 193345.75, "searches": 14.8, "reads": 0.86, "median_seconds": 30.4, "max_seconds": 591.2, "hit_turn_limit": 3, "judge_vs_match": 2, "first10": 3}, "found": [{"label": "Independent", "found": 6, "credited": 4}, {"label": "Agent-driven, no channels", "found": 3, "credited": 3}, {"label": "Agent-driven, text + coordinate", "found": 4, "credited": 2}]};
 const NS = "http://www.w3.org/2000/svg";
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const pct = (v) => Math.round(v * 100) + "%";
@@ -289,6 +315,33 @@ document.getElementById("drivencards").innerHTML = [
   card(`${N.docs_seen_by_several.toFixed(0)} / ${X.docs_seen_by_several.toFixed(0)}`, "Pages per question that more than one agent saw: the same research done two or three times"),
   card(`${N.correct} / ${X.correct}`, `Questions solved of 10, against ${by["Single agent"].correct} for the single agent and ${by["Decentralized"].correct} for decentralized`),
 ].join("");
+
+document.getElementById("foundtable").innerHTML = `<tr><th>Setup, first 10 questions</th><th class="n">At least one agent found the answer</th><th class="n">Credited to the setup</th></tr>` +
+  D.found.map((f) => `<tr><td>${esc(f.label)}</td><td class="n">${f.found}</td><td class="n"><b>${f.credited}</b></td></tr>`).join("");
+
+// published BrowseComp-Plus results (Table 1 of arXiv 2508.06600), embedding search and keyword search
+(function () {
+  const PUB = [["GPT-5", 70.12, 55.90], ["o3", 63.49, 49.28], ["gpt-oss-120b (high reasoning)", 42.89, 28.67], ["Claude Sonnet 4", 36.75, 14.34],
+    ["Claude Opus 4", 36.14, 15.54], ["GPT-4.1", 35.42, 14.58], ["Gemini 2.5 Flash", 33.01, 15.54], ["Gemini 2.5 Pro", 28.67, 19.04], ["Qwen3-32B", 10.36, 3.49]];
+  const ours = 100 * T.correct / T.n;
+  const rows = PUB.map(([m, e, b]) => ({ m, e, b })).concat([{ m: "Ours: gpt-oss-20b, single agent", e: ours, ours: true }]).sort((a, b) => b.e - a.e);
+  const W = 760, rowH = 30, left = 250, right = 70, top = 6, H = top + rows.length * rowH + 28;
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "BrowseComp-Plus accuracy of published models and ours" });
+  const x = (v) => left + (W - left - right) * v / 80;
+  [0, 20, 40, 60, 80].forEach((v) => { svg.append(el("line", { x1: x(v), x2: x(v), y1: top, y2: H - 22, class: "gridline" })); svg.append(el("text", { x: x(v), y: H - 6, "text-anchor": "middle", class: "lbl" }, v + "%")); });
+  rows.forEach((r, i) => {
+    const y = top + i * rowH;
+    svg.append(el("text", { x: left - 10, y: y + 19, "text-anchor": "end", class: "cat" }, r.m));
+    if (r.ours) {
+      svg.append(el("rect", { x: x(0), y: y + 7, width: x(r.e) - x(0), height: 16, rx: 3, fill: "var(--s2)" }));
+    } else {
+      svg.append(el("rect", { x: x(0), y: y + 7, width: x(r.e) - x(0), height: 16, rx: 3, fill: "var(--s1)" }));
+      svg.append(el("rect", { x: x(0), y: y + 7, width: x(r.b) - x(0), height: 16, rx: 3, fill: "var(--s1-soft)" }));
+    }
+    svg.append(el("text", { x: x(r.e) + 6, y: y + 19, class: "val" }, r.ours ? `${Math.round(r.e)}%` : `${r.e.toFixed(1)}% (${r.b.toFixed(1)}%)`));
+  });
+  document.getElementById("pubchart").append(svg);
+})();
 
 const agreeTrial = T.n - T.judge_vs_match;
 document.getElementById("judgenote").textContent = `On the single agent’s 100 answers, the judge and a plain string match agree on ${agreeTrial}. Every disagreement we looked at was the judge being too strict or the string match missing an accent, so the judge undercounts by about ${T.lenient - T.correct} point${T.lenient - T.correct === 1 ? "" : "s"} on that run.`;
