@@ -364,8 +364,10 @@ def main():
     if not tasks:
         sys.exit("no tasks to run")
     multi = args.topology != "single"
-    if multi and not wb:
-        sys.exit("the multi-agent topologies run on WorkBench for now: add --benchmark workbench")
+    if multi and not (wb or bc):
+        sys.exit("the multi-agent topologies need --benchmark workbench or browsecomp")
+    if args.topology == "agent-driven" and not wb:
+        sys.exit("agent-driven teams run on WorkBench for now: add --benchmark workbench")
 
     client = OpenAI(base_url=args.base_url, api_key="EMPTY")
     if not args.model:
@@ -403,7 +405,8 @@ def main():
                                      coordinate=args.coordinate)
                 actions = r["actions"]
             elif multi:
-                r = mas.run(args.topology, t["question"], make_agent, args.agents, args.rounds, log_message)
+                r = mas.run(args.topology, t["question"], make_agent, args.agents, args.rounds, log_message,
+                            env=mas.BrowseCompEnv() if bc else None)
                 actions = r["actions"]
             elif wb:
                 sandbox = wb.Sandbox()
@@ -411,7 +414,14 @@ def main():
                 actions = sandbox.actions
             elif bc:
                 session = bc.Session()
-                r = make_agent(tools=session.tools, system_prompt=bc.system_prompt()).run(bc.task_prompt(t["question"]))
+                agent = make_agent(tools=session.tools, system_prompt=bc.system_prompt())
+                r = agent.run(bc.task_prompt(t["question"]))
+                if r["stop"] == "max_turns" and not session.answer:  # out of turns: a tool-free call to answer
+                    for _ in range(2):  # gpt-oss sometimes returns only reasoning; ask once more
+                        r["final"] = agent.reply(bc.OUT_OF_TURNS)
+                        if r["final"].strip():
+                            break
+                    r.update({k: agent.stats[k] for k in new_stats()})
             else:
                 r = make_agent().run(t["question"])
         except Exception as e:
@@ -419,10 +429,10 @@ def main():
         if bc:
             # Graded on the done() answer (or, failing that, the last reply), even if the run hit a limit:
             # running out of turns or context after answering still counts the answer.
-            response = bc.response_text(session, r["final"])
+            response = r.get("answer", "") if multi else bc.response_text(session, r["final"])
             correct, judgment = bc.judge(client, args.model, t["question"], response, t["answer"])
             verdict = {"judgment": judgment, "answer_in_response": bc.answer_in_response(response, t["answer"]),
-                       **bc.retrieval_stats(session, t)}
+                       **bc.retrieval_stats(r.pop("sessions", None) or ([session] if session else []), t)}
             answer, expected = response, t["answer"]
         elif wb:
             # Scored on what the agents did (their tool calls), not on what they said.

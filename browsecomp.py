@@ -178,6 +178,10 @@ def response_text(session, final):
     return final or ""
 
 
+OUT_OF_TURNS = ("You have used all your tool calls. Based on what you have found, give your best final answer now, "
+                "in the required format.")
+
+
 def _norm(text):
     return re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()
 
@@ -199,9 +203,10 @@ def judge(client, model, question, response, correct_answer):
     return bool(m and m.group(1).lower() == "yes"), text
 
 
-def retrieval_stats(session, task):
-    """Did the agent's searches ever surface, and did it read, the question's evidence and gold documents?"""
-    searches, reads = (session.searches, session.reads) if session else ([], [])
+def retrieval_stats(sessions, task):
+    """Did the agents' searches ever surface, and did they read, the question's evidence and gold documents?"""
+    searches = [s for x in sessions for s in x.searches]
+    reads = [d for x in sessions for d in x.reads]
     seen = {d for s in searches for d in s["docids"]}
     read = set(reads)
     ev, gold = set(task["evidence_docs"]), set(task["gold_docs"])

@@ -18,6 +18,15 @@ are adapted from its prompts/multi-agent/ files:
 - hybrid:        centralized, then one extra round in which each worker also gets its peers'
                  summaries directly (first 400 characters of each).
 
+BrowseComp-Plus (env=BrowseCompEnv()): every worker searches the same read-only document collection with
+its own tools, and an answer is text, combined as the paper's code does for question answering:
+- independent:   the workers' final answers concatenated, with no cross-checking (the paper's synthesis_only).
+- centralized, hybrid: the orchestrator writes the final answer from the team's findings (the paper's
+                 lead-agent synthesis prompt, word for word).
+- decentralized: majority vote over the workers' final answers, ties to the first agent. The paper votes on
+                 the raw answer strings, which almost never match, so here the vote is on each answer's
+                 normalized "Exact Answer" line.
+
 WorkBench is scored on how the databases end up, which the paper's WorkBench adapter doesn't do
 (its tools are stubs and it grades the final text), so how each system's final changes are chosen
 is ours, following each topology's aggregation policy:
@@ -172,12 +181,63 @@ DEBATE_ROUND = """Debate round {round} of {rounds}.
 Below are your peers' answers from the previous round. Read them carefully. Identify points where you agree, points where they erred, and points where you missed something. Then produce your updated final answer for this round. You may defend your previous answer, refine it, or replace it.
 
 {peers}
-
-Your workspace still has the changes you made in earlier rounds, and your answer is the set of all changes you have made. If your updated answer needs more changes, make them now; if an earlier change was wrong, undo it if you can. Do not repeat changes you have already made.
-
+{workspace}
 Produce your updated final answer now."""
+# Our addition for WorkBench, where a worker's answer is the changes in its workspace (not used on text benchmarks).
+DEBATE_WORKSPACE = """
+Your workspace still has the changes you made in earlier rounds, and your answer is the set of all changes you have made. If your updated answer needs more changes, make them now; if an earlier change was wrong, undo it if you can. Do not repeat changes you have already made.
+"""
 
 PEER_ROUND = "Final round with peer insights. Review your peers' work and finalize your solution."
+
+SYNTHESIS = """SYNTHESIS TASK:
+Your multi-agent team has gathered the following information.
+Your task is to synthesize this information into a final answer to the original task.
+
+{findings}
+
+SYNTHESIS INSTRUCTIONS:
+- Provide a direct, concise answer to the original question
+- Synthesize information from multiple agents into a coherent response
+- Focus on the most relevant and reliable findings
+- Do not return JSON or structured data - just provide the answer
+- Be thorough but concise"""
+
+# ---- benchmarks ---------------------------------------------------------------------------------
+
+
+class WorkBenchEnv:
+    """WorkBench: each worker gets a private copy of the databases; an answer is the changes it made."""
+    text_answers = False
+    system_prompt = wb.SYSTEM_PROMPT
+
+    def session(self):
+        return wb.Sandbox()
+
+    def task_text(self, task):
+        return task
+
+
+class BrowseCompEnv:
+    """BrowseComp-Plus: each worker searches the shared read-only collection; an answer is text."""
+    text_answers = True
+
+    def __init__(self):
+        import browsecomp
+        self.bc = browsecomp
+        self.system_prompt = browsecomp.system_prompt()
+
+    def session(self):
+        return self.bc.Session()
+
+    def task_text(self, task):
+        return self.bc.task_prompt(task)
+
+
+def exact_answer(text):
+    """The normalized "Exact Answer:" line of a reply (or the whole reply if it has none), for voting."""
+    m = re.search(r"exact answer\W*:?\**\s*(.+)", text or "", re.I)
+    return re.sub(r"[^a-z0-9]+", " ", (m.group(1) if m else text or "").lower()).strip()
 
 # ---- building blocks ----------------------------------------------------------------------------
 
@@ -185,27 +245,38 @@ PEER_ROUND = "Final round with peer insights. Review your peers' work and finali
 class Worker:
     """A tool-using sub-agent with its own sandbox and a conversation that persists across rounds."""
 
-    def __init__(self, make_agent, agent_id, task, objective, focus, role):
-        self.id, self.task, self.objective, self.focus = agent_id, task, objective, focus
-        self.sandbox = wb.Sandbox()
+    def __init__(self, make_agent, agent_id, task, objective, focus, role, env):
+        self.id, self.objective, self.focus, self.env = agent_id, objective, focus, env
+        self.task = env.task_text(task)
+        self.sandbox = env.session()
         self.agent = make_agent(name=agent_id, tools=self.sandbox.tools,
-                                system_prompt=wb.SYSTEM_PROMPT + "\n\n" + role)
+                                system_prompt=env.system_prompt + "\n\n" + role)
         self.summaries = []  # what it sent the team at the end of each round
         self.writes = []     # (round, action) for every change it made (rejected writes excluded)
+        self.answers = []    # text benchmarks: its answer at the end of each round
         self.error = None
 
     def work(self, round_num, message):
         """One round: act on the message with tools, then summarize its findings for the team."""
         if not self.summaries:
             message = WORKER_START.format(task=self.task, objective=self.objective, guidance=message)
-        before = len(self.sandbox.changes)
+        before = len(getattr(self.sandbox, "changes", []))
+        submitted = getattr(self.sandbox, "answer", None)
+        final = ""
         try:
-            self.agent.send(message)
+            final = self.agent.send(message)["final"]
             self.summaries.append(self.agent.reply(SUMMARIZE))
         except Exception as e:  # one failed worker (e.g. context overflow) shouldn't sink the team
             self.error = f"{type(e).__name__}: {e}"
             self.summaries.append("")
-        self.writes += [(round_num, a) for a in self.sandbox.changes[before:]]
+        if self.env.text_answers:
+            # This round's answer: a new done() call, else its last reply, else (out of turns) the summary it
+            # sent the team, which is what the paper's code takes as a worker's answer.
+            new = self.sandbox.answer is not None and self.sandbox.answer is not submitted
+            self.answers.append(self.env.bc.response_text(self.sandbox, "") if new else
+                                final or self.last_summary or (self.answers[-1] if self.answers else ""))
+        else:
+            self.writes += [(round_num, a) for a in self.sandbox.changes[before:]]
 
     @property
     def last_summary(self):
@@ -213,7 +284,9 @@ class Worker:
 
     @property
     def answer(self):
-        """Every change this worker made, in order."""
+        """Every change this worker made, in order (text benchmarks: its latest answer)."""
+        if self.env.text_answers:
+            return self.answers[-1] if self.answers else ""
         return [a for _, a in self.writes]
 
 
@@ -238,8 +311,9 @@ def parse_json(text):
 class Team:
     """Bookkeeping for one multi-agent run: its agents, the messages between them, and a trace."""
 
-    def __init__(self, topology, task, make_agent, n_agents, log):
+    def __init__(self, topology, task, make_agent, n_agents, log, env):
         self.topology, self.task, self.make_agent, self.n, self.log = topology, task, make_agent, n_agents, log
+        self.env = env
         self.workers = []
         self.orchestrator = None
         self.messages = []  # every inter-agent message: {"round", "from", "to", "text"}
@@ -248,7 +322,7 @@ class Team:
         self.rounds = 0
 
     def add_worker(self, agent_id, objective, focus):
-        w = Worker(self.make_agent, agent_id, self.task, objective, focus, WORKER_ROLE[self.topology])
+        w = Worker(self.make_agent, agent_id, self.task, objective, focus, WORKER_ROLE[self.topology], self.env)
         self.workers.append(w)
         return w
 
@@ -261,8 +335,8 @@ class Team:
     def ask_orchestrator(self, tag, prompt):
         if self.orchestrator is None:
             tools = "\n".join(f"- {name}: {schema['function']['description'].strip().splitlines()[0]}"
-                              for name, (_, schema) in wb.Sandbox().tools.items())
-            system = ORCHESTRATOR_SYSTEM.format(date=wb.SYSTEM_PROMPT, n=self.n, tools=tools, task=self.task)
+                              for name, (_, schema) in self.env.session().tools.items())
+            system = ORCHESTRATOR_SYSTEM.format(date=self.env.system_prompt, n=self.n, tools=tools, task=self.task)
             self.orchestrator = self.make_agent(name="orchestrator", tools={}, system_prompt=system)
         reply, reasoning = self.orchestrator.ask([{"role": "system", "content": self.orchestrator.system_prompt},
                                                   {"role": "user", "content": prompt}])
@@ -273,21 +347,25 @@ class Team:
         return "\n".join(f"- Agent {w.id} (round {i}): {s}" for w in self.workers
                          for i, s in enumerate(w.summaries, 1) if s.strip()) or "No findings yet."
 
-    def result(self, actions):
+    def result(self, answer):
         agents = self.workers + ([self.orchestrator] if self.orchestrator else [])
         stats = {k: 0 for k in ("turns", "tool_calls", "tool_errors", "prompt_tokens", "completion_tokens")}
         for a in agents:
             for k in stats:
                 stats[k] += (a.agent.stats if isinstance(a, Worker) else a.stats)[k]
         errors = {w.id: w.error for w in self.workers if w.error}
+        text = self.env.text_answers
         return {
-            "actions": actions, "stop": "final", **stats,
+            "actions": [] if text else answer, **({"answer": answer, "sessions": [w.sandbox for w in self.workers]}
+                                                 if text else {}),
+            "stop": "final", **stats,
             "agents": len(self.workers), "rounds": self.rounds, "agent_messages": len(self.messages),
             "trace": {"topology": self.topology, **self.trace, "worker_errors": errors,
                       "messages": self.messages,
                       # Every orchestrator call is its system prompt plus one prompt from orchestrator_calls.
                       "orchestrator_system": self.orchestrator.system_prompt if self.orchestrator else None,
                       "orchestrator_calls": self.calls,
+                      **({"worker_answers": {w.id: w.answers for w in self.workers}} if text else {}),
                       "conversations": {w.id: w.agent.messages for w in self.workers}},
         }
 
@@ -325,8 +403,20 @@ def should_stop(team, round_num):
     return reply.strip().lstrip("*\"'").upper().startswith("STOP")
 
 
+def synthesize(team):
+    """Text benchmarks: the orchestrator writes the final answer from the team's findings (the paper's step)."""
+    findings = [(w.id, s) for w in team.workers for s in w.summaries if s.strip()]
+    findings = list(dict.fromkeys(findings))[:20]  # the paper dedupes and keeps at most 20
+    listing = "".join(f"Finding {i} (from {aid}): {s.strip()}\n\n" for i, (aid, s) in enumerate(findings, 1))
+    if not listing:
+        return ""
+    return team.ask_orchestrator("synthesis", SYNTHESIS.format(findings=listing.strip())).strip()
+
+
 def select_changes(team):
     """The orchestrator's synthesis: which of the workers' changes become the system's answer."""
+    if team.env.text_answers:
+        return synthesize(team)
     candidates = {}  # action -> who made it
     for w in team.workers:
         for r, a in w.writes:
@@ -354,6 +444,8 @@ def independent(team, rounds):
     in_parallel(lambda w: w.work(1, INDEPENDENT_GUIDANCE), team.workers)
     team.rounds = 1
     # synthesis_only: every worker's answer is kept, with no cross-checking or voting.
+    if team.env.text_answers:
+        return "\n\n".join(f"=== {w.id} ===\n{w.answer}" for w in team.workers if w.answer)
     return distinct(a for w in team.workers for _, a in w.writes)
 
 
@@ -406,9 +498,19 @@ def decentralized(team, rounds):
             peers = "\n\n".join(f"--- Peer response from {p.id} (round {r - 1}) ---\n{p.last_summary}"
                                 for p in team.workers if p is not w and p.last_summary)
             messages.append(DEBATE_ROUND.format(round=r, rounds=rounds,
-                                                peers=peers or "(no peer responses available from the previous round)"))
+                                                peers=peers or "(no peer responses available from the previous round)",
+                                                workspace="" if team.env.text_answers else DEBATE_WORKSPACE))
         in_parallel(lambda wm: wm[0].work(r, wm[1]), list(zip(team.workers, messages)))
     # Consensus: majority vote over the workers' final answers (their changes), ties to the first agent.
+    if team.env.text_answers:
+        answers = [(w.id, w.answer) for w in team.workers if w.answer]
+        if not answers:
+            return ""
+        votes = Counter(exact_answer(a) for _, a in answers)
+        winner_key, count = votes.most_common(1)[0]
+        winner, answer = next((aid, a) for aid, a in answers if exact_answer(a) == winner_key)
+        team.trace["vote"] = {"answers": {aid: exact_answer(a) for aid, a in answers}, "winner": winner, "votes": count}
+        return answer
     answers = [(w.id, w.answer) for w in team.workers]
     key = lambda actions: tuple(sorted(a.lower() for a in actions))  # noqa: E731  (as WorkBench compares)
     votes = Counter(key(actions) for _, actions in answers)
@@ -419,8 +521,8 @@ def decentralized(team, rounds):
     return actions
 
 
-def run(topology, task, make_agent, n_agents=3, rounds=None, log=lambda label, text: None):
-    """Run one task through a multi-agent topology. Returns its final changes, stats and trace."""
-    team = Team(topology, task, make_agent, n_agents, log)
-    actions = globals()[topology](team, rounds or DEFAULT_ROUNDS[topology])
-    return team.result(actions)
+def run(topology, task, make_agent, n_agents=3, rounds=None, log=lambda label, text: None, env=None):
+    """Run one task through a multi-agent topology. Returns its final answer (WorkBench: changes), stats and trace."""
+    team = Team(topology, task, make_agent, n_agents, log, env or WorkBenchEnv())
+    answer = globals()[topology](team, rounds or DEFAULT_ROUNDS[topology])
+    return team.result(answer)

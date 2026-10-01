@@ -1,0 +1,7 @@
+# BrowseComp-Plus: the paper's 100 questions, single agent and the paper's four multi-agent systems.
+# sbatch --export=ALL,BROWSECOMP=1 --time=<long enough> suite.sbatch 20b suites/browsecomp.txt
+--benchmark browsecomp --topology single
+--benchmark browsecomp --topology independent
+--benchmark browsecomp --topology centralized
+--benchmark browsecomp --topology decentralized
+--benchmark browsecomp --topology hybrid
