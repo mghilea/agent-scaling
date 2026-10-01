@@ -5,7 +5,7 @@
 <style>
 :root {
   --ground: #f3f5f8; --surface: #fbfcfd; --sunken: #e7ebf1; --ink: #16202e; --ink-2: #3e4a5c; --muted: #5d6879; --line: #d2d9e3; --grid: #e3e8ee;
-  --s1: #2a78d6; --s2: #eb6834; --pub: #9aa5b4; --pass: #22784a; --pass-soft: #dcf1e5; --fail: #b3261e; --fail-soft: #fbe2df; --seq: #2a78d6;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --pub: #9aa5b4; --pass: #22784a; --pass-soft: #dcf1e5; --fail: #b3261e; --fail-soft: #fbe2df; --seq: #2a78d6;
   --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
   --cond: "IBM Plex Sans Condensed", "IBM Plex Sans", "Arial Narrow", Arial, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, "Courier New", monospace;
@@ -14,13 +14,13 @@
   :root:not([data-theme="light"]) {
     color-scheme: dark;
     --ground: #0e131a; --surface: #151c26; --sunken: #1d2632; --ink: #e5eaf1; --ink-2: #c3ccd8; --muted: #9aa7b8; --line: #2e3a4a; --grid: #232d3a;
-    --s1: #3987e5; --s2: #d95926; --pub: #5c6878; --pass: #53c487; --pass-soft: #163527; --fail: #f2786d; --fail-soft: #3d1c1a; --seq: #3987e5;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --pub: #5c6878; --pass: #53c487; --pass-soft: #163527; --fail: #f2786d; --fail-soft: #3d1c1a; --seq: #3987e5;
   }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
   --ground: #0e131a; --surface: #151c26; --sunken: #1d2632; --ink: #e5eaf1; --ink-2: #c3ccd8; --muted: #9aa7b8; --line: #2e3a4a; --grid: #232d3a;
-  --s1: #3987e5; --s2: #d95926; --pub: #5c6878; --pass: #53c487; --pass-soft: #163527; --fail: #f2786d; --fail-soft: #3d1c1a; --seq: #3987e5;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --pub: #5c6878; --pass: #53c487; --pass-soft: #163527; --fail: #f2786d; --fail-soft: #3d1c1a; --seq: #3987e5;
 }
 * { box-sizing: border-box; }
 body { background: var(--ground); color: var(--ink); font: 16px/1.6 var(--sans); }
@@ -74,6 +74,38 @@ ol.next li span { display: block; color: var(--muted); font-size: 15px; }
 footer { font-size: 14px; color: var(--muted); display: grid; gap: 6px; border-top: 1px solid var(--line); padding-top: 18px; }
 .cellbar { display: inline-flex; align-items: center; gap: 6px; justify-content: flex-end; width: 100%; }
 .cellbar i { display: inline-block; height: 7px; border-radius: 4px; background: var(--seq); }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; border-bottom: 1px solid var(--line); }
+.tabs button { font: 500 15px var(--sans); color: var(--muted); background: none; border: none; border-bottom: 3px solid transparent; padding: 8px 12px; cursor: pointer; margin-bottom: -1px; }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--s1); }
+.tabs button:focus-visible { outline: 2px solid var(--s1); outline-offset: 2px; }
+.panel { display: grid; gap: 18px; padding-top: 4px; }
+.panel[hidden] { display: none; }
+.spec { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 14px; }
+.prompt { font: 13px/1.55 var(--mono); background: var(--sunken); border-radius: 8px; padding: 10px 12px; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink-2); }
+.prompt mark { background: color-mix(in srgb, var(--s1) 18%, transparent); color: var(--ink); border-radius: 3px; padding: 0 2px; }
+ul.plain { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 15px; color: var(--ink-2); }
+.tooltbl { min-width: 0; }
+.tooltbl td:first-child { font: 12.5px/1.5 var(--mono); white-space: nowrap; }
+.stats { display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 14.5px; color: var(--ink-2); }
+.stats b { font-size: 20px; font-family: var(--cond); color: var(--ink); margin-right: 4px; }
+.excard { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; gap: 10px; }
+.exhead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+.exhead .mark.f { background: var(--fail-soft); color: var(--fail); }
+.req { font-size: 15px; color: var(--ink); border-left: 3px solid var(--line); padding-left: 10px; }
+.cap { font-size: 15px; color: var(--muted); max-width: 90ch; }
+.tl { display: grid; gap: 0; border-top: 1px solid var(--line); }
+.tl .r { display: grid; grid-template-columns: 74px 1fr; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--grid); font-size: 14px; }
+.tl .t { color: var(--muted); font: 12px/1.6 var(--mono); text-align: right; white-space: nowrap; }
+.tl .who { font: 500 13px/1.5 var(--sans); color: var(--ink); display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+.tl .who i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
+.tl .k { font: 600 10.5px/1.6 var(--sans); letter-spacing: .05em; text-transform: uppercase; padding: 0 6px; border-radius: 4px; background: var(--sunken); color: var(--muted); }
+.tl .k.message, .tl .k.a2a, .tl .k.state { background: color-mix(in srgb, var(--s1) 14%, transparent); color: var(--ink); }
+.tl .k.conflict { background: var(--fail-soft); color: var(--fail); }
+.tl .x { color: var(--ink-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+.tl .r.action .x, .tl .r.noop .x { font: 12.5px/1.55 var(--mono); }
+.tl .r.noop .x, .tl .r.reply .x { color: var(--muted); }
+.tl .d { font: 12px/1.5 var(--mono); color: var(--muted); overflow-wrap: anywhere; }
+@media (max-width: 560px) { .tl .r { grid-template-columns: 1fr; gap: 2px; } .tl .t { text-align: left; } }
 </style>
 
 <div class="wrap">
@@ -118,6 +150,23 @@ footer { font-size: 14px; color: var(--muted); display: grid; gap: 6px; border-t
 
   <section>
     <div class="sectionhead">
+      <h2>What the three agent-driven teams do</h2>
+      <p>All three run the same harness (<code>agent_driven.py</code>) and differ only in which communication tools they get. Unlike the paper’s four setups there are no rounds, no orchestrator, no summaries passed on by the harness, and no vote.</p>
+    </div>
+    <div class="cards">
+      <div class="card"><b>Three peers, one request</b><p>agent_1, agent_2 and agent_3, all gpt-oss-20b on the same vLLM server, get the user’s request at the same moment and run at the same time, each in its own tool loop.</p></div>
+      <div class="card"><b>One shared workspace</b><p>One copy of WorkBench’s email, calendar, CRM, project board and analytics, with all 27 of its tools. A change made twice happens twice. The team is scored on how that one workspace ends up.</p></div>
+      <div class="card"><b>Nobody in charge</b><p>No roles or plan are given. Teammates’ changes notify no one: an agent sees them only in what its own tool calls return.</p></div>
+      <div class="card"><b>Sleeping and waking</b><p>An agent’s turn ends when it replies without calling a tool. Anything sent to it is added to its conversation after its current tool call, or wakes it if it is asleep. The run ends when all three are asleep with nothing in flight, or at 30 model calls per agent, 12 per wake, or 15 minutes.</p></div>
+    </div>
+    <div class="prompt" id="teamprompt"></div>
+    <p class="note">The system prompt each agent gets after WorkBench’s own (today’s date, and act without asking for confirmation), shown for agent_1. The highlighted parts are what differs between the three teams; the tabs below show what goes there.</p>
+    <div class="tabs" role="tablist" id="teamtabs"></div>
+    <div id="teampanels"></div>
+  </section>
+
+  <section>
+    <div class="sectionhead">
       <h2>How each system fails</h2>
       <p>Each task-run sorted by comparing its changes with the correct ones. “Stopped at the 5-result cap” means the main action (deletions, updates) was done exactly 5 times when more were needed: WorkBench’s search tools return at most 5 records.</p>
     </div>
@@ -135,8 +184,6 @@ footer { font-size: 14px; color: var(--muted); display: grid; gap: 6px; border-t
     <div class="quotes">
       <div class="quote"><h3>Each agent sees a different 5</h3><p>On multi_domain-147 two agents posted different batches of Raj’s leads to the shared board: the second search ran after the first agent’s deletions.</p>
         <div class="ex"><span>17.5 s agent_3 · raj_leads_deleted</span>['00000154','00000149','00000032','00000194','00000129']<span>26.7 s agent_2 · raj_leads_to_delete</span>["00000149","00000197","00000142","00000038","00000135"]</div></div>
-      <div class="quote"><h3>A clean hand-off</h3><p>calendar-86, text team, passed.</p>
-        <div class="ex"><span>17.8 s agent_3 → agent_2</span>The future event IDs with nia: 00000237, 00000279, 00000208, 00000020. Agent 2, you may proceed to delete these events.<span>25.3 s agent_2 → agent_3</span>All four events (00000237, 00000279, 00000208, 00000020) have been deleted and are no longer scheduled with nia. Task complete.</div></div>
       <div class="quote"><h3>Catching what is left</h3><p>calendar-87, all-channels team, passed; crm-69 failed despite the hand-off.</p>
         <div class="ex"><span>28.4 s agent_2 → agent_3</span>It looks like the event 00000174 (New Employee Onboarding 2023-12-21) still shows up. Has it actually been deleted yet? If not, I can delete it now to finalize cancellation.<span>20.3 s agent_2 → agent_1 (crm-69)</span>We already deleted customers 00000054 and 00000165. Please delete the remaining Akira lost hardware customers: 00000024, 00000071, 00000057.</div></div>
       <div class="quote"><h3>Disagreeing about the data</h3><p>crm-43, all-channels team: for over a minute, two agents insisted on different lists of reassigned leads and never reconciled them.</p>
@@ -333,6 +380,76 @@ const size = (total, active) => (total == null ? "undisclosed" : total === activ
 document.getElementById("workers").innerHTML = `<tr><th>Setup</th><th class="n">A single worker right</th><th class="n">At least one of 3 right</th><th class="n">All 3 right</th><th class="n">System (union or vote)</th><th class="n">One wrong, other wrong too</th></tr>` +
   ["Independent", "Decentralized"].map((s) => { const w = S[s].workers;
     return `<tr><td>${esc(s)}</td><td class="n">${pct(w.worker_right)}</td><td class="n">${pct(w.any_right)}</td><td class="n">${pct(w.all_right)}</td><td class="n">${pct(S[s].accuracy)}</td><td class="n">${pct(w.both_wrong)} <span style="color:var(--muted)">(${pct(w.both_wrong_if_independent)} if independent)</span></td></tr>`; }).join("");
+
+// the three agent-driven teams: setup, usage and example timelines
+(function () {
+  const EX = D.ex;
+  const HEAD = "You can coordinate with your teammates, as much or as little as you like:";
+  const CH = {
+    message: "- send_message: send a free-text message to one teammate or to all of them.",
+    a2a: "- a2a_send_task, a2a_update_task, a2a_get_tasks: a structured agent-to-agent protocol modeled on A2A. Send a teammate a task with an instruction and optional JSON data; it gets an id and the state \"submitted\". The receiver moves it to working, input-required, completed, failed or rejected, optionally with a text note and JSON data, and the sender is notified of each update.",
+    shared: "- shared_state_read, shared_state_write: a key-value store that every teammate can read and write. It starts empty; create whatever keys you find useful. Each write gets a version number; pass expected_version to avoid overwriting a teammate's newer update. Teammates are notified when a key changes.",
+  };
+  const HINT = " Before you change anything in the workspace, agree with your teammates on who does what, so that no change is made twice.";
+  const NONE = "You have no way to contact your teammates; you can only see the changes they make in the workspace.";
+  const TOOLS = {
+    message: [["send_message(to, text)", "to is a teammate or \"all\". The text arrives in the recipient’s conversation as “[message from agent_1 to you]” and wakes it if it is asleep."]],
+    a2a: [["a2a_send_task(to, instruction, data)", "Opens a task with an id (T1, T2, …) and the state “submitted”, plus optional JSON data, and delivers it to the receiver."],
+          ["a2a_update_task(task_id, state, text, data)", "Moves the task to working, input-required, completed, failed, rejected or canceled, with an optional note and JSON result. The other side is notified."],
+          ["a2a_get_tasks()", "Lists the tasks you sent or received, with their states and updates."]],
+    shared: [["shared_state_read(key)", "Reads one key, or the whole store if no key is given."],
+             ["shared_state_write(key, value, expected_version)", "Creates or updates a key, and its version goes up by one. If expected_version is given and is stale, the write is refused and the current value returned. Teammates are told “agent_1 updated \"key\" (version 2)”."]],
+  };
+  const TEAMS = [
+    { key: "none", sys: "Agent-driven, no channels", label: "No channels", flag: "--topology agent-driven --comm none", ch: [], hint: false,
+      what: "Three agents with WorkBench’s tools and nothing else. The coordination sentence isn’t added, since they can’t talk. In practice this is three single agents racing on one workspace. Each works once and stops, because nothing can wake it." },
+    { key: "text", sys: "Agent-driven, text + coordinate", label: "Text + coordinate", flag: "--topology agent-driven --comm text --coordinate", ch: ["message"], hint: true,
+      what: "One extra tool, free-text messages, plus one sentence asking the agents to agree on who does what before changing anything. It says nothing about how." },
+    { key: "all", sys: "Agent-driven, all channels + coordinate", label: "All channels + coordinate", flag: "--topology agent-driven --comm all --coordinate", ch: ["message", "a2a", "shared"], hint: true,
+      what: "Free-text messages, an A2A-style task protocol and a shared key-value store, all offered at once so we can see which the agents pick, plus the same coordination sentence. Each agent sees the three channel descriptions in its own random order, so none is always listed first." },
+  ];
+  // shared prompt, with the varying parts highlighted
+  document.getElementById("teamprompt").innerHTML = esc("You are agent_1, one of 3 agents on a team; your teammates are agent_2, agent_3. You all received the same request from the user, and you all work in one shared workspace: the same email, calendar, CRM, project board and analytics. Every change any of you makes happens once in that workspace and everyone can see it, so a change made twice happens twice.\n\nNobody has assigned roles or a plan. Decide as a team how to get the request done.") +
+    "<mark>[coordination sentence]</mark>\n\n<mark>[channels]</mark>\n\n" + esc("Your turn ends when you reply without calling a tool. If a teammate contacts you afterwards, you will be woken up. The task is over when nobody has anything left to do.");
+
+  const fmtT = (r) => (r.t2 != null && r.t2 !== r.t ? `${r.t.toFixed(1)}–${r.t2.toFixed(1)} s` : `${r.t.toFixed(1)} s`);
+  const KIND = { message: "message", a2a: "A2A", state: "shared state", conflict: "write refused", action: "workspace", noop: "no effect", reply: "final reply" };
+  const AG = { agent_1: "var(--s1)", agent_2: "var(--s2)", agent_3: "var(--s3)" };
+  function timeline(rows) {
+    return `<div class="tl">` + rows.map((r) => `<div class="r ${r.kind}"><div class="t">${fmtT(r)}</div><div><div class="who"><i style="background:${AG[r.agent]}"></i>${esc(r.agent)}${r.to ? ` → ${esc(r.to)}` : ""} <span class="k ${r.kind}">${KIND[r.kind]}</span></div><div class="x">${esc(r.text)}</div>${r.data ? `<div class="d">data: ${esc(JSON.stringify(r.data))}</div>` : ""}</div></div>`).join("") + `</div>`;
+  }
+  function stats(t) {
+    const v = S[t.sys], u = EX.usage[t.key], n = u.tasks;
+    const items = [[pct(v.accuracy), "correct on all 64"], [pct(v.acc_5), "on 5+ tasks"], [`${v.cap[0]}/${v.cap[1]}`, "got past the cap"], [v.tasks_with_overlap, "tasks with duplicate work"], [v.agents_changing.toFixed(1), "agents making changes per task"]];
+    if (t.key === "text") items.push([`${u.message}/${n}`, "tasks with messages"], [v.kinds.message.toFixed(1), "messages per task"], [pct(v.before_first_change), "of the tasks with communication talked before the first change"]);
+    if (t.key === "all") items.push([`${u.message}/${n}`, "tasks with messages"], [`${u.shared}/${n}`, "with shared state"], [`${u.a2a}/${n}`, "with A2A"], [v.state.writes, "state writes"], [v.state.conflicts, "writes refused"], [pct(v.before_first_change), "of the tasks with communication talked before the first change"]);
+    return `<div class="stats">${items.map(([a, b]) => `<span><b>${esc(a)}</b>${esc(b)}</span>`).join("")}</div>`;
+  }
+  const tabs = document.getElementById("teamtabs"), panels = document.getElementById("teampanels");
+  TEAMS.forEach((t, i) => {
+    const b = document.createElement("button");
+    b.setAttribute("role", "tab"); b.id = "tab-" + t.key; b.setAttribute("aria-controls", "panel-" + t.key); b.setAttribute("aria-selected", i === 0 ? "true" : "false");
+    b.textContent = t.label; tabs.append(b);
+    const channelBlock = t.ch.length ? HEAD + "\n" + t.ch.map((c) => CH[c]).join("\n") : NONE;
+    const toolRows = t.ch.flatMap((c) => TOOLS[c]);
+    const p = document.createElement("div");
+    p.className = "panel"; p.id = "panel-" + t.key; p.setAttribute("role", "tabpanel"); p.setAttribute("aria-labelledby", b.id); p.hidden = i !== 0;
+    p.innerHTML = `<p>${esc(t.what)} <code>${esc(t.flag)}</code></p>
+      <div class="spec">
+        <div class="card"><b>Coordination sentence</b><div class="prompt">${t.hint ? esc(HINT.trim()) : "(none)"}</div><b>Channels</b><div class="prompt">${esc(channelBlock)}</div></div>
+        <div class="card"><b>Tools added to WorkBench’s 27</b>${toolRows.length ? `<div class="tablewrap"><table class="tooltbl">${toolRows.map(([a, b]) => `<tr><td>${esc(a)}</td><td>${esc(b)}</td></tr>`).join("")}</table></div>` : "<p>None.</p>"}</div>
+      </div>
+      ${stats(t)}
+      ${EX.examples[t.key].map((x) => `<div class="excard"><div class="exhead"><h3>${esc(x.title)}</h3><span class="code">${esc(x.task_id)}</span><span class="mark ${x.correct ? "y" : "f"}">${x.correct ? "passed" : "failed"}</span><span class="note">needs ${D.tasks[x.task_id].changes} changes · team made ${x.changes_made}</span></div>
+        <p class="req">“${esc(x.request)}”</p><p class="cap">${esc(x.caption)}</p>${timeline(x.rows)}</div>`).join("")}`;
+    panels.append(p);
+  });
+  tabs.addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    tabs.querySelectorAll("button").forEach((x) => x.setAttribute("aria-selected", x === b ? "true" : "false"));
+    panels.querySelectorAll(".panel").forEach((p) => { p.hidden = p.id !== b.getAttribute("aria-controls"); });
+  });
+})();
 
 // task grids
 function grid(id, test) {
