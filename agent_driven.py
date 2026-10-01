@@ -25,7 +25,9 @@ Every action, message, task update and state change is logged with a timestamp i
 BrowseComp-Plus (browsecomp=True): the document collection is read-only, so there is no shared workspace to
 see each other's work in; each agent has its own search tools, and teammates learn what others found only
 by communicating. The team gives one answer: a shared submit_team_answer slot that any agent can fill, where
-each submission replaces the last and the one standing when the team stops is graded.
+each submission replaces the last and the one standing when the team stops is graded; if nobody submits, the
+team's answer is a majority vote over the members' final replies. With split=n (BrowseComp only) each agent
+searches and opens only its own 1/n of the collection (browsecomp.Session(shard=...)), and every agent is told so.
 """
 import json
 import random
@@ -68,9 +70,9 @@ COORDINATE_HINT = " Before you change anything in the workspace, agree with your
 NO_CHANNELS = "You have no way to contact your teammates; you can only see the changes they make in the workspace."
 
 # BrowseComp-Plus versions of the team prompt, the coordination hint and the no-channels line.
-TEAM_PROMPT_BC = """You are {me}, one of {n} agents on a team; your teammates are {others}. You all received the same question, and you all search the same document collection, each with your own search tools. Nobody sees another agent's searches, documents or reasoning.
+TEAM_PROMPT_BC = """You are {me}, one of {n} agents on a team; your teammates are {others}. You all received the same question, and each of you searches the document collection with your own search tools. Nobody sees another agent's searches, documents or reasoning.{split}
 
-The team gives one answer: submit_team_answer stores it, and each submission replaces the previous one, whoever made it. The answer standing when the team stops is the team's answer.
+The team gives one answer: submit_team_answer stores it, and each submission replaces the previous one, whoever made it. The answer standing when the team stops is the team's answer. If nobody submits, the team's answer is the most common of its members' final answers.
 
 Nobody has assigned roles or a plan. Decide as a team how to answer the question.{hint}
 
@@ -98,8 +100,9 @@ def _as_object(data):
 
 
 class Team:
-    def __init__(self, task, make_agent, n_agents, comm, log, seed, coordinate=False, browsecomp=False):
+    def __init__(self, task, make_agent, n_agents, comm, log, seed, coordinate=False, browsecomp=False, split=0):
         self.task, self.log, self.channels = task, log, CHANNELS[comm]
+        self.split = split
         self.bc = None
         if browsecomp:
             import browsecomp as bc
@@ -129,8 +132,10 @@ class Team:
             channels = ("You can coordinate with your teammates, as much or as little as you like:\n"
                         + "\n".join(CHANNEL_TEXT[c] for c in order)) if order else (NO_CHANNELS_BC if browsecomp else NO_CHANNELS)
             hint = (COORDINATE_HINT_BC if browsecomp else COORDINATE_HINT) if coordinate and order else ""
-            prompt = (TEAM_PROMPT_BC if browsecomp else TEAM_PROMPT).format(
-                me=me, n=n_agents, others=", ".join(a for a in self.ids if a != me), channels=channels, hint=hint)
+            fields = dict(me=me, n=n_agents, others=", ".join(a for a in self.ids if a != me), channels=channels, hint=hint)
+            if browsecomp:
+                fields["split"] = " " + self.bc.split_note(self.ids.index(me), self.ids) if split else ""
+            prompt = (TEAM_PROMPT_BC if browsecomp else TEAM_PROMPT).format(**fields)
             agent = make_agent(name=me, tools={**self._env_tools(me), **self._comm_tools(me)},
                                system_prompt=(self.bc.system_prompt() if browsecomp else wb.SYSTEM_PROMPT) + "\n\n" + prompt)
             agent.inbox = lambda me=me: self._drain(me)
@@ -176,7 +181,8 @@ class Team:
 
     def _search_tools(self, me):
         """BrowseComp-Plus: this agent's own search session, logged, plus the team's one answer slot."""
-        session = self.sessions[me] = self.bc.Session()
+        session = self.sessions[me] = (self.bc.Session(shard=self.ids.index(me), n_shards=self.split) if self.split
+                                       else self.bc.Session())
         tools = {}
         for name, (fn, schema) in session.tools.items():
             if name == "done":
@@ -372,11 +378,19 @@ class Team:
         }
         extra, trace_extra = {}, {}
         if self.bc:
-            # The team's answer is the last submission; if nobody submitted, the last reply that said anything.
-            last_reply = next((e["reply"] for e in reversed(self.events) if e["kind"] == "idle" and e["reply"].strip()), "")
+            # The team's answer is the last submission; if nobody submitted, a majority vote over each member's
+            # last reply (ties to the first agent).
+            last = {}
+            for e in self.events:
+                if e["kind"] == "idle" and e["reply"].strip():
+                    last[e["agent"]] = e["reply"]
             a = self.team_answer
-            answer = (f"Exact Answer: {a['answer']}\nConfidence: {a['confidence'] if a['confidence'] is not None else 100}%"
-                      if a else last_reply)
+            if a:
+                answer, rule, vote = (f"Exact Answer: {a['answer']}\nConfidence: "
+                                      f"{a['confidence'] if a['confidence'] is not None else 100}%"), "submitted", None
+            else:
+                answer, votes, vote = self.bc.majority_answer([(x, last[x]) for x in self.ids if x in last])
+                rule, vote = "vote", {"votes": votes, "answers": vote}
             seen = Counter(d for x in self.sessions.values() for d in {d for q in x.searches for d in q["docids"]})
             queries = Counter(q["query"].strip().lower() for x in self.sessions.values() for q in x.searches)
             comm.update({"team_answers": len(self.submissions),
@@ -384,7 +398,9 @@ class Team:
                          "docs_seen_by_several": sum(1 for c in seen.values() if c > 1),
                          "repeated_queries": sum(c - 1 for c in queries.values() if c > 1)})
             extra = {"answer": answer, "sessions": list(self.sessions.values())}
-            trace_extra = {"team_answers": self.submissions}
+            trace_extra = {"team_answers": self.submissions, "answer_rule": rule, "vote": vote, "split": self.split,
+                           "blocked_opens": {x: s.blocked for x, s in self.sessions.items() if s.blocked}}
+            comm["answer_rule"] = rule
         return {
             "actions": [] if self.bc else list(self.sandbox.actions), **extra,
             "stop": "final" if not self.expired() else "time_limit",
@@ -402,5 +418,5 @@ class Team:
 
 
 def run(task, make_agent, n_agents=3, comm="all", log=lambda label, text: None, seed=0, coordinate=False,
-        browsecomp=False):
-    return Team(task, make_agent, n_agents, comm, log, seed, coordinate, browsecomp).run()
+        browsecomp=False, split=0):
+    return Team(task, make_agent, n_agents, comm, log, seed, coordinate, browsecomp, split).run()

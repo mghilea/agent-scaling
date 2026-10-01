@@ -211,24 +211,45 @@ class WorkBenchEnv:
     text_answers = False
     system_prompt = wb.SYSTEM_PROMPT
 
-    def session(self):
+    def session(self, index=None):
         return wb.Sandbox()
+
+    def worker_note(self, index, ids):
+        return ""
+
+    def team_note(self, ids):
+        return ""
 
     def task_text(self, task):
         return task
 
 
 class BrowseCompEnv:
-    """BrowseComp-Plus: each worker searches the shared read-only collection; an answer is text."""
+    """BrowseComp-Plus: each worker searches the shared read-only collection; an answer is text.
+
+    split=n gives worker i only its own 1/n of the collection (strict: it can't open pages in other parts),
+    tells each worker so, and tells the orchestrator how the collection is divided.
+    """
     text_answers = True
 
-    def __init__(self):
+    def __init__(self, split=0):
         import browsecomp
-        self.bc = browsecomp
+        self.bc, self.split = browsecomp, split
         self.system_prompt = browsecomp.system_prompt()
 
-    def session(self):
+    def session(self, index=None):
+        if self.split and index is not None:
+            return self.bc.Session(shard=index, n_shards=self.split)
         return self.bc.Session()
+
+    def worker_note(self, index, ids):
+        return "\n\n" + self.bc.split_note(index, ids) if self.split else ""
+
+    def team_note(self, ids):
+        if not self.split:
+            return ""
+        return ("\n\nThe document collection is split into parts: " + ", ".join(ids) + " can each search and open only "
+                "their own part, and the evidence for a question is usually spread across all the parts.")
 
     def task_text(self, task):
         return self.bc.task_prompt(task)
@@ -245,12 +266,12 @@ def exact_answer(text):
 class Worker:
     """A tool-using sub-agent with its own sandbox and a conversation that persists across rounds."""
 
-    def __init__(self, make_agent, agent_id, task, objective, focus, role, env):
+    def __init__(self, make_agent, agent_id, task, objective, focus, role, env, index=None, ids=()):
         self.id, self.objective, self.focus, self.env = agent_id, objective, focus, env
         self.task = env.task_text(task)
-        self.sandbox = env.session()
+        self.sandbox = env.session(index)
         self.agent = make_agent(name=agent_id, tools=self.sandbox.tools,
-                                system_prompt=env.system_prompt + "\n\n" + role)
+                                system_prompt=env.system_prompt + "\n\n" + role + env.worker_note(index, ids))
         self.summaries = []  # what it sent the team at the end of each round
         self.writes = []     # (round, action) for every change it made (rejected writes excluded)
         self.answers = []    # text benchmarks: its answer at the end of each round
@@ -322,7 +343,9 @@ class Team:
         self.rounds = 0
 
     def add_worker(self, agent_id, objective, focus):
-        w = Worker(self.make_agent, agent_id, self.task, objective, focus, WORKER_ROLE[self.topology], self.env)
+        ids = [f"agent_{i}" for i in range(1, self.n + 1)]
+        w = Worker(self.make_agent, agent_id, self.task, objective, focus, WORKER_ROLE[self.topology], self.env,
+                   index=len(self.workers), ids=ids)
         self.workers.append(w)
         return w
 
@@ -336,7 +359,9 @@ class Team:
         if self.orchestrator is None:
             tools = "\n".join(f"- {name}: {schema['function']['description'].strip().splitlines()[0]}"
                               for name, (_, schema) in self.env.session().tools.items())
-            system = ORCHESTRATOR_SYSTEM.format(date=self.env.system_prompt, n=self.n, tools=tools, task=self.task)
+            ids = [f"agent_{i}" for i in range(1, self.n + 1)]
+            system = ORCHESTRATOR_SYSTEM.format(date=self.env.system_prompt + self.env.team_note(ids), n=self.n,
+                                                tools=tools, task=self.task)
             self.orchestrator = self.make_agent(name="orchestrator", tools={}, system_prompt=system)
         reply, reasoning = self.orchestrator.ask([{"role": "system", "content": self.orchestrator.system_prompt},
                                                   {"role": "user", "content": prompt}])

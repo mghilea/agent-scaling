@@ -17,6 +17,11 @@ text (pages average ~22K characters, so one search is ~25K tokens), which fits G
 gpt-oss's 128K after a few searches. Here a hit shows a 2,000-character snippet and retrieve_document returns
 the page 20,000 characters at a time.
 
+Split collection (Session(shard=i, n_shards=n), agent.py --split n): each agent searches and opens only its own
+part of the collection, a fixed random split by docid, so a question's evidence is usually spread across agents.
+It is strict: a page in another agent's part can't be opened even by its docid, so findings must be passed on
+in messages.
+
 Answers are graded by an LLM judge with the paper's BrowseComp grader prompt (the paper used gemini-2.0-flash;
 here the local model at temperature 0).
 """
@@ -62,6 +67,22 @@ def grader_prompt():
     return yaml.safe_load(open(PAPER_REPO / "prompts/eval/browsecomp-grader.yaml"))[0]["content"]
 
 
+def shard_of(docid, n_shards):
+    """Which agent's part of the collection a page is in: a fixed random split by docid."""
+    import hashlib
+    return int(hashlib.sha256(str(docid).encode()).hexdigest(), 16) % n_shards
+
+
+def split_note(me_index, ids):
+    """The line every agent in a split team gets, saying who searches what."""
+    rest = [a for i, a in enumerate(ids) if i != me_index]
+    others = ", ".join(rest[:-1]) + " and " + rest[-1] if len(rest) > 1 else rest[0]
+    return (f"You can search and open only your own part of the document collection, about 1/{len(ids)} of it; "
+            f"{others} each search a different part. The evidence for a question is usually spread across all the "
+            "parts, so nobody can answer alone: what you find, they cannot see unless you tell them, and what they "
+            "find, you cannot see unless they tell you.")
+
+
 def load_tasks(limit=None, sample="paper", offset=0):
     """Questions as dicts: id, question, answer, gold_docs, evidence_docs.
 
@@ -103,6 +124,7 @@ class Corpus:
             vecs.append(v.astype(np.float32))
             self.docids += [str(i) for i in ids]
         self.vectors = np.concatenate(vecs)
+        self._parts = {}
         from openai import OpenAI
         self.embedder = OpenAI(base_url=EMBED_URL, api_key="EMPTY")
 
@@ -110,10 +132,22 @@ class Corpus:
         r = self.embedder.embeddings.create(model=EMBED_MODEL, input=texts)
         return np.array([d.embedding for d in r.data], dtype=np.float32)
 
-    def search(self, query, k=TOP_K):
-        scores = self.vectors @ self.embed([QUERY_PREFIX + query])[0]
+    def part(self, shard, n_shards):
+        """The rows of one part of a split collection: (row indices, their vectors), built once and kept."""
+        key = (shard, n_shards)
+        with self._lock:
+            if key not in self._parts:
+                rows = np.array([i for i, d in enumerate(self.docids) if shard_of(d, n_shards) == shard])
+                self._parts[key] = (rows, np.ascontiguousarray(self.vectors[rows]))
+            return self._parts[key]
+
+    def search(self, query, k=TOP_K, shard=None, n_shards=None):
+        q = self.embed([QUERY_PREFIX + query])[0]
+        rows, vectors = self.part(shard, n_shards) if shard is not None else (None, self.vectors)
+        scores = vectors @ q
         top = np.argpartition(-scores, k)[:k]
-        return [(self.docids[i], float(scores[i])) for i in top[np.argsort(-scores[top])]]
+        top = top[np.argsort(-scores[top])]
+        return [(self.docids[rows[i] if rows is not None else i], float(scores[i])) for i in top]
 
 
 def _snippet(text, n=SNIPPET_CHARS):
@@ -129,9 +163,11 @@ def _schema(name, description, props, required):
 class Session:
     """One agent's tools over the shared corpus, recording its searches, reads and final answer."""
 
-    def __init__(self):
+    def __init__(self, shard=None, n_shards=None):
         self.corpus = Corpus.get()
+        self.shard, self.n_shards = shard, n_shards
         self.searches, self.reads, self.answer = [], [], None
+        self.blocked = []  # docids it tried to open in another agent's part (split teams)
         self.tools = {
             "search_documents": (self.search_documents, _schema(
                 "search_documents", f"Search the document collection. Returns the top {TOP_K} hits, each with its "
@@ -149,7 +185,7 @@ class Session:
         }
 
     def search_documents(self, query=""):
-        hits = self.corpus.search(str(query))
+        hits = self.corpus.search(str(query), shard=self.shard, n_shards=self.n_shards)
         self.searches.append({"query": query, "docids": [d for d, _ in hits]})
         return json.dumps([{"docid": d, "score": round(s, 4), "snippet": _snippet(self.corpus.text.get(d, ""))}
                            for d, s in hits], ensure_ascii=False)
@@ -158,6 +194,10 @@ class Session:
         text = self.corpus.text.get(str(docid).strip())
         if text is None:
             return json.dumps({"error": f"no document with docid {docid!r}"})
+        if self.shard is not None and shard_of(str(docid).strip(), self.n_shards) != self.shard:
+            self.blocked.append(str(docid).strip())
+            return json.dumps({"error": f"document {docid!r} is in a teammate's part of the collection; you can't "
+                                        "open it. Ask the teammate who found it what it says."})
         offset = max(0, int(offset or 0))
         self.reads.append(str(docid).strip())
         page = {"docid": docid, "text": text[offset:offset + PAGE_CHARS]}
@@ -181,6 +221,27 @@ def response_text(session, final):
 
 OUT_OF_TURNS = ("You have used all your tool calls. Based on what you have found, give your best final answer now, "
                 "in the required format.")
+
+
+def majority_answer(replies):
+    """Majority vote over agents' final replies on their normalized "Exact Answer" line; ties go to the first.
+
+    replies: [(agent, reply)] in agent order. Returns (reply, votes, {agent: normalized answer}).
+    """
+    keyed = [(a, r, _exact(r)) for a, r in replies if r and r.strip()]
+    if not keyed:
+        return "", 0, {}
+    counts = {}
+    for _, _, k in keyed:
+        counts[k] = counts.get(k, 0) + 1
+    best = max(counts.values())
+    winner = next(r for _, r, k in keyed if counts[k] == best)
+    return winner, best, {a: k for a, _, k in keyed}
+
+
+def _exact(text):
+    m = re.search(r"exact answer\W*:?\**\s*(.+)", text or "", re.I)
+    return _norm(m.group(1) if m else text)
 
 
 def _norm(text):

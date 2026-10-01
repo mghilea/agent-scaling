@@ -340,6 +340,9 @@ def main():
     ap.add_argument("--limit", type=int, help="workbench: run a random sample of this many tasks; "
                                                   "browsecomp: the first this many of the paper's 100")
     ap.add_argument("--seed", type=int, default=0, help="workbench: which random sample --limit takes")
+    ap.add_argument("--split", type=int, default=0,
+                    help="browsecomp, multi-agent: split the document collection into this many parts, one per agent "
+                         "(strict: an agent can only search and open its own part)")
     ap.add_argument("--offset", type=int, default=0,
                     help="browsecomp: skip this many questions first (to split a run across jobs with --limit)")
     ap.add_argument("--domain", action="append", help="workbench: only this domain (repeatable), e.g. email")
@@ -383,6 +386,8 @@ def main():
     multi = args.topology != "single"
     if multi and not (wb or bc):
         sys.exit("the multi-agent topologies need --benchmark workbench or browsecomp")
+    if args.split and not (bc and multi and args.split == args.agents):
+        sys.exit("--split needs --benchmark browsecomp, a multi-agent topology, and one part per agent (--agents)")
 
     client = OpenAI(base_url=args.base_url, api_key="EMPTY")
     if not args.model:
@@ -396,6 +401,7 @@ def main():
     if driven:
         import agent_driven
     topo_name = f"agent-driven-{args.comm}{'-coord' if args.coordinate else ''}" if driven else args.topology
+    topo_name += f"-split{args.split}" if args.split else ""
     kind = "ask" if args.ask else ("sas" if not multi else topo_name) + ("-workbench" if wb else "-browsecomp" if bc else "")
     run_dir = ROOT / "runs" / f"{datetime.now():%Y%m%d-%H%M%S}-{kind}-{args.model}{'-' + args.tag if args.tag else ''}"
     (run_dir / "traces").mkdir(parents=True)
@@ -417,11 +423,11 @@ def main():
         try:
             if driven:
                 r = agent_driven.run(t["question"], make_agent, args.agents, args.comm, log_message, seed=t["id"],
-                                     coordinate=args.coordinate, browsecomp=bool(bc))
+                                     coordinate=args.coordinate, browsecomp=bool(bc), split=args.split)
                 actions = r["actions"]
             elif multi:
                 r = mas.run(args.topology, t["question"], make_agent, args.agents, args.rounds, log_message,
-                            env=mas.BrowseCompEnv() if bc else None)
+                            env=mas.BrowseCompEnv(split=args.split) if bc else None)
                 actions = r["actions"]
             elif wb:
                 sandbox = wb.Sandbox()
