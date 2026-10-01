@@ -8,6 +8,7 @@ One of the paper's six benchmarks. setup.sh (with BROWSECOMP=1) puts everything 
   questions never appear as plain text online, so that file stays in /scratch: not in git, not on pages.
 - the paper's 100-question sample is the default task set (the authors' repo, cloned next to it).
 
+The agent gets the paper's BrowseComp prompts (prompts/dataset-shared/browsecomp.yaml), word for word.
 Search follows the paper's dense setup: the query, with Qwen3-Embedding's instruction prefix, is embedded by a
 second vLLM server on the same GPU (port $EMBED_PORT) and every document is ranked by inner product with
 the prebuilt index (the paper's FAISS flat search, done with numpy). The tools are the paper's three:
@@ -39,9 +40,21 @@ TOP_K = 5
 SNIPPET_CHARS = 2000
 PAGE_CHARS = 20000
 
-SYSTEM_PROMPT = """You answer hard research questions using a search engine over a fixed collection of web documents.
-Search as many times as you need, read the documents that look relevant, and check every condition in the question
-before answering. When you are confident, call done with your exact final answer and a confidence from 0 to 100."""
+def _paper_prompts():
+    import yaml
+    return yaml.safe_load(open(PAPER_REPO / "prompts/dataset-shared/browsecomp.yaml"))
+
+
+def system_prompt():
+    """The paper's BrowseComp task description and behavior instructions, word for word."""
+    t = _paper_prompts()
+    return t["task_description_with_tools_template"].strip() + "\n\n" + t["task_behavior_template"].strip()
+
+
+def task_prompt(question):
+    """The paper's question template plus its answer format (Explanation / Exact Answer / Confidence)."""
+    t = _paper_prompts()
+    return t["task_instance_template"].replace("{{question}}", question) + "\n\n" + t["task_output_template"].strip()
 
 def grader_prompt():
     """The paper's grader prompt, word for word (prompts/eval/browsecomp-grader.yaml in the authors' repo)."""
@@ -163,6 +176,15 @@ def response_text(session, final):
         a = session.answer
         return f"Exact Answer: {a['answer']}\nConfidence: {a['confidence'] if a['confidence'] is not None else 100}%"
     return final or ""
+
+
+def _norm(text):
+    return re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()
+
+
+def answer_in_response(response, correct_answer):
+    """A rough cross-check on the judge: does the correct answer appear, normalized, in the response?"""
+    return bool(_norm(correct_answer)) and f" {_norm(correct_answer)} " in f" {_norm(response)} "
 
 
 def judge(client, model, question, response, correct_answer):

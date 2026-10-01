@@ -5,6 +5,7 @@
 #   sbatch run.sbatch                                  # gpt-oss-20b, all tasks
 #   sbatch run.sbatch 20b --reasoning-effort low       # extra args go to agent.py
 #   sbatch --gres=gpu:2 -c 16 --mem=128G run.sbatch 120b
+#   sbatch --export=ALL,BROWSECOMP=1 run.sbatch 20b --benchmark browsecomp   # also sets up BrowseComp-Plus
 #
 # Watch it:   tail -f logs/agent-<jobid>.out    (vLLM's own log: logs/vllm-<jobid>.log)
 # Cancel it:  scancel <jobid>
@@ -22,7 +23,8 @@ size="${1:-20b}"
 [[ $# -gt 0 ]] && shift
 
 export VLLM_LOG="$SLURM_SUBMIT_DIR/logs/vllm-$SLURM_JOB_ID.log"
+export PORT=$((20000 + SLURM_JOB_ID % 20000))  # a port of its own, so jobs can share a node
 source ./setup.sh "$size" || exit 1
 
-python agent.py "$@"
+python agent.py "$@" --base-url "http://localhost:$PORT/v1"
 echo "finished $(date)"

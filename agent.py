@@ -411,7 +411,7 @@ def main():
                 actions = sandbox.actions
             elif bc:
                 session = bc.Session()
-                r = make_agent(tools=session.tools, system_prompt=bc.SYSTEM_PROMPT).run(t["question"])
+                r = make_agent(tools=session.tools, system_prompt=bc.system_prompt()).run(bc.task_prompt(t["question"]))
             else:
                 r = make_agent().run(t["question"])
         except Exception as e:
@@ -421,7 +421,8 @@ def main():
             # running out of turns or context after answering still counts the answer.
             response = bc.response_text(session, r["final"])
             correct, judgment = bc.judge(client, args.model, t["question"], response, t["answer"])
-            verdict = {"judgment": judgment, **bc.retrieval_stats(session, t)}
+            verdict = {"judgment": judgment, "answer_in_response": bc.answer_in_response(response, t["answer"]),
+                       **bc.retrieval_stats(session, t)}
             answer, expected = response, t["answer"]
         elif wb:
             # Scored on what the agents did (their tool calls), not on what they said.
