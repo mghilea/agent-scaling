@@ -1,0 +1,412 @@
+<title>Agent-Driven Communication</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root {
+  --ground: #f3f5f8; --surface: #fbfcfd; --sunken: #e7ebf1; --ink: #16202e; --ink-2: #3e4a5c; --muted: #5d6879; --line: #d2d9e3; --grid: #e3e8ee;
+  --msg: #2a78d6; --a2a: #eb6834; --state: #1baf7a; --write: #16202e; --pass: #22784a; --pass-soft: #dcf1e5; --fail: #b3261e; --fail-soft: #fbe2df;
+  --seq: #2a78d6; --seq-soft: #d6e5f7;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  --cond: "IBM Plex Sans Condensed", "IBM Plex Sans", "Arial Narrow", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, "Courier New", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground: #0e131a; --surface: #151c26; --sunken: #1d2632; --ink: #e5eaf1; --ink-2: #c3ccd8; --muted: #9aa7b8; --line: #2e3a4a; --grid: #232d3a;
+    --msg: #3987e5; --a2a: #d95926; --state: #199e70; --write: #e5eaf1; --pass: #53c487; --pass-soft: #163527; --fail: #f2786d; --fail-soft: #3d1c1a;
+    --seq: #3987e5; --seq-soft: #1b3150;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #0e131a; --surface: #151c26; --sunken: #1d2632; --ink: #e5eaf1; --ink-2: #c3ccd8; --muted: #9aa7b8; --line: #2e3a4a; --grid: #232d3a;
+  --msg: #3987e5; --a2a: #d95926; --state: #199e70; --write: #e5eaf1; --pass: #53c487; --pass-soft: #163527; --fail: #f2786d; --fail-soft: #3d1c1a;
+  --seq: #3987e5; --seq-soft: #1b3150;
+}
+* { box-sizing: border-box; }
+body { background: var(--ground); color: var(--ink); font: 16px/1.6 var(--sans); }
+.wrap { max-width: 1120px; margin: 0 auto; padding-inline: 20px; padding-block: 36px 60px; display: grid; gap: 52px; }
+header { display: grid; gap: 14px; }
+.eyebrow { margin: 0; font: 600 12px/1.4 var(--sans); letter-spacing: .1em; text-transform: uppercase; color: var(--msg); }
+h1 { margin: 0; font: 600 clamp(30px, 4.4vw, 46px)/1.1 var(--cond); text-wrap: balance; max-width: 24ch; }
+h2 { margin: 0; font: 600 clamp(23px, 3vw, 30px)/1.2 var(--cond); text-wrap: balance; }
+h3 { margin: 0; font: 600 19px/1.3 var(--cond); }
+p { margin: 0; }
+.lede { font-size: 18px; color: var(--muted); max-width: 72ch; }
+.code, code { font-family: var(--mono); font-size: 13.5px; background: var(--sunken); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+section { display: grid; gap: 18px; }
+.sectionhead { display: grid; gap: 6px; }
+.sectionhead p { color: var(--muted); max-width: 74ch; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; gap: 6px; align-content: start; }
+.card b { font-weight: 600; }
+.card p { color: var(--muted); font-size: 15px; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
+.tablewrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+table { border-collapse: collapse; width: 100%; min-width: 720px; font-size: 14.5px; font-variant-numeric: tabular-nums; }
+th, td { padding: 9px 13px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 600 12px/1.4 var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); background: var(--sunken); }
+td.n, th.n { text-align: right; }
+tr:last-child td { border-bottom: none; }
+tr.ref td { color: var(--muted); }
+tr.sep td { background: var(--sunken); font: 600 12px/1.4 var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.pill { display: inline-block; padding: 0 8px; border-radius: 999px; font: 600 12px/1.7 var(--sans); }
+.pill.good { background: var(--pass-soft); color: var(--pass); }
+.pill.bad { background: var(--fail-soft); color: var(--fail); }
+.note { font-size: 14px; color: var(--muted); max-width: 84ch; }
+figure { margin: 0; display: grid; gap: 8px; }
+figcaption { font-size: 14px; color: var(--muted); max-width: 84ch; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13.5px; color: var(--ink-2); }
+.legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.axis text, .lbl { fill: var(--muted); font: 12px var(--sans); }
+.val { fill: var(--ink-2); font: 500 12px var(--sans); font-variant-numeric: tabular-nums; }
+.cat { fill: var(--ink); font: 500 13px var(--sans); }
+.gridline { stroke: var(--grid); stroke-width: 1; }
+.baseline { stroke: var(--line); stroke-width: 1; }
+.tip { position: fixed; z-index: 10; pointer-events: none; max-width: 340px; background: var(--ink); color: var(--surface); font: 13px/1.45 var(--sans); padding: 8px 10px; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.18); }
+.tip b { font-weight: 600; }
+.tip .mono { font-family: var(--mono); font-size: 12px; opacity: .9; overflow-wrap: anywhere; }
+.compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)); gap: 16px; }
+.compare .panel { display: grid; gap: 10px; align-content: start; }
+.compare ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 15px; color: var(--ink-2); }
+.lanes { display: grid; gap: 22px; }
+.lane-card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; gap: 8px; }
+.lane-head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; }
+.lane-head .q { color: var(--muted); font-size: 14px; flex-basis: 100%; }
+.quotes { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr)); gap: 14px; }
+.quote { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; gap: 8px; align-content: start; }
+.quote h3 { font-size: 18px; }
+.quote p { font-size: 15px; color: var(--ink-2); }
+.quote .ex { font: 13px/1.5 var(--mono); background: var(--sunken); border-radius: 8px; padding: 8px 10px; color: var(--ink); overflow-wrap: anywhere; display: grid; gap: 4px; }
+.quote .ex span { color: var(--muted); }
+ol.next { margin: 0; padding-left: 22px; display: grid; gap: 10px; max-width: 84ch; }
+ol.next li span { display: block; color: var(--muted); font-size: 15px; }
+footer { font-size: 14px; color: var(--muted); display: grid; gap: 6px; border-top: 1px solid var(--line); padding-top: 18px; }
+.pending { color: var(--muted); font-style: italic; }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">agent-scaling · WorkBench · gpt-oss-20b · 30 September 2026</p>
+    <h1>What agents say when nobody schedules the conversation</h1>
+    <p class="lede">The scaling paper’s multi-agent setups talk on a fixed schedule: every round, every worker writes a summary and the harness delivers it. We replaced that with an agent-driven team: three peers in one shared workspace who decide for themselves whether to talk, when, and through which channel: free-text messages, an A2A-style task protocol, or a shared state they create and edit.</p>
+    <div class="cards">
+      <div class="card"><b>Left alone, they don’t talk</b><p>With every channel open and WorkBench’s usual prompt, agents communicated in 2 of 10 tasks and never before acting. Each just did the job, and two or three agents changed the same thing in half the tasks.</p></div>
+      <div class="card"><b>Given a choice, prose and ad-hoc state</b><p>Asked to coordinate with every channel open, they used free-text messages and invented shared-state keys, and never opened an A2A task.</p></div>
+      <div class="card"><b>Structure carried data, not agreement</b><p>Every A2A and shared-state write was structured, yet claims still collided and each agent invented its own keys, so nobody read the others’ flags.</p></div>
+      <div class="card"><b>A fraction of the chatter</b><p>60–650 characters per task against 12,000–20,000 in the fixed-round setups, with no accuracy loss. None of the conditions beat the single agent on these small tasks.</p></div>
+    </div>
+  </header>
+
+  <section>
+    <div class="sectionhead">
+      <h2>What fixed rounds make agents send</h2>
+      <p>From the 60 saved multi-agent traces of the paper’s setups (2 runs × 10 tasks each). The schedule, not the work, decides when messages go out.</p>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <tr><th>Setup</th><th class="n">Messages per task</th><th class="n">Typical length</th><th class="n">Markdown tables</th><th class="n">Later rounds with no tool call</th><th class="n">New IDs or addresses received</th><th class="n">…of which used</th></tr>
+        <tr><td>Centralized</td><td class="n">12</td><td class="n">1,657 chars (reports), 294 (guidance)</td><td class="n">46%</td><td class="n">18%</td><td class="n">7</td><td class="n">6</td></tr>
+        <tr><td>Decentralized</td><td class="n">12</td><td class="n">1,660 chars</td><td class="n">95%</td><td class="n">83%</td><td class="n">32</td><td class="n">9</td></tr>
+        <tr><td>Hybrid</td><td class="n">21</td><td class="n">1,629 (reports), 400 (peer)</td><td class="n">66%</td><td class="n">57%</td><td class="n">16</td><td class="n">8</td></tr>
+      </table>
+    </div>
+    <p class="note">“New IDs or addresses” counts email IDs, record IDs and email addresses that arrived in a worker’s messages and that it hadn’t already seen in its own tool results, over all 20 task-runs; “used” means it later passed one to a tool. None of the messages were JSON.</p>
+    <figure class="chart" id="volume"></figure>
+  </section>
+
+  <section>
+    <div class="sectionhead">
+      <h2>Two ways to run the same team</h2>
+      <p>Same model, same 27 WorkBench tools, same three agents. What changes is who decides about communication, and what the agents act on.</p>
+    </div>
+    <div class="compare">
+      <div class="panel">
+        <h3>The paper’s rounds (mas.py)</h3>
+        <ul>
+          <li>The harness runs synchronized rounds; every worker acts, then writes a summary.</li>
+          <li>Summaries are delivered whether or not anyone needs them: to the orchestrator, to peers, or both.</li>
+          <li>Each worker has a private copy of the databases; an aggregation step (union, vote, orchestrator’s pick) decides the answer.</li>
+          <li>Agents can’t choose whom to contact, when, or in what format.</li>
+        </ul>
+      </div>
+      <div class="panel">
+        <h3>Agent-driven (agent_driven.py)</h3>
+        <ul>
+          <li>Three peers start at once and run independently; no rounds, no orchestrator.</li>
+          <li>One shared workspace: a change made twice happens twice, and the team is scored on the end state.</li>
+          <li>Optional channels: <code>send_message</code>; an A2A-style task protocol with states and JSON data; a shared key-value store, empty at the start, versioned, with change notifications.</li>
+          <li>Messages reach a busy agent between its turns and wake an idle one; the run ends when everyone is idle.</li>
+        </ul>
+      </div>
+    </div>
+    <p class="note">Conditions: all channels (free choice) or one channel at a time, and optionally one extra sentence: “Before you change anything in the workspace, agree with your teammates on who does what, so that no change is made twice.” It asks for coordination without saying how. Channel descriptions are listed in a different random order for each agent.</p>
+  </section>
+
+  <section>
+    <div class="sectionhead">
+      <h2>Outcomes on the same 10 tasks</h2>
+      <p>One run per condition, so differences under about 20 points are noise. Paper setups are shown for reference.</p>
+    </div>
+    <div class="tablewrap">
+      <table id="outcomes"></table>
+    </div>
+    <p class="note">“Two or more agents changed the same target” counts tasks where at least two agents changed the same email, event, task, customer or chart, even with slightly different arguments. In analytics-65 every agent-driven condition drew the same chart two or three times, which alone fails the task.</p>
+  </section>
+
+  <section>
+    <div class="sectionhead">
+      <h2>Which channel they chose</h2>
+      <p>Communication acts per task: messages sent, A2A tasks opened or updated, shared-state keys written. Reads aren’t counted here.</p>
+    </div>
+    <figure class="chart">
+      <div class="legend"><span><i style="background:var(--msg)"></i>Free-text message</span><span><i style="background:var(--a2a)"></i>A2A task or update</span><span><i style="background:var(--state)"></i>Shared-state write</span></div>
+      <div id="channels"></div>
+      <figcaption>With every channel available and the coordination sentence, agents split between messages (0.8 per task) and shared state (0.6) and never opened an A2A task. Restricted to one channel, text was used the most and earliest. The shared-state condition also read the store 3.5 times per task.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <div class="sectionhead">
+      <h2>What they exchanged</h2>
+      <p>Every communication act from all conditions, labeled by gpt-oss-20b into one of seven kinds. Counts, pooled across conditions by channel.</p>
+    </div>
+    <div class="tablewrap"><table id="acts"></table></div>
+    <p class="note">Messages carried plans, claims and questions in prose; none were JSON. Every A2A payload and every shared-state value was structured (JSON or key-value). A2A was used to ask a teammate for something and to report “completed”; shared state became a status board.</p>
+  </section>
+
+  <section>
+    <div class="sectionhead">
+      <h2>Three runs, second by second</h2>
+      <p>Real traces. Each row is one agent; hover a mark to see the exact call, message or value.</p>
+    </div>
+    <div class="legend"><span><i style="background:var(--muted);border-radius:50%"></i>read-only tool call</span><span><i style="background:var(--write)"></i>change to the workspace</span><span><i style="background:var(--msg)"></i>message (line shows recipients)</span><span><i style="background:var(--a2a)"></i>A2A</span><span><i style="background:var(--state);transform:rotate(45deg)"></i>shared-state write</span><span><i style="border:2px solid var(--state);background:transparent;border-radius:50%"></i>shared-state read</span></div>
+    <div class="lanes" id="lanes"></div>
+  </section>
+
+  <section>
+    <div class="sectionhead"><h2>Patterns in the traces</h2></div>
+    <div class="quotes">
+      <div class="quote"><h3>Claims without arbitration</h3><p>Agents announce “I’ll do it, nobody else touch it” at nearly the same moment, often after a teammate already did it.</p>
+        <div class="ex"><span>5.1 s agent_1</span>Planning to delete Peyton Jones from CRM. Will search and delete using their customer ID.<span>5.2 s agent_3</span>Planning to delete Peyton Jones from CRM. I will search for the customer ID and then delete the record.<span>7.8 s agent_2</span>Peyton Jones already deleted from CRM by me.</div></div>
+      <div class="quote"><h3>Everyone invents their own keys</h3><p>Shared state filled up with private status flags. For the same task one agent wrote <code>dakota_update_status</code> and another <code>customer_update_Dakota_Wilson_to_Raj</code>, so neither read the other’s.</p>
+        <div class="ex"><span>kofi_meeting_plan</span>{"status":"planning","owner":"agent_3"}<span>kofi_meeting_created</span>00000300<span>kofi_meeting_schedule_status</span>pending → scheduled</div></div>
+      <div class="quote"><h3>Structure isn’t correctness</h3><p>A2A payloads were clean JSON, but they carried guessed values, and two agents sometimes delegated the same question to each other.</p>
+        <div class="ex"><span>A2A T1 agent_1 → agent_2</span>{"email_id": "00000120", "recipient": "nadia@atlas.com"}<span>T2 agent_1 → failed</span>Unable to query all tasks due to API constraint; cannot determine person with fewest tasks.</div></div>
+      <div class="quote"><h3>Logging instead of locking</h3><p>With channels open but no nudge, one task’s agents used shared state as a log of their duplicates: three agents each added the same lead.</p>
+        <div class="ex"><span>last_added_lead_id v1, agent_2</span>00000200<span>v2, agent_3</span>00000201<span>v3, agent_1</span>00000202</div></div>
+      <div class="quote"><h3>They act before they read</h3><p>Reads of shared state or task lists per task: 0.2 with all channels open, 0.5 with the nudge, 3.5 when shared state was the only channel. Versioning refused 2 stale writes, so the lock primitive was there; agents just didn’t use it to claim work.</p></div>
+      <div class="quote"><h3>Talk is cheap here</h3><p>The one text-only condition with 90% of tasks coordinated spent 652 characters per task, about 3% of what decentralized rounds send, and matched the single agent’s 60%.</p></div>
+    </div>
+  </section>
+
+  <section id="complexity">
+    <div class="sectionhead">
+      <h2>Are the tasks too small for teamwork to pay?</h2>
+      <p>WorkBench does have a notion of size: how many changes the correct answer makes, and how many domains it touches. Most tasks are one lookup and one change.</p>
+    </div>
+    <figure class="chart">
+      <div id="sizes"></div>
+      <figcaption>Required changes per task across all 690 WorkBench tasks: 78% need 0 or 1, and only 64 tasks (9%) need 3 or more. All 10 tasks in our sample need 0–2.</figcaption>
+    </figure>
+    <div class="tablewrap">
+      <table>
+        <tr><th>Required changes</th><th class="n">0</th><th class="n">1</th><th class="n">2</th><th class="n">3–4</th><th class="n">5+</th></tr>
+        <tr><td>All 24 published models (2026 re-run)</td><td class="n">67%</td><td class="n">81%</td><td class="n">66%</td><td class="n">69%</td><td class="n">24%</td></tr>
+        <tr><td>GPT-4o</td><td class="n">80%</td><td class="n">78%</td><td class="n">47%</td><td class="n">32%</td><td class="n">7%</td></tr>
+        <tr><td>o3</td><td class="n">85%</td><td class="n">82%</td><td class="n">66%</td><td class="n">78%</td><td class="n">11%</td></tr>
+        <tr><td>Claude Opus 4.8</td><td class="n">93%</td><td class="n">98%</td><td class="n">94%</td><td class="n">97%</td><td class="n">89%</td></tr>
+      </table>
+    </div>
+    <p class="note">Single-agent accuracy from WorkBench’s published per-task results. Accuracy also falls from 80% for one-domain tasks to 28% for five-domain tasks. Large tasks are where single agents break, and where splitting the work could help.</p>
+    <div class="tablewrap"><table id="hard"></table></div>
+    <p class="note" id="hardnote"></p>
+  </section>
+
+  <section>
+    <div class="sectionhead"><h2>What this suggests</h2></div>
+    <ol class="next">
+      <li><b>The paper’s rounds overstate how much agents talk and hide the real coordination problem.</b><span>Private workspaces plus a merge step mean duplicate work is filtered by the harness. In a shared workspace, duplicates are the main failure, and agents rarely prevent them unprompted.</span></li>
+      <li><b>Free choice favors prose and ad-hoc shared state.</b><span>When A2A was optional it appeared in one task out of twenty. When it was the only channel, they used it for delegation and status, with structured data, but structure didn’t fix wrong values or colliding claims.</span></li>
+      <li><b>The missing piece is agreement, not format.</b><span>A claim primitive with arbitration (first writer wins, others see it before acting), a shared key convention, and a read-before-write habit would address the failures we saw better than a richer message schema.</span></li>
+      <li><b>Test where teamwork has room.</b><span>Tasks needing 3+ changes, composite requests that chain several independent tasks, and teams where each agent holds only some tools (one per domain, as in AppWorld) so information has to be exchanged.</span></li>
+    </ol>
+  </section>
+
+  <footer>
+    <p>Runs of 30 September 2026 (agent-driven, 10 tasks each, seed 0) and 23 September 2026 (paper setups, same tasks), gpt-oss-20b on vLLM. Code: <code>agent_driven.py</code>, <code>agent.py --topology agent-driven --comm all|text|a2a|shared|none [--coordinate]</code>; <code>show_trace.py</code> prints any run’s timeline.</p>
+    <p>Caveats: one run of 10 tasks per condition; message kinds labeled automatically by gpt-oss-20b; the agents’ system prompt keeps WorkBench’s standard “execute actions immediately” instruction, which favors acting over talking.</p>
+  </footer>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script>
+(function () {
+const NS = "http://www.w3.org/2000/svg";
+const tip = document.getElementById("tip");
+function el(tag, attrs, text) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text !== undefined) e.textContent = text; return e; }
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+function showTip(evt, html) { tip.innerHTML = html; tip.hidden = false; moveTip(evt); }
+function moveTip(evt) { const x = Math.min(evt.clientX + 14, innerWidth - tip.offsetWidth - 8), y = Math.min(evt.clientY + 14, innerHeight - tip.offsetHeight - 8); tip.style.left = x + "px"; tip.style.top = y + "px"; }
+function hideTip() { tip.hidden = true; }
+function hover(node, html) { node.addEventListener("pointerenter", (e) => showTip(e, html)); node.addEventListener("pointermove", moveTip); node.addEventListener("pointerleave", hideTip); node.setAttribute("tabindex", "0"); node.addEventListener("focus", (e) => { const r = node.getBoundingClientRect(); showTip({ clientX: r.right, clientY: r.top }, html); }); node.addEventListener("blur", hideTip); }
+
+// ---- data ----
+const OUT = [
+  // name, correct, side, tokens, commTasks, acts, chars, before, overlap, ref
+  ["Single agent (reference)", 60, 30, 32962, null, null, null, null, null, 1],
+  ["Decentralized, paper rounds (reference)", 80, 20, 227932, 100, 12, 19920, null, null, 1],
+  ["Centralized, paper rounds (reference)", 30, 60, 248524, 100, 12, 11706, null, null, 1],
+  ["sep", "Agent-driven, WorkBench’s usual prompt"],
+  ["No channels", 40, 40, 108885, 0, 0, 0, null, 5],
+  ["All channels (free choice)", 30, 50, 120072, 20, 0.6, 62, 0, 5],
+  ["sep", "Agent-driven, asked to coordinate"],
+  ["All channels (free choice)", 40, 40, 140839, 40, 1.4, 167, 50, 3],
+  ["Text messages only", 60, 20, 121587, 90, 4.0, 652, 89, 4],
+  ["A2A only", 40, 40, 126552, 40, 1.9, 270, 50, 4],
+  ["Shared state only", 50, 30, 178489, 70, 2.3, 182, 57, 4],
+];
+const CHANNELS = [ // label, message, a2a, state
+  ["All channels, usual prompt", 0.1, 0.2, 0.3],
+  ["All channels, coordinate", 0.8, 0.0, 0.6],
+  ["Text only, coordinate", 4.0, 0, 0],
+  ["A2A only, coordinate", 0, 1.9, 0],
+  ["Shared state only, coordinate", 0, 0, 2.3],
+];
+const ACT_KINDS = ["plan", "claim or assignment", "question or request", "status or result report", "information or data", "acknowledgment or agreement", "other"];
+const ACTS = { // channel -> counts by kind, pooled across conditions
+  "Free-text messages": { "plan": 13, "claim or assignment": 12, "question or request": 10, "status or result report": 8, "information or data": 1, "acknowledgment or agreement": 4, "other": 1 },
+  "A2A tasks": { "question or request": 8, "claim or assignment": 3, "other": 1 },
+  "A2A updates": { "status or result report": 9 },
+  "Shared-state writes": { "status or result report": 16, "information or data": 11, "claim or assignment": 4, "plan": 1 },
+};
+const STRUCTURED = { "Free-text messages": "0 of 49", "A2A tasks": "12 of 12", "A2A updates": "9 of 9", "Shared-state writes": "32 of 32" };
+const SIZES = [[0, 122], [1, 416], [2, 88], [3, 23], [4, 14], [5, 2], [6, 5], [7, 3], [8, 4], [9, 3], [10, 2], [11, 6], [12, 2]];
+const VOLUME = [["Decentralized rounds", 19920], ["Hybrid rounds", 18927], ["Centralized rounds", 11706], ["Agent-driven: text only, coordinate", 652], ["Agent-driven: A2A only, coordinate", 270], ["Agent-driven: shared state only, coordinate", 182], ["Agent-driven: all channels, coordinate", 167], ["Agent-driven: all channels, usual prompt", 62]];
+const LANES = /*LANES*/[];
+const HARD = /*HARD*/null;
+
+// ---- outcomes table ----
+const pct = (v) => v == null ? "–" : v + "%";
+const t = document.getElementById("outcomes");
+t.innerHTML = `<tr><th>Condition</th><th class="n">Correct</th><th class="n">Side effects</th><th class="n">Tokens per task</th><th class="n">Tasks with any communication</th><th class="n">Communication acts per task</th><th class="n">Characters sent per task</th><th class="n">Coordinated before the first change</th><th class="n">Two or more agents changed the same target</th></tr>` +
+  OUT.map((r) => r[0] === "sep" ? `<tr class="sep"><td colspan="9">${esc(r[1])}</td></tr>` :
+    `<tr class="${r[9] ? "ref" : ""}"><td>${esc(r[0])}</td><td class="n">${r[1]}%</td><td class="n">${r[2]}%</td><td class="n">${Math.round(r[3] / 1000)}k</td><td class="n">${pct(r[4])}</td><td class="n">${r[5] == null ? "–" : r[5]}</td><td class="n">${r[6] == null ? "–" : r[6].toLocaleString()}</td><td class="n">${r[7] == null ? "–" : r[7] + "%"}</td><td class="n">${r[8] == null ? "–" : r[8] + " of 10"}</td></tr>`).join("");
+
+// ---- horizontal bar chart helper (single series) ----
+function hbar(mount, rows, opts) {
+  const W = 760, rowH = 30, left = opts.left || 300, right = 70, top = 8, H = top + rows.length * rowH + 26;
+  const max = opts.max || Math.max(...rows.map((r) => r[1]));
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": opts.aria });
+  const x = (v) => left + (W - left - right) * v / max;
+  for (const tv of opts.ticks) {
+    svg.append(el("line", { x1: x(tv), x2: x(tv), y1: top, y2: H - 22, class: "gridline" }));
+    svg.append(el("text", { x: x(tv), y: H - 6, "text-anchor": "middle", class: "lbl" }, opts.fmt(tv)));
+  }
+  rows.forEach(([name, v, color], i) => {
+    const y = top + i * rowH;
+    svg.append(el("text", { x: left - 10, y: y + 19, "text-anchor": "end", class: "cat" }, name));
+    const w = Math.max(2, x(v) - left);
+    const bar = el("rect", { x: left, y: y + 6, width: w, height: 18, rx: 4, fill: color || "var(--seq)" });
+    svg.append(bar);
+    svg.append(el("text", { x: left + w + 6, y: y + 19, class: "val" }, opts.fmt(v)));
+    const hit = el("rect", { x: 0, y, width: W, height: rowH, fill: "transparent" });
+    hover(hit, `<b>${esc(name)}</b><br>${esc(opts.fmt(v))} ${esc(opts.unit || "")}`);
+    svg.append(hit);
+  });
+  svg.append(el("line", { x1: left, x2: left, y1: top, y2: H - 22, class: "baseline" }));
+  mount.append(svg);
+}
+hbar(document.getElementById("volume"), VOLUME.map(([n, v]) => [n, v, n.startsWith("Agent") ? "var(--msg)" : "var(--muted)"]),
+  { aria: "Characters agents sent each other per task", ticks: [0, 5000, 10000, 15000, 20000], max: 21000, fmt: (v) => v.toLocaleString(), unit: "characters per task", left: 330 });
+document.getElementById("volume").insertAdjacentHTML("beforeend", `<figcaption>Characters agents sent each other per task, on the same 10 tasks. Grey: the paper’s fixed rounds. Blue: agent-driven conditions.</figcaption>`);
+
+// ---- stacked channel chart ----
+(function () {
+  const W = 760, rowH = 34, left = 250, right = 60, top = 8, H = top + CHANNELS.length * rowH + 26, max = 4.4;
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Communication acts per task by channel" });
+  const x = (v) => left + (W - left - right) * v / max;
+  [0, 1, 2, 3, 4].forEach((tv) => { svg.append(el("line", { x1: x(tv), x2: x(tv), y1: top, y2: H - 22, class: "gridline" })); svg.append(el("text", { x: x(tv), y: H - 6, "text-anchor": "middle", class: "lbl" }, tv)); });
+  const cols = [["Free-text message", "var(--msg)"], ["A2A task or update", "var(--a2a)"], ["Shared-state write", "var(--state)"]];
+  CHANNELS.forEach(([name, ...vals], i) => {
+    const y = top + i * rowH;
+    svg.append(el("text", { x: left - 10, y: y + 21, "text-anchor": "end", class: "cat" }, name));
+    let acc = 0;
+    vals.forEach((v, j) => {
+      if (!v) return;
+      const x0 = x(acc), w = x(acc + v) - x0;
+      const seg = el("rect", { x: x0 + (acc ? 1 : 0), y: y + 7, width: Math.max(1, w - (acc ? 1 : 0)), height: 20, rx: 4, fill: cols[j][1] });
+      hover(seg, `<b>${esc(name)}</b><br>${esc(cols[j][0])}: ${v} per task`);
+      svg.append(seg);
+      if (w > 26) svg.append(el("text", { x: x0 + w / 2, y: y + 21, "text-anchor": "middle", class: "val", style: "fill:#ffffff" }, v));
+      acc += v;
+    });
+    svg.append(el("text", { x: x(acc) + 6, y: y + 21, class: "val" }, (Math.round(acc * 10) / 10).toString()));
+  });
+  svg.append(el("line", { x1: left, x2: left, y1: top, y2: H - 22, class: "baseline" }));
+  document.getElementById("channels").append(svg);
+})();
+
+// ---- speech acts table with inline bars ----
+(function () {
+  const chans = Object.keys(ACTS);
+  const tbl = document.getElementById("acts");
+  const head = `<tr><th>Kind of content</th>${chans.map((c) => `<th class="n">${esc(c)}</th>`).join("")}</tr>`;
+  const body = ACT_KINDS.map((k) => `<tr><td>${esc(k[0].toUpperCase() + k.slice(1))}</td>${chans.map((c) => {
+    const total = Object.values(ACTS[c]).reduce((a, b) => a + b, 0), v = ACTS[c][k] || 0, share = total ? v / total : 0;
+    return `<td class="n" title="${v} of ${total}"><span style="display:inline-flex;align-items:center;gap:8px;justify-content:flex-end;width:100%"><span style="display:inline-block;height:8px;width:${Math.round(60 * share)}px;border-radius:4px;background:var(--seq)"></span>${v ? v : "·"}</span></td>`;
+  }).join("")}</tr>`).join("");
+  const totals = `<tr><td><b>Total</b></td>${chans.map((c) => `<td class="n"><b>${Object.values(ACTS[c]).reduce((a, b) => a + b, 0)}</b></td>`).join("")}</tr>`;
+  const st = `<tr><td>Structured (JSON or key-value)</td>${chans.map((c) => `<td class="n">${STRUCTURED[c]}</td>`).join("")}</tr>`;
+  tbl.innerHTML = head + body + totals + st;
+})();
+
+// ---- size distribution ----
+hbar(document.getElementById("sizes"), SIZES.map(([n, v]) => [`${n} change${n === 1 ? "" : "s"}`, v, n >= 3 ? "var(--msg)" : "var(--muted)"]),
+  { aria: "Number of WorkBench tasks by required changes", ticks: [0, 100, 200, 300, 400], max: 440, fmt: (v) => v.toString(), unit: "tasks", left: 120 });
+
+// ---- swimlanes ----
+const KCOL = { read: "var(--muted)", write: "var(--write)", message: "var(--msg)", a2a: "var(--a2a)", state: "var(--state)", sread: "var(--state)", conflict: "var(--fail)", idle: "var(--line)" };
+LANES.forEach((L) => {
+  const card = document.createElement("div"); card.className = "lane-card";
+  const verdict = L.correct ? `<span class="pill good">PASS</span>` : `<span class="pill bad">FAIL${L.side_effects ? " · side effects" : ""}</span>`;
+  card.innerHTML = `<div class="lane-head"><h3>${esc(L.title)}</h3>${verdict}<span class="code">${esc(L.task)}</span><span class="q">“${esc(L.question)}” · correct answer: ${esc(L.expected.join("; ") || "no change")}</span></div>`;
+  const agents = ["agent_1", "agent_2", "agent_3"], W = 760, left = 70, right = 20, laneH = 46, top = 10;
+  const tmax = Math.ceil(Math.max(...L.events.map((e) => e.t)) / 5) * 5 + 1;
+  const H = top + agents.length * laneH + 28;
+  const x = (t) => left + (W - left - right) * t / tmax, y = (a) => top + agents.indexOf(a) * laneH + laneH / 2;
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": `Timeline of ${L.task} with ${L.events.length} events` });
+  for (let tv = 0; tv <= tmax; tv += 5) { svg.append(el("line", { x1: x(tv), x2: x(tv), y1: top, y2: H - 24, class: "gridline" })); svg.append(el("text", { x: x(tv), y: H - 8, "text-anchor": "middle", class: "lbl" }, tv + " s")); }
+  agents.forEach((a) => { svg.append(el("line", { x1: left, x2: W - right, y1: y(a), y2: y(a), class: "baseline" })); svg.append(el("text", { x: left - 10, y: y(a) + 4, "text-anchor": "end", class: "cat" }, a.replace("_", " "))); });
+  L.events.forEach((e) => {
+    const cx = x(e.t), cy = y(e.a), col = KCOL[e.k];
+    if ((e.k === "message" || e.k === "a2a") && e.to) e.to.forEach((to) => svg.append(el("line", { x1: cx, x2: cx, y1: cy, y2: y(to), stroke: col, "stroke-width": 2, "stroke-opacity": 0.7 })));
+    let m;
+    if (e.k === "write") m = el("rect", { x: cx - 6, y: cy - 6, width: 12, height: 12, rx: 2, fill: col, stroke: "var(--surface)", "stroke-width": 2 });
+    else if (e.k === "state") m = el("rect", { x: cx - 6, y: cy - 6, width: 12, height: 12, fill: col, stroke: "var(--surface)", "stroke-width": 2, transform: `rotate(45 ${cx} ${cy})` });
+    else if (e.k === "sread") m = el("circle", { cx, cy, r: 5, fill: "var(--surface)", stroke: col, "stroke-width": 2 });
+    else if (e.k === "idle") m = el("rect", { x: cx - 1.5, y: cy - 10, width: 3, height: 20, fill: "var(--muted)" });
+    else if (e.k === "conflict") m = el("text", { x: cx, y: cy + 5, "text-anchor": "middle", fill: col, style: "font:700 15px var(--sans)" }, "×");
+    else m = el("circle", { cx, cy, r: e.k === "read" ? 4.5 : 6.5, fill: col, stroke: "var(--surface)", "stroke-width": 2 });
+    svg.append(m);
+    const hit = el("circle", { cx, cy, r: 11, fill: "transparent" });
+    const to = e.to ? ` → ${e.to.join(", ")}` : "";
+    hover(hit, `<b>${e.t.toFixed(1)} s · ${esc(e.a)}${esc(to)}</b><br>${esc(e.label)}<div class="mono">${esc(e.detail)}</div>`);
+    svg.append(hit);
+  });
+  const fig = document.createElement("figure"); fig.className = "chart"; fig.append(svg); card.append(fig);
+  document.getElementById("lanes").append(card);
+});
+
+// ---- hard slice ----
+const hard = document.getElementById("hard"), hn = document.getElementById("hardnote");
+if (HARD) {
+  hard.innerHTML = `<tr><th>Tasks needing 3+ changes (${HARD.n} tasks)</th><th class="n">Correct</th><th class="n">Side effects</th><th class="n">Tokens per task</th><th class="n">Communication acts per task</th><th class="n">Two or more agents changed the same target</th></tr>` +
+    HARD.rows.map((r) => `<tr><td>${esc(r[0])}</td><td class="n">${r[1]}</td><td class="n">${r[2]}</td><td class="n">${r[3]}</td><td class="n">${r[4]}</td><td class="n">${r[5]}</td></tr>`).join("");
+  hn.textContent = HARD.note;
+} else { hard.remove(); hn.textContent = "A run on the 3+-change slice is in progress."; }
+})();
+</script>
