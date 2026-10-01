@@ -3,7 +3,9 @@
 # Submit from ~/agent-scaling, with a suite file holding one agent.py argument list per line:
 #
 #   sbatch suite.sbatch 20b suites/hard-a.txt
+#   sbatch suite.sbatch 20b suites/hard-a.txt --tag rep03   # extra args go to every line
 #
+# Each job serves vLLM on its own port, so several suite jobs can share a node.
 # Each line gets its own log, logs/suite-<jobid>-<n>.log; this job's own log is logs/suite-<jobid>.out.
 #SBATCH --job-name=suite
 #SBATCH --gres=gpu:1
@@ -17,6 +19,8 @@ echo "job $SLURM_JOB_ID on $(hostname -s), commit $(git rev-parse --short HEAD),
 size="${1:-20b}"
 suite="$2"
 [[ -f "$suite" ]] || { echo "no suite file: $suite" >&2; exit 1; }
+extra=("${@:3}")
+export PORT=$((20000 + SLURM_JOB_ID % 20000))
 
 export VLLM_LOG="$SLURM_SUBMIT_DIR/logs/vllm-$SLURM_JOB_ID.log"
 source ./setup.sh "$size" || exit 1
@@ -26,9 +30,10 @@ pids=()
 while IFS= read -r line; do
     [[ -z "$line" || "$line" == \#* ]] && continue
     n=$((n + 1))
-    echo "[$n] python agent.py $line"
+    echo "[$n] python agent.py $line ${extra[*]}"
     # shellcheck disable=SC2086  # each line is an argument list
-    python agent.py $line --quiet >| "logs/suite-$SLURM_JOB_ID-$n.log" 2>&1 &
+    python agent.py $line "${extra[@]}" --base-url "http://localhost:$PORT/v1" --quiet \
+        >| "logs/suite-$SLURM_JOB_ID-$n.log" 2>&1 &
     pids+=($!)
     sleep 5
 done < "$suite"

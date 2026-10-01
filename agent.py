@@ -343,6 +343,7 @@ def main():
     ap.add_argument("--ask", help="ask your own question instead of running the task file")
     ap.add_argument("--show-reasoning", action="store_true", help="also print the model's reasoning each turn")
     ap.add_argument("--quiet", action="store_true", help="only print one result line per task")
+    ap.add_argument("--tag", help="suffix for the run directory, e.g. rep03, so parallel repeats get distinct names")
     args = ap.parse_args()
 
     wb = None
@@ -374,7 +375,7 @@ def main():
         import agent_driven
     topo_name = f"agent-driven-{args.comm}{'-coord' if args.coordinate else ''}" if driven else args.topology
     kind = "ask" if args.ask else ("sas" if not multi else topo_name) + ("-workbench" if wb else "")
-    run_dir = ROOT / "runs" / f"{datetime.now():%Y%m%d-%H%M%S}-{kind}-{args.model}"
+    run_dir = ROOT / "runs" / f"{datetime.now():%Y%m%d-%H%M%S}-{kind}-{args.model}{'-' + args.tag if args.tag else ''}"
     (run_dir / "traces").mkdir(parents=True)
     (run_dir / "config.json").write_text(json.dumps({"git_commit": git_commit(), **vars(args)}, indent=2))
 

@@ -47,16 +47,20 @@ _agent_setup() {
     [[ ":$PATH:" == *":$WORK/bin:"* ]] || export PATH="$WORK/bin:$PATH"
     mkdir -p "$WORK/models" || return 1
 
+    # Two jobs landing on one fresh node must not install or download into $WORK at the same time.
+    local lock
+    exec {lock}>"$WORK/.setup.lock"
+    flock "$lock"
     if [[ ! -x "$WORK/bin/uv" ]]; then
         echo "==> Installing uv"
         curl -LsSf https://astral.sh/uv/install.sh \
-            | env UV_INSTALL_DIR="$WORK/bin" UV_NO_MODIFY_PATH=1 sh || return 1
+            | env UV_INSTALL_DIR="$WORK/bin" UV_NO_MODIFY_PATH=1 sh || { exec {lock}>&-; return 1; }
     fi
 
     if [[ ! -x "$WORK/venv/bin/vllm" ]]; then
         echo "==> Installing vLLM $vllm_version (takes a few minutes on a fresh node)"
-        uv venv --allow-existing --python 3.12 "$WORK/venv" || return 1
-        uv pip install --python "$WORK/venv/bin/python" "vllm==$vllm_version" || return 1
+        uv venv --allow-existing --python 3.12 "$WORK/venv" || { exec {lock}>&-; return 1; }
+        uv pip install --python "$WORK/venv/bin/python" "vllm==$vllm_version" || { exec {lock}>&-; return 1; }
     fi
     source "$WORK/venv/bin/activate"
 
@@ -65,21 +69,22 @@ _agent_setup() {
     export WORKBENCH_DIR="$WORK/WorkBench"
     if [[ ! -d "$WORKBENCH_DIR/.git" ]]; then
         echo "==> Cloning WorkBench"
-        git clone -q https://github.com/olly-styles/WorkBench.git "$WORKBENCH_DIR" || return 1
-        git -C "$WORKBENCH_DIR" checkout -q 49c7dfd || return 1
+        git clone -q https://github.com/olly-styles/WorkBench.git "$WORKBENCH_DIR" || { exec {lock}>&-; return 1; }
+        git -C "$WORKBENCH_DIR" checkout -q 49c7dfd || { exec {lock}>&-; return 1; }
     fi
     if ! python -c "import pandas" 2>/dev/null; then
         echo "==> Installing pandas for WorkBench"
-        uv pip install --python "$WORK/venv/bin/python" "pandas==2.3.3" || return 1
+        uv pip install --python "$WORK/venv/bin/python" "pandas==2.3.3" || { exec {lock}>&-; return 1; }
     fi
 
     local model_dir="$WORK/models/$name"
     if [[ ! -f "$model_dir/.complete" ]]; then
         echo "==> Downloading openai/$name"
         hf download "openai/$name" --exclude "original/*" --exclude "metal/*" \
-            --local-dir "$model_dir" || return 1
+            --local-dir "$model_dir" || { exec {lock}>&-; return 1; }
         touch "$model_dir/.complete"
     fi
+    exec {lock}>&-  # closing the file releases the lock
 
     # ---- vLLM server ----
     if curl -sf "localhost:$port/health" >/dev/null; then
@@ -94,7 +99,7 @@ _agent_setup() {
     else
         local log="${VLLM_LOG:-$WORK/vllm-$name.log}"
         local pid
-        pid=$(pgrep -u "$USER" -f "vllm serve" | head -n 1)
+        pid=$(pgrep -u "$USER" -f "vllm serve .*--port $port( |$)" | head -n 1)
         if [[ -n "$pid" ]]; then
             echo "==> vLLM is still starting (pid $pid); waiting for it"
         else
