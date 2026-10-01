@@ -366,8 +366,6 @@ def main():
     multi = args.topology != "single"
     if multi and not (wb or bc):
         sys.exit("the multi-agent topologies need --benchmark workbench or browsecomp")
-    if args.topology == "agent-driven" and not wb:
-        sys.exit("agent-driven teams run on WorkBench for now: add --benchmark workbench")
 
     client = OpenAI(base_url=args.base_url, api_key="EMPTY")
     if not args.model:
@@ -402,7 +400,7 @@ def main():
         try:
             if driven:
                 r = agent_driven.run(t["question"], make_agent, args.agents, args.comm, log_message, seed=t["id"],
-                                     coordinate=args.coordinate)
+                                     coordinate=args.coordinate, browsecomp=bool(bc))
                 actions = r["actions"]
             elif multi:
                 r = mas.run(args.topology, t["question"], make_agent, args.agents, args.rounds, log_message,

@@ -13,8 +13,8 @@ HTML replay of one task across runs. Toy tasks in `tasks.jsonl`, outputs in `run
 Benchmark: WorkBench (`workbench.py`, `agent.py --benchmark workbench --limit N`), one of the
 paper's six; its repo is cloned by `setup.sh` into `/scratch/$USER/WorkBench` and scored with its own
 state-based evaluator (accuracy plus side-effect rate).
-Second benchmark, in progress: BrowseComp-Plus (`browsecomp.py`, `agent.py --benchmark browsecomp`, single agent
-only so far): the paper's 100 questions over a fixed 100K-document collection, dense search with the paper's
+Second benchmark, in progress: BrowseComp-Plus (`browsecomp.py`, `agent.py --benchmark browsecomp`, with every
+topology: `mas.py` BrowseCompEnv, and agent-driven teams that share one answer slot where the last submission counts): the paper's 100 questions over a fixed 100K-document collection, dense search with the paper's
 Qwen3-Embedding-4B index, graded by the local model with the paper's grader prompt. `BROWSECOMP=1` before
 `source setup.sh` (or `sbatch --export=ALL,BROWSECOMP=1 run.sbatch ...`) downloads it into `/scratch/$USER/browsecomp`
 and serves the query embedder as a second vLLM on PORT+1; `browsecomp_check.py` checks search. The decrypted

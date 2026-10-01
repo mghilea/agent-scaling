@@ -21,6 +21,11 @@ worker writes a summary, and the harness delivers it. Here the agents decide all
   with an empty inbox, an agent runs out of turns, or the time limit passes.
 
 Every action, message, task update and state change is logged with a timestamp in trace["events"].
+
+BrowseComp-Plus (browsecomp=True): the document collection is read-only, so there is no shared workspace to
+see each other's work in; each agent has its own search tools, and teammates learn what others found only
+by communicating. The team gives one answer: a shared submit_team_answer slot that any agent can fill, where
+each submission replaces the last and the one standing when the team stops is graded.
 """
 import json
 import random
@@ -60,6 +65,19 @@ CHANNEL_TEXT = {
 COORDINATE_HINT = " Before you change anything in the workspace, agree with your teammates on who does what, so that no change is made twice."
 NO_CHANNELS = "You have no way to contact your teammates; you can only see the changes they make in the workspace."
 
+# BrowseComp-Plus versions of the team prompt, the coordination hint and the no-channels line.
+TEAM_PROMPT_BC = """You are {me}, one of {n} agents on a team; your teammates are {others}. You all received the same question, and you all search the same document collection, each with your own search tools. Nobody sees another agent's searches, documents or reasoning.
+
+The team gives one answer: submit_team_answer stores it, and each submission replaces the previous one, whoever made it. The answer standing when the team stops is the team's answer.
+
+Nobody has assigned roles or a plan. Decide as a team how to answer the question.{hint}
+
+{channels}
+
+Your turn ends when you reply without calling a tool. If a teammate contacts you afterwards, you will be woken up. The task is over when nobody has anything left to do."""
+COORDINATE_HINT_BC = " Before you start searching, agree with your teammates on who investigates what, so that no work is done twice."
+NO_CHANNELS_BC = "You have no way to contact your teammates."
+
 
 def _schema(name, description, props, required):
     return {"type": "function", "function": {"name": name, "description": description,
@@ -78,11 +96,15 @@ def _as_object(data):
 
 
 class Team:
-    def __init__(self, task, make_agent, n_agents, comm, log, seed, coordinate=False):
+    def __init__(self, task, make_agent, n_agents, comm, log, seed, coordinate=False, browsecomp=False):
         self.task, self.log, self.channels = task, log, CHANNELS[comm]
+        self.bc = None
+        if browsecomp:
+            import browsecomp as bc
+            self.bc, self.sessions, self.team_answer, self.submissions = bc, {}, None, []
         self.comm, self.coordinate = comm, coordinate
         self.ids = [f"agent_{i}" for i in range(1, n_agents + 1)]
-        self.sandbox = wb.Sandbox()             # the one workspace everybody shares
+        self.sandbox = None if browsecomp else wb.Sandbox()  # the one workspace everybody shares
         self.env_lock = threading.Lock()         # WorkBench tools aren't thread-safe on shared state
         self.cond = threading.Condition()        # guards inboxes, idle and done
         self.inbox = {a: [] for a in self.ids}
@@ -103,11 +125,12 @@ class Team:
             order = self.channels[:]
             rng.shuffle(order)
             channels = ("You can coordinate with your teammates, as much or as little as you like:\n"
-                        + "\n".join(CHANNEL_TEXT[c] for c in order)) if order else NO_CHANNELS
-            prompt = TEAM_PROMPT.format(me=me, n=n_agents, others=", ".join(a for a in self.ids if a != me),
-                                        channels=channels, hint=COORDINATE_HINT if coordinate and order else "")
+                        + "\n".join(CHANNEL_TEXT[c] for c in order)) if order else (NO_CHANNELS_BC if browsecomp else NO_CHANNELS)
+            hint = (COORDINATE_HINT_BC if browsecomp else COORDINATE_HINT) if coordinate and order else ""
+            prompt = (TEAM_PROMPT_BC if browsecomp else TEAM_PROMPT).format(
+                me=me, n=n_agents, others=", ".join(a for a in self.ids if a != me), channels=channels, hint=hint)
             agent = make_agent(name=me, tools={**self._env_tools(me), **self._comm_tools(me)},
-                               system_prompt=wb.SYSTEM_PROMPT + "\n\n" + prompt)
+                               system_prompt=(self.bc.system_prompt() if browsecomp else wb.SYSTEM_PROMPT) + "\n\n" + prompt)
             agent.inbox = lambda me=me: self._drain(me)
             self.agents[me] = agent
 
@@ -133,6 +156,8 @@ class Team:
 
     # ---- tools -------------------------------------------------------------------------------
     def _env_tools(self, me):
+        if self.bc:
+            return self._search_tools(me)
         tools = {}
         for name, (fn, schema) in self.sandbox.tools.items():
             def run(_fn=fn, _name=name, **kwargs):
@@ -145,6 +170,35 @@ class Team:
                            changes=[wb.show(a) for a in new])
                 return out
             tools[name] = (run, schema)
+        return tools
+
+    def _search_tools(self, me):
+        """BrowseComp-Plus: this agent's own search session, logged, plus the team's one answer slot."""
+        session = self.sessions[me] = self.bc.Session()
+        tools = {}
+        for name, (fn, schema) in session.tools.items():
+            if name == "done":
+                continue
+            def run(_fn=fn, _name=name, **kwargs):
+                out = _fn(**kwargs)
+                self.event(me, "tool", tool=_name, args=kwargs, out=out[:600])
+                return out
+            tools[name] = (run, schema)
+
+        def submit_team_answer(answer="", confidence_score=None):
+            with self.cond:
+                replaced = self.team_answer
+                self.team_answer = {"answer": str(answer), "confidence": confidence_score, "by": me}
+                self.submissions.append({"t": round(time.time() - self.t0, 2), **self.team_answer})
+            self.event(me, "team_answer", answer=str(answer), confidence=confidence_score,
+                       replaced=replaced["by"] if replaced else None)
+            return ("Team answer recorded" + (f", replacing {replaced['by']}'s." if replaced else ".") +
+                    " Any later submission by anyone replaces it.")
+        tools["submit_team_answer"] = (submit_team_answer, _schema(
+            "submit_team_answer", "Submit the team's final answer. Each submission replaces the previous one, "
+            "whoever made it.", {"answer": {"type": "string", "description": "The exact final answer"},
+                                 "confidence_score": {"type": "integer", "description": "Confidence from 0 to 100"}},
+            ["answer"]))
         return tools
 
     def _comm_tools(self, me):
@@ -246,7 +300,8 @@ class Team:
 
     # ---- running -----------------------------------------------------------------------------
     def _loop(self, me):
-        agent, message = self.agents[me], f"Request from the user: {self.task}"
+        agent = self.agents[me]
+        message = self.bc.task_prompt(self.task) if self.bc else f"Request from the user: {self.task}"
         try:
             while True:
                 left = TURN_BUDGET - agent.stats["turns"]
@@ -307,8 +362,24 @@ class Team:
                               + len(e.get("value", "")) for e in self.events
                               if e["kind"] in ("message", "a2a_send", "a2a_update", "state_write")),
         }
+        extra, trace_extra = {}, {}
+        if self.bc:
+            # The team's answer is the last submission; if nobody submitted, the last reply that said anything.
+            last_reply = next((e["reply"] for e in reversed(self.events) if e["kind"] == "idle" and e["reply"].strip()), "")
+            a = self.team_answer
+            answer = (f"Exact Answer: {a['answer']}\nConfidence: {a['confidence'] if a['confidence'] is not None else 100}%"
+                      if a else last_reply)
+            seen = Counter(d for x in self.sessions.values() for d in {d for q in x.searches for d in q["docids"]})
+            queries = Counter(q["query"].strip().lower() for x in self.sessions.values() for q in x.searches)
+            comm.update({"team_answers": len(self.submissions),
+                         "answer_authors": len({x["by"] for x in self.submissions}),
+                         "docs_seen_by_several": sum(1 for c in seen.values() if c > 1),
+                         "repeated_queries": sum(c - 1 for c in queries.values() if c > 1)})
+            extra = {"answer": answer, "sessions": list(self.sessions.values())}
+            trace_extra = {"team_answers": self.submissions}
         return {
-            "actions": list(self.sandbox.actions), "stop": "final" if not self.expired() else "time_limit",
+            "actions": [] if self.bc else list(self.sandbox.actions), **extra,
+            "stop": "final" if not self.expired() else "time_limit",
             **{k: stats[k] for k in ("turns", "tool_calls", "tool_errors", "prompt_tokens", "completion_tokens")},
             "agents": len(self.ids), "rounds": max(self.wakes.values(), default=0),
             "agent_messages": deliveries, "comm": comm,
@@ -317,10 +388,11 @@ class Team:
                       "task": self.task, "events": self.events,
                       "changes": [{"agent": a, "change": wb.show(c)} for a, c in self.changes],
                       "shared_state": self.state, "shared_state_history": self.state_history,
-                      "a2a_tasks": list(self.a2a.values()),
+                      "a2a_tasks": list(self.a2a.values()), **trace_extra,
                       "conversations": {a: ag.messages for a, ag in self.agents.items()}},
         }
 
 
-def run(task, make_agent, n_agents=3, comm="all", log=lambda label, text: None, seed=0, coordinate=False):
-    return Team(task, make_agent, n_agents, comm, log, seed, coordinate).run()
+def run(task, make_agent, n_agents=3, comm="all", log=lambda label, text: None, seed=0, coordinate=False,
+        browsecomp=False):
+    return Team(task, make_agent, n_agents, comm, log, seed, coordinate, browsecomp).run()

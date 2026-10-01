@@ -1,0 +1,5 @@
+# BrowseComp-Plus: the paper's 100 questions, agent-driven teams (one shared answer slot, the last submission counts).
+# sbatch --export=ALL,BROWSECOMP=1 --time=<long enough> suite.sbatch 20b suites/browsecomp-driven.txt
+--benchmark browsecomp --topology agent-driven --comm none
+--benchmark browsecomp --topology agent-driven --comm text --coordinate
+--benchmark browsecomp --topology agent-driven --comm all --coordinate
