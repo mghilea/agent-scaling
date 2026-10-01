@@ -1,0 +1,296 @@
+<title>BrowseComp-Plus Trials</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one reading column of sections, the same system as the hard-task page; tables and the chart scroll in their own boxes. */
+:root {
+  --ground: #f3f5f8; --surface: #fbfcfd; --sunken: #e7ebf1; --ink: #16202e; --ink-2: #3e4a5c; --muted: #5d6879; --line: #d2d9e3; --grid: #e3e8ee;
+  --s1: #2a78d6; --s1-soft: #b9d3f3; --s2: #eb6834; --pass: #22784a; --pass-soft: #dcf1e5; --fail: #b3261e; --fail-soft: #fbe2df; --warn-soft: #fdf0d2; --warn: #8a5a00;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  --cond: "IBM Plex Sans Condensed", "IBM Plex Sans", "Arial Narrow", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, "Courier New", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground: #0e131a; --surface: #151c26; --sunken: #1d2632; --ink: #e5eaf1; --ink-2: #c3ccd8; --muted: #9aa7b8; --line: #2e3a4a; --grid: #232d3a;
+    --s1: #3987e5; --s1-soft: #23436b; --s2: #d95926; --pass: #53c487; --pass-soft: #163527; --fail: #f2786d; --fail-soft: #3d1c1a; --warn-soft: #3a2c0c; --warn: #e2b24a;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #0e131a; --surface: #151c26; --sunken: #1d2632; --ink: #e5eaf1; --ink-2: #c3ccd8; --muted: #9aa7b8; --line: #2e3a4a; --grid: #232d3a;
+  --s1: #3987e5; --s1-soft: #23436b; --s2: #d95926; --pass: #53c487; --pass-soft: #163527; --fail: #f2786d; --fail-soft: #3d1c1a; --warn-soft: #3a2c0c; --warn: #e2b24a;
+}
+* { box-sizing: border-box; }
+body { background: var(--ground); color: var(--ink); font: 16px/1.6 var(--sans); }
+.wrap { max-width: 1080px; margin: 0 auto; padding-inline: 20px; padding-block: 36px 60px; display: grid; gap: 48px; }
+header { display: grid; gap: 14px; }
+.eyebrow { margin: 0; font: 600 12px/1.4 var(--sans); letter-spacing: .1em; text-transform: uppercase; color: var(--s1); }
+h1 { margin: 0; font: 600 clamp(30px, 4.4vw, 44px)/1.1 var(--cond); text-wrap: balance; max-width: 24ch; }
+h2 { margin: 0; font: 600 clamp(23px, 3vw, 29px)/1.2 var(--cond); text-wrap: balance; }
+h3 { margin: 0; font: 600 18px/1.3 var(--cond); }
+p { margin: 0; }
+.lede { font-size: 18px; color: var(--muted); max-width: 70ch; }
+code { font-family: var(--mono); font-size: 13px; background: var(--sunken); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+section { display: grid; gap: 18px; }
+.sectionhead { display: grid; gap: 6px; }
+.sectionhead p { color: var(--muted); max-width: 72ch; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; gap: 6px; align-content: start; }
+.card p { color: var(--muted); font-size: 15px; }
+.card .big { font: 600 30px/1 var(--cond); color: var(--ink); font-variant-numeric: tabular-nums; }
+.tablewrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 14px; font-variant-numeric: tabular-nums; }
+th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 600 11.5px/1.4 var(--sans); letter-spacing: .05em; text-transform: uppercase; color: var(--muted); background: var(--sunken); }
+td.n, th.n { text-align: right; } td.c, th.c { text-align: center; }
+tr:last-child td { border-bottom: none; }
+.note { font-size: 14px; color: var(--muted); max-width: 84ch; }
+.spec { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+@media (max-width: 760px) { .spec { grid-template-columns: minmax(0, 1fr); } }
+dl { margin: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 16px; font-size: 15px; }
+dt { font-weight: 600; color: var(--ink); }
+dd { margin: 0; color: var(--ink-2); }
+@media (max-width: 520px) { dl { grid-template-columns: minmax(0, 1fr); gap: 2px; } dd { margin-bottom: 8px; } }
+.chartbox { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; gap: 10px; overflow-x: auto; }
+.chartbox svg { display: block; width: 100%; min-width: 560px; height: auto; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13.5px; color: var(--ink-2); }
+.legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+figcaption { font-size: 14px; color: var(--muted); max-width: 84ch; }
+.lbl { fill: var(--muted); font: 12px var(--sans); }
+.val { fill: var(--ink-2); font: 500 12px var(--sans); font-variant-numeric: tabular-nums; }
+.cat { fill: var(--ink); font: 500 13px var(--sans); }
+.gridline { stroke: var(--grid); stroke-width: 1; }
+.mark { display: inline-block; min-width: 46px; text-align: center; padding: 0 6px; border-radius: 999px; font: 600 11.5px/1.7 var(--sans); }
+.mark.yes { background: var(--pass-soft); color: var(--pass); }
+.mark.lenient { background: var(--warn-soft); color: var(--warn); }
+.mark.no { background: var(--sunken); color: var(--muted); }
+.qid { font: 12.5px var(--mono); white-space: nowrap; }
+ol.list, ul.list { margin: 0; padding-left: 22px; display: grid; gap: 10px; max-width: 84ch; }
+ol.list li span, ul.list li span { display: block; color: var(--muted); font-size: 15px; }
+.flag { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--s2); border-radius: 8px; padding: 12px 14px; display: grid; gap: 6px; max-width: 84ch; }
+.flag p { font-size: 15px; color: var(--ink-2); }
+footer { font-size: 14px; color: var(--muted); display: grid; gap: 6px; border-top: 1px solid var(--line); padding-top: 18px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">agent-scaling · BrowseComp-Plus · gpt-oss-20b · 30 September–1 October 2026</p>
+    <h1>BrowseComp-Plus with gpt-oss-20b</h1>
+    <p class="lede">Our first runs on the paper’s second benchmark: hard multi-hop questions answered by searching a fixed collection of about 100,000 web pages. The document collection is read-only, so a team can share what it found only by talking. This page covers the setup, the checks, a single-agent run on the paper’s 100 questions, and every setup on the first 10.</p>
+    <div class="cards" id="cards"></div>
+  </header>
+
+  <section>
+    <div class="sectionhead">
+      <h2>How we run it</h2>
+      <p>We follow the scaling paper’s released code wherever our hardware allows. The questions, the document collection and the search index are the ones the paper used.</p>
+    </div>
+    <div class="spec">
+      <div class="card">
+        <dl>
+          <dt>Questions</dt><dd>The paper’s sample of 100 from BrowseComp-Plus’s 830: 10 from each of 10 topics (people, geography, sports, politics and so on).</dd>
+          <dt>Documents</dt><dd>100,195 web pages, searched only through the tools below. No live web.</dd>
+          <dt>Search</dt><dd>The paper’s Qwen3-Embedding-4B index. The query is embedded by a second model server on the same GPU and every page is ranked by similarity.</dd>
+          <dt>Tools</dt><dd><code>search_documents</code> (top 5 hits with a snippet), <code>retrieve_document</code> (a page, 20,000 characters at a time), <code>done</code> (answer and confidence).</dd>
+          <dt>Prompts</dt><dd>The paper’s BrowseComp prompts, word for word, asking for an explanation, an exact answer and a confidence.</dd>
+          <dt>Grading</dt><dd>The paper’s grader prompt, answered by gpt-oss-20b at temperature 0. Each answer is also checked against the gold answer by string match.</dd>
+          <dt>Hardware</dt><dd>One L40 per job: gpt-oss-20b in 70% of its memory, the embedding model in 25%.</dd>
+        </dl>
+      </div>
+      <div class="tablewrap">
+        <table style="min-width:0">
+          <tr><th>Where we differ</th><th>Paper</th><th>Ours</th></tr>
+          <tr><td>Model</td><td>three other LLM families</td><td>gpt-oss-20b</td></tr>
+          <tr><td>Search results</td><td>each hit’s full text (about 25k tokens per search)</td><td>a 2,000-character snippet per hit; full pages on request</td></tr>
+          <tr><td>Judge</td><td>gemini-2.0-flash</td><td>gpt-oss-20b, same prompt</td></tr>
+          <tr><td>Decentralized vote</td><td>on raw answer text, which almost never matches</td><td>on each answer’s normalized “Exact Answer” line</td></tr>
+          <tr><td>Out of turns</td><td>not specified</td><td>a worker answers with its team summary; the single agent gets one tool-free call to answer</td></tr>
+          <tr><td>Agent-driven teams</td><td>not in the paper</td><td>our extension: one shared answer slot, the last submission counts</td></tr>
+        </table>
+      </div>
+    </div>
+    <p class="note">The full-text search results only fit Gemini’s 1M-token context; with gpt-oss-20b’s 128K a few searches would fill it. Comparisons between our own setups are clean (same questions, tools and judge); our absolute numbers aren’t comparable with the paper’s.</p>
+  </section>
+
+  <section>
+    <div class="sectionhead">
+      <h2>Checks before running</h2>
+      <p>Whether our search matches the index the paper built, and whether the paper’s 100 questions look like the rest of the 830.</p>
+    </div>
+    <div class="cards">
+      <div class="card"><span class="big">29 / 30</span><p>Pages whose own opening text retrieves them first. Our query embeddings match how the index was built.</p></div>
+      <div class="card"><span class="big">56%</span><p>Gold pages in the top 100 when the whole question is the query; 15% in the top 5. Multi-hop questions need several narrower searches.</p></div>
+      <div class="card"><span class="big">100 / 100</span><p>The paper’s questions found in the official set with identical question and answer text.</p></div>
+    </div>
+    <div class="tablewrap"><table style="min-width:480px">
+      <tr><th>Compared with the other 730</th><th class="n">Paper’s 100</th><th class="n">Other 730</th></tr>
+      <tr><td>Evidence pages per question (median)</td><td class="n">6</td><td class="n">6</td></tr>
+      <tr><td>Gold pages per question (median)</td><td class="n">2</td><td class="n">2</td></tr>
+      <tr><td>Question length (median characters)</td><td class="n">504</td><td class="n">524</td></tr>
+    </table></div>
+  </section>
+
+  <section>
+    <div class="sectionhead">
+      <h2>Single agent on the paper’s 100</h2>
+      <p id="trialnote"></p>
+    </div>
+    <div class="cards" id="trialcards"></div>
+  </section>
+
+  <section>
+    <div class="sectionhead">
+      <h2>Every setup on the first 10 questions</h2>
+      <p>The paper’s four multi-agent setups, the single agent and two agent-driven teams, each run once on the first 10 of the paper’s 100. With 10 questions one question is 10 points, so these numbers show cost and behavior more than accuracy.</p>
+    </div>
+    <div class="chartbox">
+      <div class="legend"><span><i style="background:var(--s1)"></i>Correct by the judge</span><span><i style="background:var(--s1-soft)"></i>Also correct once formatting is ignored</span></div>
+      <div id="bars"></div>
+      <figcaption id="barscap"></figcaption>
+    </div>
+    <div class="tablewrap"><table id="systable"></table></div>
+    <p class="note">Seconds per question are not comparable across rows. The single agent and the paper’s four setups shared one GPU in one job, which slowed each of them; the agent-driven teams each had GPUs to themselves.</p>
+    <h3>Question by question</h3>
+    <div class="tablewrap"><table id="grid"></table></div>
+    <p class="note">Question ids are BrowseComp-Plus’s own. The questions and answers stay off this page: BrowseComp asks that they never appear as plain text online.</p>
+  </section>
+
+  <section>
+    <div class="sectionhead">
+      <h2>The agent-driven teams barely talked</h2>
+      <p id="drivennote"></p>
+    </div>
+    <div class="cards" id="drivencards"></div>
+    <div class="flag"><h3>What might explain it</h3><p>On WorkBench the same text team messaged in 95% of tasks: there, changes in the shared workspace collide, and the coordination sentence tells agents to agree before changing anything. Here nothing collides, the paper’s task prompt asks each agent for a finished answer in a fixed format, and every agent can do the whole search alone, so each one does. Whether talking would help here is still untested; these teams almost never tried.</p></div>
+  </section>
+
+  <section>
+    <div class="sectionhead">
+      <h2>How much to trust the judge</h2>
+      <p id="judgenote"></p>
+    </div>
+    <ul class="list">
+      <li><b>It is strict about formatting.</b><span>It rejected a company name that added “Inc.” and, in two setups, a place name written with a comma instead of a semicolon. The lenient re-grade accepts the judge’s own extracted answer when it matches the gold answer up to case, punctuation and accents.</span></li>
+      <li><b>Our parser misread some of its verdicts, now fixed.</b><span>The judge sometimes writes “Correctness: yes” instead of “correct: yes”, and our first parser read 2 such verdicts in the 100-question run as wrong. Every stored verdict on this page was re-read with the fixed parser.</span></li>
+      <li><b>The paper’s independent setup confuses it.</b><span>Independent hands the judge all three workers’ answers pasted together. On 2 of the 10 questions one worker had the right answer and the judge extracted “None”.</span></li>
+      <li><b>It never accepted a wrong answer in the cases checked.</b><span>Every case where the judge said yes and the string match said no was a spelling variant of the gold answer (accents, apostrophes).</span></li>
+    </ul>
+  </section>
+
+  <section>
+    <div class="sectionhead">
+      <h2>Problems found and fixed</h2>
+    </div>
+    <ol class="list">
+      <li><b>Agent-driven teams went idle before answering.</b><span>WorkBench’s 12 model calls per wake-up ran out mid-research and nobody woke them. BrowseComp agents now get the single agent’s 30 calls in one go.</span></li>
+      <li><b>Tool calls written out as text were taken as answers.</b><span>gpt-oss sometimes writes a call as raw format tokens instead of making it. These now count as a tool error and the agent is asked to call again (BrowseComp only, so WorkBench runs stay comparable).</span></li>
+      <li><b>Jobs on one node took each other’s embedding server.</b><span>Each job’s embedder port was the next job’s chat-model port, so 4 of the 10 agent-driven jobs ran every search against the wrong model and found nothing. Ports are now even and setup checks the embedder; those 4 jobs were rerun and the broken runs set aside.</span></li>
+      <li><b>Two correct answers were scored as wrong.</b><span>The verdict parser missed the judge’s “Correctness: yes” wording. It now accepts it, and all stored verdicts were re-read; the 100-question run goes from 20 to 22 correct.</span></li>
+      <li><b>The 100-question single-agent run used older code.</b><span>It started before the two fixes above that apply to it (the tool-free final answer and the retry of text tool calls), so it isn’t exactly comparable with the 10-question runs.</span></li>
+    </ol>
+  </section>
+
+  <section>
+    <div class="sectionhead">
+      <h2>What a full run would take</h2>
+      <p>All 100 questions, one GPU job per setup (or a few per setup, split with <code>--offset</code>).</p>
+    </div>
+    <div class="tablewrap"><table style="min-width:520px">
+      <tr><th>Setup</th><th class="n">Per question</th><th class="n">100 questions</th></tr>
+      <tr><td>Single agent</td><td class="n">36 s (measured)</td><td class="n">about 1 h</td></tr>
+      <tr><td>Agent-driven teams</td><td class="n">about 80 s with a GPU each (measured)</td><td class="n">about 2–3 h</td></tr>
+      <tr><td>Independent</td><td class="n">2–3 min</td><td class="n">3–5 h</td></tr>
+      <tr><td>Decentralized</td><td class="n">5–8 min</td><td class="n">8–14 h, or split across jobs</td></tr>
+      <tr><td>Centralized, hybrid</td><td class="n">5–15 min</td><td class="n">8–28 h, or split across jobs</td></tr>
+    </table></div>
+  </section>
+
+  <section>
+    <div class="sectionhead"><h2>Next</h2></div>
+    <ol class="list">
+      <li><b>Find out whether talking helps when agents do talk.</b><span>A variant that makes sharing findings and the team answer slot part of the job, compared with the no-channels team on the same questions.</span></li>
+      <li><b>More questions.</b><span>The paper’s full 100 for the single agent, the agent-driven teams and decentralized, so differences of about 10 points become visible.</span></li>
+      <li><b>A sturdier grade.</b><span>Report the lenient re-grade next to the judge, and have a second judge re-grade a sample.</span></li>
+    </ol>
+  </section>
+
+  <footer>
+    <p>Code: <code>browsecomp.py</code>, <code>mas.py</code> (BrowseCompEnv), <code>agent_driven.py</code>; setup with <code>BROWSECOMP=1</code> before <code>setup.sh</code>. Runs: jobs 4046744 (single agent, 100 questions), 4046828 (single agent and the paper’s four setups, 10 questions), 4048860–4048869 and the reruns 4048884–4048887 (agent-driven, 10 questions). Analysis: <code>analysis/browsecomp_runs.py</code>; page: <code>analysis/build_browsecomp_page.py</code>.</p>
+  </footer>
+</div>
+
+<script>
+(function () {
+const D = /*DATA*/null;
+const NS = "http://www.w3.org/2000/svg";
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const pct = (v) => Math.round(v * 100) + "%";
+const k = (v) => Math.round(v / 1000) + "k";
+function el(tag, attrs, text) { const e = document.createElementNS(NS, tag); for (const a in attrs) e.setAttribute(a, attrs[a]); if (text !== undefined) e.textContent = text; return e; }
+const card = (big, text) => `<div class="card"><span class="big">${esc(big)}</span><p>${esc(text)}</p></div>`;
+const by = Object.fromEntries(D.systems.map((s) => [s.label, s]));
+const T = D.trial;
+const driven = D.systems.filter((s) => s.messages !== undefined);
+const drivenRuns = driven.reduce((a, s) => a + s.n, 0);
+const msgQuestions = driven.reduce((a, s) => a + s.questions_with_messages, 0);
+const teamAnswers = driven.reduce((a, s) => a + s.team_answers * s.n, 0);
+const paper4 = ["Independent", "Centralized", "Decentralized", "Hybrid"].map((l) => by[l].correct);
+
+document.getElementById("cards").innerHTML = [
+  card(`${T.correct} / ${T.n}`, `Questions the single agent answered correctly; ${T.lenient} once formatting is ignored. gpt-oss-20b is well above zero here.`),
+  card(`${Math.min(...paper4) === Math.max(...paper4) ? Math.min(...paper4) : Math.min(...paper4) + "–" + Math.max(...paper4)} of 10`, `Solved by each of the paper’s four multi-agent setups on the first 10 questions, against ${by["Single agent"].correct} for the single agent in the same job.`),
+  card(`${msgQuestions} of ${drivenRuns}`, `Agent-driven question runs with any message between agents. In the one that had any, two agents proposed splitting up the clues at the start and nobody replied.`),
+  card(`${T.judge_vs_match} / ${T.n}`, `Single-agent answers where the judge and a plain string match disagree; the judge rejects some correct answers over formatting.`),
+].join("");
+
+document.getElementById("trialnote").textContent = `One run of the single agent on all 100 questions. It answered ${T.correct} correctly by the judge (${T.lenient} with formatting ignored), searching ${T.searches.toFixed(0)} times per question on average and opening a full page only ${T.reads.toFixed(1)} times: it works almost entirely from the snippets.`;
+document.getElementById("trialcards").innerHTML = [
+  card(pct(T.correct / T.n), "Correct by the judge"),
+  card(`${Math.round(T.seconds)} s`, `Mean time per question (median ${Math.round(T.median_seconds)} s, longest ${Math.round(T.max_seconds)} s)`),
+  card(k(T.tokens), "Tokens per question, mostly the growing conversation re-read each turn"),
+  card(String(T.hit_turn_limit), "Questions that used all 30 model calls"),
+].join("");
+
+// bars: solved of 10 per system, judge and lenient-only
+(function () {
+  const rows = D.systems;
+  const W = 760, rowH = 34, left = 250, right = 150, top = 8, H = top + rows.length * rowH + 30;
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Questions solved out of 10 per setup" });
+  const x = (v) => left + (W - left - right) * v / 10;
+  [0, 2, 4, 6, 8, 10].forEach((v) => { svg.append(el("line", { x1: x(v), x2: x(v), y1: top, y2: H - 24, class: "gridline" })); svg.append(el("text", { x: x(v), y: H - 8, "text-anchor": "middle", class: "lbl" }, String(v))); });
+  rows.forEach((s, i) => {
+    const y = top + i * rowH, extra = s.lenient - s.correct;
+    svg.append(el("text", { x: left - 10, y: y + 21, "text-anchor": "end", class: "cat" }, s.label));
+    if (s.correct) svg.append(el("rect", { x: x(0), y: y + 8, width: x(s.correct) - x(0), height: 18, rx: 3, fill: "var(--s1)" }));
+    if (extra) svg.append(el("rect", { x: x(s.correct), y: y + 8, width: x(s.lenient) - x(s.correct), height: 18, rx: 3, fill: "var(--s1-soft)" }));
+    if (!s.lenient) svg.append(el("rect", { x: x(0), y: y + 8, width: 2, height: 18, fill: "var(--muted)" }));
+    svg.append(el("text", { x: x(Math.max(s.lenient, 0)) + 8, y: y + 21, class: "val" }, `${s.correct}${extra ? ` (+${extra})` : ""} · ${k(s.tokens)} tokens/q`));
+  });
+  document.getElementById("bars").append(svg);
+})();
+const best = D.systems.reduce((a, b) => (b.correct > a.correct ? b : a));
+document.getElementById("barscap").textContent = `Questions solved of the first 10, with tokens per question. The paper’s four setups each solve ${Math.min(...paper4) === Math.max(...paper4) ? Math.min(...paper4) : Math.min(...paper4) + "–" + Math.max(...paper4)} at 0.7–1.5 million tokens per question; the agent-driven teams, at about ${k((by["Agent-driven, no channels"].tokens + by["Agent-driven, text + coordinate"].tokens) / 2)}, solve ${by["Agent-driven, no channels"].correct} and ${by["Agent-driven, text + coordinate"].correct}.`;
+
+document.getElementById("systable").innerHTML = `<tr><th>Setup</th><th class="n">Correct</th><th class="n">Formatting ignored</th><th class="n">Seconds per question</th><th class="n">Tokens per question</th><th class="n">Searches per question</th><th class="n">Pages opened</th></tr>` +
+  D.systems.map((s) => `<tr><td>${esc(s.label)}</td><td class="n"><b>${s.correct}</b> / ${s.n}</td><td class="n">${s.lenient}</td><td class="n">${Math.round(s.seconds)}</td><td class="n">${k(s.tokens)}</td><td class="n">${s.searches.toFixed(0)}</td><td class="n">${s.reads.toFixed(1)}</td></tr>`).join("");
+
+const G = D.grid;
+const names = { yes: "correct", lenient: "formatting", no: "wrong" };
+document.getElementById("grid").innerHTML = `<tr><th>Question</th>${G.columns.map((c) => `<th class="c">${esc(c.label)}</th>`).join("")}</tr>` +
+  G.questions.map((q) => `<tr><td class="qid">${esc(q)}</td>${G.columns.map((c) => { const v = c.cells[q]; return `<td class="c">${v ? `<span class="mark ${v}">${names[v]}</span>` : "–"}</td>`; }).join("")}</tr>`).join("");
+
+const N = by["Agent-driven, no channels"], X = by["Agent-driven, text + coordinate"];
+document.getElementById("drivennote").textContent = `Both teams are three gpt-oss-20b agents, each with its own search tools and 30 model calls, sharing one answer slot. The text team can also message and is asked to agree on who investigates what before searching. Across the ${drivenRuns} question runs, ${msgQuestions ? `only ${msgQuestions} had any message` : "no agent sent a single message"}, and the shared answer slot was used ${teamAnswers} times: every team answer came from the last reply.`;
+document.getElementById("drivencards").innerHTML = [
+  card(`${(N.searches).toFixed(0)} / ${(X.searches).toFixed(0)}`, "Searches per question, no-channels team / text team: three agents searching in parallel"),
+  card(`${N.docs_seen_by_several.toFixed(0)} / ${X.docs_seen_by_several.toFixed(0)}`, "Pages per question that more than one agent saw: the same research done two or three times"),
+  card(`${N.correct} / ${X.correct}`, `Questions solved of 10, against ${by["Single agent"].correct} for the single agent and ${by["Decentralized"].correct} for decentralized`),
+].join("");
+
+const agreeTrial = T.n - T.judge_vs_match;
+document.getElementById("judgenote").textContent = `On the single agent’s 100 answers, the judge and a plain string match agree on ${agreeTrial}. Every disagreement we looked at was the judge being too strict or the string match missing an accent, so the judge undercounts by about ${T.lenient - T.correct} point${T.lenient - T.correct === 1 ? "" : "s"} on that run.`;
+})();
+</script>

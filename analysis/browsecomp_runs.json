@@ -1,0 +1,869 @@
+{
+ "runs": {
+  "sas/trial": {
+   "n": 100,
+   "correct": 22,
+   "lenient": 23,
+   "answer_in_response": 22,
+   "seconds": 36.42,
+   "tokens": 193345.75,
+   "searches": 14.8,
+   "reads": 0.86
+  },
+  "sas/t10": {
+   "n": 10,
+   "correct": 2,
+   "lenient": 2,
+   "answer_in_response": 2,
+   "seconds": 202.93,
+   "tokens": 236442.3,
+   "searches": 17.4,
+   "reads": 0.5
+  },
+  "independent/t10": {
+   "n": 10,
+   "correct": 4,
+   "lenient": 4,
+   "answer_in_response": 6,
+   "seconds": 213.15,
+   "tokens": 735229.2,
+   "searches": 49.5,
+   "reads": 2.2
+  },
+  "centralized/t10": {
+   "n": 10,
+   "correct": 4,
+   "lenient": 5,
+   "answer_in_response": 5,
+   "seconds": 333.1,
+   "tokens": 1524225.2,
+   "searches": 65.1,
+   "reads": 5.1
+  },
+  "agent-driven-none/t10": {
+   "n": 1,
+   "correct": 0,
+   "lenient": 0,
+   "answer_in_response": 0,
+   "seconds": 173.4,
+   "tokens": 1086702,
+   "searches": 68,
+   "reads": 0,
+   "messages": 0,
+   "a2a_tasks": 0,
+   "state_writes": 0,
+   "team_answers": 0,
+   "docs_seen_by_several": 50,
+   "repeated_queries": 1,
+   "questions_with_messages": 0
+  },
+  "decentralized/t10": {
+   "n": 10,
+   "correct": 4,
+   "lenient": 4,
+   "answer_in_response": 4,
+   "seconds": 298.88,
+   "tokens": 1290161.7,
+   "searches": 58.9,
+   "reads": 3.5
+  },
+  "agent-driven-text-coord/t10": {
+   "n": 2,
+   "correct": 1,
+   "lenient": 1,
+   "answer_in_response": 1,
+   "seconds": 151.95,
+   "tokens": 866809.5,
+   "searches": 57,
+   "reads": 3,
+   "messages": 0,
+   "a2a_tasks": 0,
+   "state_writes": 0,
+   "team_answers": 0,
+   "docs_seen_by_several": 30.5,
+   "repeated_queries": 0.5,
+   "questions_with_messages": 0
+  },
+  "hybrid/t10": {
+   "n": 10,
+   "correct": 4,
+   "lenient": 5,
+   "answer_in_response": 5,
+   "seconds": 354.69,
+   "tokens": 1463234.2,
+   "searches": 64.7,
+   "reads": 5.1
+  },
+  "agent-driven-all-coord/t10": {
+   "n": 1,
+   "correct": 0,
+   "lenient": 0,
+   "answer_in_response": 0,
+   "seconds": 124.3,
+   "tokens": 742479,
+   "searches": 54,
+   "reads": 0,
+   "messages": 0,
+   "a2a_tasks": 0,
+   "state_writes": 0,
+   "team_answers": 0,
+   "docs_seen_by_several": 44,
+   "repeated_queries": 0,
+   "questions_with_messages": 0
+  },
+  "agent-driven-none/t10b": {
+   "n": 10,
+   "correct": 3,
+   "lenient": 3,
+   "answer_in_response": 3,
+   "seconds": 59.02,
+   "tokens": 523355.9,
+   "searches": 43,
+   "reads": 1.6,
+   "messages": 0,
+   "a2a_tasks": 0,
+   "state_writes": 0,
+   "team_answers": 0,
+   "docs_seen_by_several": 29,
+   "repeated_queries": 0.1,
+   "questions_with_messages": 0
+  },
+  "agent-driven-text-coord/t10b": {
+   "n": 10,
+   "correct": 2,
+   "lenient": 3,
+   "answer_in_response": 3,
+   "seconds": 70.35,
+   "tokens": 635544,
+   "searches": 47.1,
+   "reads": 1.9,
+   "messages": 0.2,
+   "a2a_tasks": 0,
+   "state_writes": 0,
+   "team_answers": 0,
+   "docs_seen_by_several": 26.7,
+   "repeated_queries": 0.1,
+   "questions_with_messages": 1
+  }
+ },
+ "per_question": {
+  "sas/trial": {
+   "bc-116": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-1225": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-100": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-67": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-235": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-852": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-535": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-1091": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-503": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-228": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-445": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-154": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-1072": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-760": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-515": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-131": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-655": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-843": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-83": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-54": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-1179": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-1022": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-618": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-64": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-298": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-960": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-921": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-261": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-592": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-629": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-827": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-865": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-184": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-289": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-394": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-156": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-726": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-754": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-1144": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-833": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-651": {
+    "correct": false,
+    "lenient": true
+   },
+   "bc-1237": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-1162": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-932": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-353": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-333": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-496": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-909": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-897": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-548": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-739": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-314": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-910": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-1027": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-366": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-88": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-763": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-468": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-370": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-1062": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-1218": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-771": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-120": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-1167": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-249": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-1033": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-255": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-788": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-512": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-1004": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-999": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-1258": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-342": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-279": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-1252": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-331": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-778": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-930": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-153": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-737": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-725": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-635": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-894": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-1223": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-561": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-895": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-93": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-203": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-397": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-1135": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-304": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-1073": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-1217": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-963": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-71": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-652": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-864": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-268": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-1198": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-1118": {
+    "correct": false,
+    "lenient": false
+   }
+  },
+  "sas/t10": {
+   "bc-116": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-1225": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-100": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-67": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-235": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-852": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-535": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-1091": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-503": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-228": {
+    "correct": false,
+    "lenient": false
+   }
+  },
+  "independent/t10": {
+   "bc-116": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-1225": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-100": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-67": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-235": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-852": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-535": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-1091": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-503": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-228": {
+    "correct": false,
+    "lenient": false
+   }
+  },
+  "centralized/t10": {
+   "bc-116": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-1225": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-100": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-67": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-235": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-852": {
+    "correct": false,
+    "lenient": true
+   },
+   "bc-535": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-1091": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-503": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-228": {
+    "correct": false,
+    "lenient": false
+   }
+  },
+  "agent-driven-none/t10": {
+   "bc-116": {
+    "correct": false,
+    "lenient": false
+   }
+  },
+  "decentralized/t10": {
+   "bc-116": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-1225": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-100": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-67": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-235": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-852": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-535": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-1091": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-503": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-228": {
+    "correct": false,
+    "lenient": false
+   }
+  },
+  "agent-driven-text-coord/t10": {
+   "bc-116": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-1225": {
+    "correct": true,
+    "lenient": true
+   }
+  },
+  "hybrid/t10": {
+   "bc-116": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-1225": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-100": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-67": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-235": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-852": {
+    "correct": false,
+    "lenient": true
+   },
+   "bc-535": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-1091": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-503": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-228": {
+    "correct": false,
+    "lenient": false
+   }
+  },
+  "agent-driven-all-coord/t10": {
+   "bc-116": {
+    "correct": false,
+    "lenient": false
+   }
+  },
+  "agent-driven-none/t10b": {
+   "bc-100": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-67": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-116": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-1225": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-535": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-1091": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-503": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-228": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-235": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-852": {
+    "correct": false,
+    "lenient": false
+   }
+  },
+  "agent-driven-text-coord/t10b": {
+   "bc-503": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-228": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-116": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-1225": {
+    "correct": false,
+    "lenient": true
+   },
+   "bc-535": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-1091": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-235": {
+    "correct": true,
+    "lenient": true
+   },
+   "bc-852": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-100": {
+    "correct": false,
+    "lenient": false
+   },
+   "bc-67": {
+    "correct": false,
+    "lenient": false
+   }
+  }
+ }
+}

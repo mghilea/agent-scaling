@@ -7,12 +7,14 @@ Runs split across jobs with --offset/--limit (tags like t10b-s1 … t10b-s5) are
 Besides the judge's verdict, each answer gets two cross-checks: the gold answer appears in the response
 (answer_in_response, recorded at run time), and a lenient re-grade that accepts the judge's own extracted
 answer when it equals the gold answer up to case, punctuation and accents, or contains it as a whole phrase
-in a short answer (the 20b judge rejects "FormFactor, Inc." against "FormFactor").
+in a short answer (the 20b judge rejects "FormFactor, Inc." against "FormFactor"). Verdicts are re-read with
+browsecomp.parse_verdict, which also accepts the judge's "**Correctness:** yes".
 
 Writes analysis/browsecomp_runs.json with question ids and numbers only: BrowseComp's questions and answers
 must not leave /scratch.
 """
 import argparse
+import sys
 import json
 import re
 import statistics as st
@@ -21,6 +23,8 @@ from collections import defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+from browsecomp import parse_verdict  # noqa: E402
 NAME = re.compile(r"\d{8}-\d{6}-(?P<kind>.+)-browsecomp-gpt-oss-20b(?:-(?P<tag>[^/]+))?$")
 
 
@@ -51,6 +55,9 @@ def load(tag_prefix=None):
             continue
         for line in open(d / "results.jsonl"):
             r = json.loads(line)
+            # Re-read the verdict: runs before 1 October parsed "**Correctness:** yes" as no.
+            if r.get("judgment") and r["judgment"] != "empty response":
+                r["correct"] = parse_verdict(r["judgment"])
             groups[(m["kind"], tag)][r["id"]] = r
     return groups
 

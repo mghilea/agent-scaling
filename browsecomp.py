@@ -192,6 +192,15 @@ def answer_in_response(response, correct_answer):
     return bool(_norm(correct_answer)) and f" {_norm(correct_answer)} " in f" {_norm(response)} "
 
 
+VERDICT = re.compile(r"\bcorrect(?:ness)?\b\W*?:\W*(yes|no)\b", re.I)
+
+
+def parse_verdict(judgment):
+    """The judge's yes/no. It writes "correct: yes", "**Correctness:** yes" and other variants."""
+    m = VERDICT.search(judgment or "")
+    return bool(m and m.group(1).lower() == "yes")
+
+
 def judge(client, model, question, response, correct_answer):
     """The paper's grader prompt, answered by the local model at temperature 0. Returns (correct, raw text)."""
     if not response.strip():
@@ -200,8 +209,7 @@ def judge(client, model, question, response, correct_answer):
               .replace("{{correct_answer}}", correct_answer))
     r = client.chat.completions.create(model=model, temperature=0, messages=[{"role": "user", "content": prompt}])
     text = r.choices[0].message.content or ""
-    m = re.search(r"correct:\s*\**\s*(yes|no)", text, re.I)
-    return bool(m and m.group(1).lower() == "yes"), text
+    return parse_verdict(text), text
 
 
 def retrieval_stats(sessions, task):
