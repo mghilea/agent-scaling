@@ -22,13 +22,17 @@ export VLLM_LOG="$SLURM_SUBMIT_DIR/logs/vllm-$SLURM_JOB_ID.log"
 source ./setup.sh "$size" || exit 1
 
 n=0
+pids=()
 while IFS= read -r line; do
     [[ -z "$line" || "$line" == \#* ]] && continue
     n=$((n + 1))
     echo "[$n] python agent.py $line"
     # shellcheck disable=SC2086  # each line is an argument list
     python agent.py $line --quiet >| "logs/suite-$SLURM_JOB_ID-$n.log" 2>&1 &
+    pids+=($!)
     sleep 5
 done < "$suite"
-wait
+# Wait for the agent runs only: a bare `wait` would also wait for the vLLM server that
+# setup.sh started in the background, holding the GPU until the time limit.
+wait "${pids[@]}"
 echo "finished $(date)"
