@@ -1,0 +1,5 @@
+# BrowseComp-Plus, first 10 of the paper's 100: agent-driven teams (unsplit), propose-then-decide team answer
+--benchmark browsecomp --limit 10 --topology agent-driven --comm text --coordinate 
+--benchmark browsecomp --limit 10 --topology agent-driven --comm a2a --coordinate 
+--benchmark browsecomp --limit 10 --topology agent-driven --comm shared --coordinate 
+--benchmark browsecomp --limit 10 --topology agent-driven --comm all --coordinate 

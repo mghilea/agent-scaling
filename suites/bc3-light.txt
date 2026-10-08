@@ -1,0 +1,4 @@
+# BrowseComp-Plus, first 10 of the paper's 100: single agent and independent (unsplit and split)
+--benchmark browsecomp --limit 10 --topology single
+--benchmark browsecomp --limit 10 --topology independent
+--benchmark browsecomp --limit 10 --topology independent --split 3

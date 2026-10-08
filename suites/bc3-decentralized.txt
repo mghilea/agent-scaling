@@ -1,0 +1,3 @@
+# BrowseComp-Plus, first 10 of the paper's 100: decentralized, unsplit and split
+--benchmark browsecomp --limit 10 --topology decentralized
+--benchmark browsecomp --limit 10 --topology decentralized --split 3
