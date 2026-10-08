@@ -77,9 +77,9 @@ footer { font-size: 14px; color: var(--muted); display: grid; gap: 6px; border-t
 
 <div class="wrap">
   <header>
-    <p class="eyebrow">agent-scaling · BrowseComp-Plus · gpt-oss-20b · 30 September–1 October 2026</p>
+    <p class="eyebrow">agent-scaling · BrowseComp-Plus · gpt-oss-20b · 30 September–7 October 2026</p>
     <h1>BrowseComp-Plus with gpt-oss-20b</h1>
-    <p class="lede">Our first runs on the paper’s second benchmark: hard multi-hop questions answered by searching a fixed collection of about 100,000 web pages. The document collection is read-only, so a team can share what it found only by talking. This page covers the setup, the checks, a single-agent run on the paper’s 100 questions, and every setup on the first 10.</p>
+    <p class="lede">Our first runs on the paper’s second benchmark: hard multi-hop questions answered by searching a fixed collection of about 100,000 web pages. The document collection is read-only, so a team can share what it found only by talking. This page covers the setup, the checks, a single-agent run on the paper’s 100 questions, every setup on the first 10, a pilot that splits the collection between agents so that they have to share, and why the agents still didn’t talk.</p>
     <div class="cards" id="cards"></div>
   </header>
 
@@ -108,7 +108,7 @@ footer { font-size: 14px; color: var(--muted); display: grid; gap: 6px; border-t
           <tr><td>Judge</td><td>gemini-2.0-flash</td><td>gpt-oss-20b, same prompt</td></tr>
           <tr><td>Decentralized vote</td><td>on raw answer text, which almost never matches</td><td>on each answer’s normalized “Exact Answer” line</td></tr>
           <tr><td>Out of turns</td><td>not specified</td><td>a worker answers with its team summary; the single agent gets one tool-free call to answer</td></tr>
-          <tr><td>Agent-driven teams</td><td>not in the paper</td><td>our extension: one shared answer slot, the last submission counts</td></tr>
+          <tr><td>Agent-driven teams</td><td>not in the paper</td><td>our extension: one shared answer slot where the last submission counts; if nobody submits, a majority vote over the agents’ final answers (first runs: the last reply)</td></tr>
         </table>
       </div>
     </div>
@@ -144,7 +144,7 @@ footer { font-size: 14px; color: var(--muted); display: grid; gap: 6px; border-t
   <section>
     <div class="sectionhead">
       <h2>Every setup on the first 10 questions</h2>
-      <p>The paper’s four multi-agent setups, the single agent and two agent-driven teams, each run once on the first 10 of the paper’s 100. With 10 questions one question is 10 points, so these numbers show cost and behavior more than accuracy.</p>
+      <p>The paper’s four multi-agent setups, the single agent and two agent-driven teams, each run once on the first 10 of the paper’s 100. With 10 questions one question is 10 points, so these numbers show cost and behavior more than accuracy. The agent-driven teams’ answers were re-graded on 7 October after a bug that cut answers off (see below); the text team moves from 2 to 4.</p>
     </div>
     <div class="chartbox">
       <div class="legend"><span><i style="background:var(--s1)"></i>Correct by the judge</span><span><i style="background:var(--s1-soft)"></i>Also correct once formatting is ignored</span></div>
@@ -164,20 +164,41 @@ footer { font-size: 14px; color: var(--muted); display: grid; gap: 6px; border-t
       <p id="drivennote"></p>
     </div>
     <div class="cards" id="drivencards"></div>
-    <div class="flag"><h3>What might explain it</h3><p>On WorkBench the same text team messaged in 95% of tasks: there, changes in the shared workspace collide, and the coordination sentence tells agents to agree before changing anything. Here nothing collides, the paper’s task prompt asks each agent for a finished answer in a fixed format, and every agent can do the whole search alone, so each one does. Whether talking would help here is still untested; these teams almost never tried.</p></div>
+    <div class="flag"><h3>The contrast with WorkBench</h3><p>On WorkBench the same text team messaged in 95% of tasks: there, changes in the shared workspace collide, and the coordination sentence ties agreeing first to a concrete risk. Here nothing collides and every agent can do the whole search alone, so each one does. Splitting the collection, below, removes the second reason; the agents still didn’t talk.</p></div>
   </section>
 
   <section>
     <div class="sectionhead">
-      <h2>Why the agent-driven teams scored below independent</h2>
-      <p>With no messages, both agent-driven teams were in effect three agents searching in parallel, which is what independent is too. The difference is in how a team’s answer is chosen, plus noise.</p>
+      <h2>How a team’s answer is chosen</h2>
+      <p>With no messages, the agent-driven teams were in effect three agents searching in parallel, which is what independent is too. What differs is how the three answers become one.</p>
     </div>
     <div class="tablewrap"><table id="foundtable" style="min-width:520px"></table></div>
     <ul class="list">
-      <li><b>How the final answer is chosen.</b><span>Independent hands the judge all three workers’ answers pasted together, so a right answer anywhere can earn credit. The agent-driven teams keep whichever agent replied last. On two questions the text team had the right answer and lost it; on one of them, two of the three agents had it and the third, which was wrong, replied last.</span></li>
-      <li><b>Noise.</b><span>Independent’s workers also found the answer more often. On 10 questions and one run that can easily be luck, and their prompt differs: they get the paper’s “work thoroughly” worker instructions.</span></li>
-      <li><b>A fairer rule for agent-driven teams.</b><span>A majority vote over the agents’ answers, or agents that actually use the shared answer slot, would have kept the right answers the text team lost.</span></li>
+      <li><b>Independent pastes all three answers together.</b><span>The judge sees every worker’s answer, so a right answer anywhere can earn credit.</span></li>
+      <li><b>The first agent-driven runs kept whichever agent replied last.</b><span>After re-grading, the text team ties independent at 4 of 10; both had the right answer somewhere on the team on 6 questions.</span></li>
+      <li><b>Agent-driven teams now vote when nobody submits a team answer.</b><span>The vote only helps when two agents agree. In the split pilot below, all three answers differed on most questions, and the tie went to agent_1.</span></li>
     </ul>
+  </section>
+
+  <section>
+    <div class="sectionhead">
+      <h2>Splitting the collection between agents</h2>
+      <p>To make sharing necessary, a pilot on the same 10 questions gave each agent only its own third of the 100,000 pages: a fixed random split, strict, so a page in a teammate’s third can’t be opened even by its id. Every agent was told who searches which part and that the evidence for a question is usually spread across all three. On the paper’s 100 questions the evidence pages span more than one third for 96, and the answer page sits in a single agent’s third for about half.</p>
+    </div>
+    <div class="tablewrap"><table id="splittable" style="min-width:560px"></table></div>
+    <p class="note">One run each, 10 questions. Team answer: the shared answer slot, else a majority vote over the agents’ final answers. Decentralized’s round summaries reach every worker automatically, and on one question that carried the answer across the split: only agent_3 could see the answer page, and by the third round two of the three workers had adopted its answer.</p>
+  </section>
+
+  <section>
+    <div class="sectionhead">
+      <h2>Why the agents didn’t communicate</h2>
+      <p>Even split, with messages available at any time, the agents barely used them. Their traces (every model call, tool result and private reasoning step) show why. Counts are over the 30 agents in each team, 3 per question.</p>
+    </div>
+    <div class="tablewrap"><table id="whytable" style="min-width:640px"></table></div>
+    <ol class="list" id="whylist"></ol>
+    <h3>What the silence cost</h3>
+    <div class="tablewrap"><table id="costtable" style="min-width:560px"></table></div>
+    <p class="note" id="costnote"></p>
   </section>
 
   <section>
@@ -215,6 +236,8 @@ footer { font-size: 14px; color: var(--muted); display: grid; gap: 6px; border-t
       <li><b>Tool calls written out as text were taken as answers.</b><span>gpt-oss sometimes writes a call as raw format tokens instead of making it. These now count as a tool error and the agent is asked to call again (BrowseComp only, so WorkBench runs stay comparable).</span></li>
       <li><b>Jobs on one node took each other’s embedding server.</b><span>Each job’s embedder port was the next job’s chat-model port, so 4 of the 10 agent-driven jobs ran every search against the wrong model and found nothing. Ports are now even and setup checks the embedder; those 4 jobs were rerun and the broken runs set aside.</span></li>
       <li><b>Two correct answers were scored as wrong.</b><span>The verdict parser missed the judge’s “Correctness: yes” wording. It now accepts it, and all stored verdicts were re-read; the 100-question run goes from 20 to 22 correct.</span></li>
+      <li><b>Team answers were cut off before the answer line.</b><span>The agent-driven team’s answer was built from each agent’s final reply as kept in the event log, which stores 800 characters. The paper’s format puts “Exact Answer” after the explanation, so about a third of agents’ final replies lost it, and 2–3 graded team answers per 10 questions had no answer in them. Teams now keep full replies, and the earlier runs were re-graded from the full replies saved in their traces.</span></li>
+      <li><b>Too many runs for one interactive job’s memory.</b><span>Each run holds its own copy of the collection, about 10 GB. Eight at once exceeded the 64 GB limit and two pilot runs were killed and rerun; plan about 12 GB per run.</span></li>
       <li><b>The 100-question single-agent run used older code.</b><span>It started before the two fixes above that apply to it (the tool-free final answer and the retry of text tool calls), so it isn’t exactly comparable with the 10-question runs.</span></li>
     </ol>
   </section>
@@ -235,16 +258,21 @@ footer { font-size: 14px; color: var(--muted); display: grid; gap: 6px; border-t
   </section>
 
   <section>
-    <div class="sectionhead"><h2>Next</h2></div>
-    <ol class="list">
-      <li><b>Find out whether talking helps when agents do talk.</b><span>A variant that makes sharing findings and the team answer slot part of the job, compared with the no-channels team on the same questions.</span></li>
-      <li><b>More questions.</b><span>The paper’s full 100 for the single agent, the agent-driven teams and decentralized, so differences of about 10 points become visible.</span></li>
-      <li><b>A sturdier grade.</b><span>Report the lenient re-grade next to the judge, and have a second judge re-grade a sample.</span></li>
-    </ol>
+    <div class="sectionhead"><h2>Ways to make them communicate</h2><p>Candidates for the next runs, each aimed at one of the reasons above, on the same 10 questions and repeated so that results can be averaged.</p></div>
+    <div class="tablewrap"><table style="min-width:620px">
+      <tr><th>Reason</th><th>Strategy</th></tr>
+      <tr><td>They thought they were done</td><td><b>Propose, then commit.</b> Agents can’t answer alone: each posts its candidate, confidence and key evidence; once all have posted, everyone sees the proposals, may check a teammate’s candidate in their own part, and the team commits.</td></tr>
+      <tr><td>They couldn’t see what they were missing</td><td><b>Make the split visible.</b> Label search results “from your third; teammates search the rest”, and put the team framing next to the question.</td></tr>
+      <tr><td>Teammates came to mind late</td><td><b>Regular check-ins.</b> Every 8 or so calls, ask each agent to post anything teammates should know: candidates, ruled-out options, key facts. The agents still choose what to say.</td></tr>
+      <tr><td>Nothing to share into</td><td><b>A shared notebook</b> with fixed sections for candidates, facts and ruled-out options, read before searching.</td></tr>
+      <tr><td>Each agent can still try alone</td><td><b>Make them depend on each other:</b> fewer calls each, roles by clue (one finds candidates, the others check constraints), or different search tools per agent.</td></tr>
+      <tr><td>Choosing to share at all</td><td><b>An automatic shared feed</b> of every agent’s searches and top hits. A control: does seeing each other’s work help when nobody decides to share?</td></tr>
+    </table></div>
+    <p class="note">Every strategy has to beat the free control above: taking the most confident agent’s answer, with no communication at all. Otherwise its gain comes from combining answers better, not from talking.</p>
   </section>
 
   <footer>
-    <p>Code: <code>browsecomp.py</code>, <code>mas.py</code> (BrowseCompEnv), <code>agent_driven.py</code>; setup with <code>BROWSECOMP=1</code> before <code>setup.sh</code>. Runs: jobs 4046744 (single agent, 100 questions), 4046828 (single agent and the paper’s four setups, 10 questions), 4048860–4048869 and the reruns 4048884–4048887 (agent-driven, 10 questions). Analysis: <code>analysis/browsecomp_runs.py</code>; page: <code>analysis/build_browsecomp_page.py</code>.</p>
+    <p>Code: <code>browsecomp.py</code>, <code>mas.py</code> (BrowseCompEnv), <code>agent_driven.py</code>; setup with <code>BROWSECOMP=1</code> before <code>setup.sh</code>. Runs: jobs 4046744 (single agent, 100 questions), 4046828 (single agent and the paper’s four setups, 10 questions), 4048860–4048869 and the reruns 4048884–4048887 (agent-driven, 10 questions), and the split pilot (tag <code>split-p1</code>, run interactively on 1 October). Agent-driven answers re-graded with <code>analysis/rescore_driven_browsecomp.py</code>. Analysis: <code>analysis/browsecomp_runs.py</code> and <code>analysis/browsecomp_silence.py</code>; page: <code>analysis/build_browsecomp_page.py</code>.</p>
   </footer>
 </div>
 
@@ -268,7 +296,7 @@ const paper4 = ["Independent", "Centralized", "Decentralized", "Hybrid"].map((l)
 document.getElementById("cards").innerHTML = [
   card(`${T.correct} / ${T.n}`, `Questions the single agent answered correctly; ${T.lenient} once formatting is ignored. gpt-oss-20b is well above zero here.`),
   card(`${Math.min(...paper4) === Math.max(...paper4) ? Math.min(...paper4) : Math.min(...paper4) + "–" + Math.max(...paper4)} of 10`, `Solved by each of the paper’s four multi-agent setups on the first 10 questions, against ${by["Single agent"].correct} for the single agent in the same job.`),
-  card(`${msgQuestions} of ${drivenRuns}`, `Agent-driven question runs with any message between agents. In the one that had any, two agents proposed splitting up the clues at the start and nobody replied.`),
+  card(`${D.silence.split.text.someone_right} of 10`, `Questions where an agent on the split text team had the right answer. Nobody compared answers, and the team delivered ${D.silence.split.text.team_right}.`),
   card(`${T.judge_vs_match} / ${T.n}`, `Single-agent answers where the judge and a plain string match disagree; the judge rejects some correct answers over formatting.`),
 ].join("");
 
@@ -343,6 +371,48 @@ document.getElementById("foundtable").innerHTML = `<tr><th>Setup, first 10 quest
   document.getElementById("pubchart").append(svg);
 })();
 
+
+// split pilot table
+document.getElementById("splittable").innerHTML = `<tr><th>Setup, first 10 questions</th><th class="n">Correct, split</th><th class="n">Correct, unsplit</th><th class="n">Messages per question, split</th><th class="n">Tokens per question, split</th><th class="n">Seconds per question, split</th></tr>` +
+  D.split.map((r) => `<tr><td>${esc(r.label)}</td><td class="n"><b>${r.split}</b> / ${r.split_n}</td><td class="n">${r.unsplit == null ? "–" : r.unsplit + " / 10"}</td><td class="n">${r.messages == null ? "round summaries" : r.messages.toFixed(1)}</td><td class="n">${k(r.split_tokens)}</td><td class="n">${Math.round(r.split_seconds)}</td></tr>`).join("");
+
+// why they didn't talk
+(function () {
+  const S = D.silence.split, U = D.silence.unsplit;
+  const cols = [["Split, no channels", S.none], ["Split, text", S.text], ["Split, all channels", S.all], ["Unsplit, text", U.text]];
+  const row = (label, f) => `<tr><td>${label}</td>${cols.map(([, x]) => `<td class="n">${f(x)}</td>`).join("")}</tr>`;
+  const pctAt = (x) => (x.team_at_mean == null ? "–" : pct(x.team_at_mean));
+  document.getElementById("whytable").innerHTML = `<tr><th>Per team, 30 agents</th>${cols.map(([l]) => `<th class="n">${l}</th>`).join("")}</tr>` +
+    row("Agents ending with a wrong answer / giving up", (x) => `${x.agents_wrong} / ${x.agents_gave_up}`) +
+    row("Median confidence stated with a wrong answer", (x) => (x.wrong_conf_median == null ? "–" : x.wrong_conf_median)) +
+    row("Model calls used, median of 30", (x) => x.calls_median) +
+    row("Thought about teammates in the first step", (x) => x.team_first) +
+    row("Ever thought about teammates", (x) => x.team_ever) +
+    row("Mean point of that first thought, through the run", pctAt) +
+    row("Thought about teammates when finishing", (x) => x.team_at_finish) +
+    `<tr><td>Ever reasoned about seeing only part of the collection</td>${cols.map(([l, x]) => `<td class="n">${l.startsWith("Unsplit") ? "–" : x.split_mentioned}</td>`).join("")}</tr>` +
+    row("Agents that sent anything", (x) => x.agents_sent) +
+    row("Messages sent / answered by a recipient", (x) => `${x.messages} / ${x.messages_answered}`) +
+    row("Questions with a submitted team answer", (x) => x.submitted);
+  const t = S.text, a = S.all;
+  const items = [
+    ["They believed they were done.", `Agents stopped after a median of ${t.calls_median} of their 30 calls, each with an answer and a stated confidence. Wrong answers came with a median confidence of ${t.wrong_conf_median}–${a.wrong_conf_median}. In the split text team no agent gave up. Asking for help happens when an agent is stuck, and they rarely felt stuck: only ${t.team_at_finish + a.team_at_finish} of the 60 agents with channels thought of their teammates when finishing.`],
+    ["They couldn’t see what they were missing.", `Every search returns 5 plausible hits from the agent’s own third, so nothing signals that the evidence is elsewhere. None of the 90 agents in the split teams ever reasoned about having only part of the collection, although the prompt said so.`],
+    ["The question reads as a solo task.", `It arrives with the paper’s single-agent answer format (explanation, exact answer, confidence), and the team framing sits in the system prompt. The first thought is the puzzle: ${t.team_first + a.team_first} of 60 agents with channels thought of teammates in their first step, and the rest, if at all, ${pct(t.team_at_mean)} of the way through, as a fallback after failing.`],
+    ["The few messages asked for help and mostly went unanswered.", `${t.messages + a.messages} messages across both teams, ${t.messages_answered + a.messages_answered} of them answered; recipients were busy searching or already done. They divided up searching or asked “did anyone find…”; none passed on a finding.`],
+    ["The conversation that would have helped never happened.", `Each agent addressed its answer to the user rather than the team, so nobody ever compared answers. The table below shows what that cost.`],
+  ];
+  document.getElementById("whylist").innerHTML = items.map(([b, x]) => `<li><b>${esc(b)}</b><span>${esc(x)}</span></li>`).join("");
+  const cc = [["Split, no channels", S.none], ["Split, text", S.text], ["Split, all channels", S.all]];
+  const crow = (label, f) => `<tr><td>${label}</td>${cc.map(([, x]) => `<td class="n">${f(x)}</td>`).join("")}</tr>`;
+  document.getElementById("costtable").innerHTML = `<tr><th>Of 10 questions</th>${cc.map(([l]) => `<th class="n">${l}</th>`).join("")}</tr>` +
+    crow("Some agent had the right answer", (x) => x.someone_right) +
+    crow("<b>Team answer right</b>", (x) => `<b>${x.team_right}</b>`) +
+    crow("Vote tied: all three answers different", (x) => x.ties) +
+    crow("The right agent was the most confident", (x) => `${x.right_most_confident} of ${x.right_multi}`) +
+    crow("Taking the most confident answer instead (no communication)", (x) => x.most_confident_rule);
+  document.getElementById("costnote").textContent = `Right and wrong in this table by whether an agent’s final answer contains the gold answer. The right answer was on the team for half the questions, and its holder stated the highest confidence almost every time, but the vote tied and fell to agent_1. Exchanging “here is my answer and how sure I am” once at the end would have recovered most of these. Taking the most confident answer is also a free control for any communication strategy: one that doesn’t beat it is only combining answers better.`;
+})();
 const agreeTrial = T.n - T.judge_vs_match;
 document.getElementById("judgenote").textContent = `On the single agent’s 100 answers, the judge and a plain string match agree on ${agreeTrial}. Every disagreement we looked at was the judge being too strict or the string match missing an accent, so the judge undercounts by about ${T.lenient - T.correct} point${T.lenient - T.correct === 1 ? "" : "s"} on that run.`;
 })();

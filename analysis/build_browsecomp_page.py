@@ -12,6 +12,10 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from browsecomp_runs import lenient, load, norm, summary  # noqa: E402
+from browsecomp_silence import full_finals, team_stats  # noqa: E402
+
+sys.path.insert(0, str(HERE.parent))
+import browsecomp as bc  # noqa: E402
 
 # Which run group stands for each system on the page (tag t10: the first 10 of the paper's 100 questions).
 SYSTEMS = [
@@ -59,11 +63,7 @@ def found_by_some_agent(kind, tag):
             if "worker_answers" in t:
                 answers = [v[-1] for v in t["worker_answers"].values() if v]
             else:
-                last = {}
-                for e in t["events"]:
-                    if e["kind"] == "idle" and e["reply"].strip():
-                        last[e["agent"]] = e["reply"]
-                answers = list(last.values())
+                answers = list(full_finals(t).values())  # full replies (the event log keeps 800 characters)
             gold = norm(r["expected"])
             found += any(gold and f" {gold} " in f" {norm(a)} " for a in answers)
     return found
@@ -71,6 +71,31 @@ def found_by_some_agent(kind, tag):
 
 data["found"] = [{"label": label, "found": found_by_some_agent(kind, tag), "credited": next(s["correct"] for s in data["systems"] if s["label"] == label)}
                  for label, kind, tag in SYSTEMS if kind in ("independent", "agent-driven-none", "agent-driven-text-coord")]
+
+# The split pilot: the collection split three ways, one part per agent (tag split-p1), next to the same setups unsplit.
+SPLIT = [("Agent-driven, no channels", ("agent-driven-none-split3", "split-p1"), ("agent-driven-none", "t10b")),
+         ("Agent-driven, text + coordinate", ("agent-driven-text-coord-split3", "split-p1"), ("agent-driven-text-coord", "t10b")),
+         ("Agent-driven, all channels + coordinate", ("agent-driven-all-coord-split3", "split-p1"), None),
+         ("Decentralized", ("decentralized-split3", "split-p1"), ("decentralized", "t10"))]
+data["split"] = []
+for label, sk, uk in SPLIT:
+    s_ = summary(groups[sk])
+    data["split"].append({"label": label, "split": s_["correct"], "split_n": s_["n"], "split_tokens": s_["tokens"],
+                          "split_seconds": s_["seconds"], "messages": s_.get("messages"),
+                          "unsplit": summary(groups[uk])["correct"] if uk else None})
+data["grid"]["columns"] += [{"label": f"{label}, split", "cells": {
+    i: ("yes" if groups[sk][i]["correct"] else "lenient" if lenient(groups[sk][i]) else "no") for i in paper_order if i in groups[sk]}}
+    for label, sk, _ in SPLIT]
+
+# Why the agent-driven teams didn't talk: counts from their traces (questions and answers stay on /scratch).
+tasks = {t["id"]: t for t in bc.load_tasks()}
+runs = HERE.parent / "runs"
+data["silence"] = {
+    "split": {name: team_stats(sorted(runs.glob(f"*-agent-driven-{kind}-split3-browsecomp-gpt-oss-20b-split-p1")), tasks)
+              for name, kind in (("none", "none"), ("text", "text-coord"), ("all", "all-coord"))},
+    "unsplit": {name: team_stats(sorted(runs.glob(f"*-agent-driven-{kind}-browsecomp-gpt-oss-20b-t10b-s*")), tasks)
+                for name, kind in (("none", "none"), ("text", "text-coord"))},
+}
 
 html = (HERE / "browsecomp.html").read_text().replace("/*DATA*/null", json.dumps(data).replace("</", "<\\/"))
 (HERE / "browsecomp-final.html").write_text(html)

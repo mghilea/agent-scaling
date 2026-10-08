@@ -50,6 +50,82 @@ def agent_view(msgs, gold_docs, gold):
             "answered": bool(final.strip())}
 
 
+TEAM = re.compile(r"teammate|agent_[123]|agent [123]\b|send_message|message (my |the )?team|coordinat|"
+                  r"share (my |our |the )?(find|result)|ask (my |the )?team|the team\b|our team", re.I)
+PART = re.compile(r"my (own )?part|my third|only (search|see|access) (my|part|a third)|1/3 of|part of the (document )?collection|"
+                  r"other parts", re.I)
+
+
+def full_finals(trace):
+    """Each agent's full final reply, from its conversation (the event log keeps only 800 characters)."""
+    out = {}
+    for agent, msgs in trace["conversations"].items():
+        final = next((m.get("content") or "" for m in reversed(msgs) if m.get("role") == "assistant"
+                      and not m.get("tool_calls") and (m.get("content") or "").strip()), "")
+        if final:
+            out[agent] = final
+    return out
+
+
+def team_stats(run_dirs, tasks):
+    """Counts (no question text) describing what an agent-driven team's members saw, believed, said and did."""
+    agents, qs = [], []
+    for d in run_dirs:
+        for line in open(d / "results.jsonl"):
+            r = json.loads(line)
+            t = json.load(open(d / "traces" / f"{r['id']}.json"))
+            task = tasks[r["id"]]
+            gold_docs, gold = set(task["gold_docs"]), task["answer"]
+            finals = full_finals(t)
+            ev = t["events"]
+            sent = Counter(e["agent"] for e in ev if e["kind"] in ("message", "a2a_send", "state_write"))
+            msgs = [(i, e) for i, e in enumerate(ev) if e["kind"] == "message"]
+            answered = sum(any(x["kind"] == "message" and x["agent"] in e["to"] for x in ev[i + 1:]) for i, e in msgs)
+            views = {}
+            for a, m in t["conversations"].items():
+                v = agent_view(m, gold_docs, gold)
+                reas = [x.get("reasoning") or "" for x in m if x.get("role") == "assistant"]
+                hits = [i for i, x in enumerate(reas) if TEAM.search(x)]
+                last = [x for x in m if x.get("role") == "assistant" and not x.get("tool_calls") and (x.get("content") or "").strip()]
+                v.update({"sent": sent.get(a, 0), "team_first": bool(reas) and bool(TEAM.search(reas[0])),
+                          "team_ever": bool(hits), "team_at": hits[0] / max(1, len(reas) - 1) if hits else None,
+                          "split_mentioned": any(PART.search(x) for x in reas),
+                          "team_at_finish": bool(last) and bool(TEAM.search((last[-1].get("reasoning") or "") + (last[-1].get("content") or "")))})
+                views[a] = v
+            agents += views.values()
+            conf = {a: v["confidence"] if v["confidence"] is not None else -1 for a, v in views.items() if a in finals}
+            right = [a for a, v in views.items() if v["right"]]
+            ids = sorted(finals)
+            _, votes, _ = bc.majority_answer([(a, finals[a]) for a in ids])
+            best = max(ids, key=lambda a: conf[a]) if ids else None
+            qs.append({"team_right": bool(r["correct"]), "someone_right": bool(right),
+                       "talked": sum(sent.values()) > 0, "messages": len(msgs), "answered": answered,
+                       "tie": votes == 1 and len(ids) > 1, "submitted": bool(t.get("team_answers")),
+                       "right_most_confident": bool(right) and len(ids) > 1 and max(conf.get(a, -1) for a in right) >= max(conf.values()),
+                       "most_confident_right": bool(best) and contains(finals[best], gold)})
+    wrong = [a for a in agents if not a["right"] and not a["gave_up"]]
+    confs = [a["confidence"] for a in wrong if a["confidence"] is not None]
+    at = [a["team_at"] for a in agents if a["team_at"] is not None]
+    return {
+        "questions": len(qs), "agents": len(agents),
+        "agents_saw_gold": sum(a["saw_gold"] for a in agents), "agents_right": sum(a["right"] for a in agents),
+        "agents_wrong": len(wrong), "agents_gave_up": sum(a["gave_up"] for a in agents),
+        "wrong_conf_median": st.median(confs) if confs else None, "wrong_conf_70": sum(c >= 70 for c in confs), "wrong_conf_n": len(confs),
+        "calls_median": st.median(a["calls"] for a in agents), "ran_out": sum(a["calls"] >= 30 for a in agents),
+        "agents_sent": sum(a["sent"] > 0 for a in agents),
+        "team_first": sum(a["team_first"] for a in agents), "team_ever": sum(a["team_ever"] for a in agents),
+        "team_at_mean": st.mean(at) if at else None, "team_at_finish": sum(a["team_at_finish"] for a in agents),
+        "split_mentioned": sum(a["split_mentioned"] for a in agents),
+        "messages": sum(q["messages"] for q in qs), "messages_answered": sum(q["answered"] for q in qs),
+        "questions_talked": sum(q["talked"] for q in qs), "submitted": sum(q["submitted"] for q in qs),
+        "team_right": sum(q["team_right"] for q in qs), "someone_right": sum(q["someone_right"] for q in qs),
+        "lost": sum(q["someone_right"] and not q["team_right"] for q in qs), "ties": sum(q["tie"] for q in qs),
+        "right_most_confident": sum(q["right_most_confident"] for q in qs),
+        "right_multi": sum(q["someone_right"] for q in qs),
+        "most_confident_rule": sum(q["most_confident_right"] for q in qs),
+    }
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--tag", default="split-p1")
