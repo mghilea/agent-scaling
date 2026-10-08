@@ -1,0 +1,288 @@
+<title>BrowseComp-Plus Team Comparison</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one reading column of sections, matching the project's BrowseComp-Plus page; tables and the chart scroll in their own boxes. */
+:root {
+  --ground: #f3f5f8; --surface: #fbfcfd; --sunken: #e7ebf1; --ink: #16202e; --ink-2: #3e4a5c; --muted: #5d6879; --line: #d2d9e3; --grid: #e3e8ee;
+  --s1: #2a78d6; --s2: #eb6834; --pass: #22784a; --pass-soft: #dcf1e5; --warn: #8a5a00; --warn-soft: #fdf0d2;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  --cond: "IBM Plex Sans Condensed", "IBM Plex Sans", "Arial Narrow", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, "Courier New", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground: #0e131a; --surface: #151c26; --sunken: #1d2632; --ink: #e5eaf1; --ink-2: #c3ccd8; --muted: #9aa7b8; --line: #2e3a4a; --grid: #232d3a;
+    --s1: #3987e5; --s2: #d95926; --pass: #53c487; --pass-soft: #163527; --warn: #e2b24a; --warn-soft: #3a2c0c;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #0e131a; --surface: #151c26; --sunken: #1d2632; --ink: #e5eaf1; --ink-2: #c3ccd8; --muted: #9aa7b8; --line: #2e3a4a; --grid: #232d3a;
+  --s1: #3987e5; --s2: #d95926; --pass: #53c487; --pass-soft: #163527; --warn: #e2b24a; --warn-soft: #3a2c0c;
+}
+* { box-sizing: border-box; }
+body { background: var(--ground); color: var(--ink); font: 16px/1.6 var(--sans); }
+.wrap { max-width: 1080px; margin: 0 auto; padding-inline: 20px; padding-block: 36px 60px; display: grid; gap: 46px; }
+header { display: grid; gap: 14px; }
+.eyebrow { margin: 0; font: 600 12px/1.4 var(--sans); letter-spacing: .1em; text-transform: uppercase; color: var(--s1); }
+h1 { margin: 0; font: 600 clamp(30px, 4.4vw, 44px)/1.1 var(--cond); text-wrap: balance; max-width: 24ch; }
+h2 { margin: 0; font: 600 clamp(23px, 3vw, 29px)/1.2 var(--cond); text-wrap: balance; }
+h3 { margin: 0; font: 600 18px/1.3 var(--cond); }
+p { margin: 0; }
+.lede { font-size: 18px; color: var(--muted); max-width: 70ch; }
+code { font-family: var(--mono); font-size: 13px; background: var(--sunken); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+section { display: grid; gap: 18px; min-width: 0; }
+.sectionhead { display: grid; gap: 6px; }
+.sectionhead p { color: var(--muted); max-width: 72ch; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; gap: 6px; align-content: start; }
+.card p { color: var(--muted); font-size: 15px; }
+.card .big { font: 600 30px/1 var(--cond); color: var(--ink); font-variant-numeric: tabular-nums; }
+.tablewrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 14px; font-variant-numeric: tabular-nums; }
+th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 600 11.5px/1.4 var(--sans); letter-spacing: .05em; text-transform: uppercase; color: var(--muted); background: var(--sunken); }
+td.n, th.n { text-align: right; } td.c, th.c { text-align: center; }
+tr:last-child td { border-bottom: none; }
+th.group { text-align: center; border-left: 1px solid var(--line); }
+td.gstart, th.gstart { border-left: 1px solid var(--line); }
+.note { font-size: 14px; color: var(--muted); max-width: 84ch; }
+.chartbox { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; gap: 10px; overflow-x: auto; }
+.chartbox svg { display: block; width: 100%; min-width: 560px; height: auto; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13.5px; color: var(--ink-2); }
+.legend i { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+figcaption { font-size: 14px; color: var(--muted); max-width: 84ch; }
+.lbl { fill: var(--muted); font: 12px var(--sans); }
+.val { fill: var(--ink-2); font: 500 12px var(--sans); font-variant-numeric: tabular-nums; }
+.cat { fill: var(--ink); font: 500 13px var(--sans); }
+.cat.team { fill: var(--ink-2); }
+.gridline { stroke: var(--grid); stroke-width: 1; }
+.mark { display: inline-block; min-width: 22px; text-align: center; padding: 0 5px; border-radius: 999px; font: 600 11.5px/1.7 var(--sans); }
+.mark.yes { background: var(--pass-soft); color: var(--pass); }
+.mark.no { color: var(--muted); }
+.mark.one { background: var(--warn-soft); color: var(--warn); }
+.qid { font: 12.5px var(--mono); white-space: nowrap; }
+ol.list, ul.list { margin: 0; padding-left: 22px; display: grid; gap: 10px; max-width: 84ch; }
+ol.list li span, ul.list li span { display: block; color: var(--muted); font-size: 15px; }
+dl { margin: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 16px; font-size: 15px; }
+dt { font-weight: 600; } dd { margin: 0; color: var(--ink-2); }
+@media (max-width: 560px) { dl { grid-template-columns: minmax(0, 1fr); gap: 2px; } dd { margin-bottom: 8px; } }
+.tip { position: fixed; z-index: 10; pointer-events: none; max-width: 300px; background: var(--ink); color: var(--surface); font: 13px/1.45 var(--sans); padding: 8px 10px; border-radius: 8px; }
+footer { font-size: 14px; color: var(--muted); display: grid; gap: 6px; border-top: 1px solid var(--line); padding-top: 18px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">agent-scaling · BrowseComp-Plus · gpt-oss-20b · run 1 of 3 · 7–8 October 2026</p>
+    <h1>Seventeen team setups on ten BrowseComp-Plus questions</h1>
+    <p class="lede" id="lede"></p>
+    <div class="cards" id="cards"></div>
+  </header>
+
+  <section>
+    <div class="sectionhead">
+      <h2>What was run</h2>
+      <p>The first 10 of the scaling paper’s 100 BrowseComp-Plus questions. Every setup uses gpt-oss-20b, the paper’s search index over 100,195 pages, and the paper’s grader prompt answered by gpt-oss-20b. Each multi-agent setup ran twice: with every agent searching the whole collection, and with the collection split three ways.</p>
+    </div>
+    <div class="tablewrap"><table style="min-width:620px">
+      <tr><th>Setup</th><th>How the agents work together</th><th>How the team’s answer is formed</th></tr>
+      <tr><td>Single agent</td><td>One agent, 30 model calls.</td><td>Its own answer.</td></tr>
+      <tr><td>Independent</td><td>Three agents work alone in parallel.</td><td>All three answers pasted together and graded as one.</td></tr>
+      <tr><td>Centralized</td><td>An orchestrator plans, then instructs the three agents round by round (up to 5 rounds) from their summaries.</td><td>The orchestrator writes it from the team’s findings.</td></tr>
+      <tr><td>Decentralized</td><td>Three rounds of debate: after each round every agent reads its peers’ answers and revises.</td><td>Majority vote over the final answers.</td></tr>
+      <tr><td>Hybrid</td><td>Centralized, plus one round in which the agents read each other’s summaries directly.</td><td>The orchestrator writes it.</td></tr>
+      <tr><td>Agent-driven, text / A2A / shared state / all channels</td><td>Three peers with no rounds and no leader. They contact each other whenever they choose, through the channels their team has: free-text messages, A2A-style tasks with states and JSON data, a shared key-value store, or all three. Each is asked to agree on who investigates what before searching.</td><td>Propose, then decide: each agent proposes an answer with its confidence and evidence, which every teammate receives. Once all three have, everyone sees all proposals and gets 8 more calls; one agent submits the team’s answer, and the first submission is final.</td></tr>
+    </table></div>
+    <p class="note">The first five rows follow the scaling paper’s released code. Split: each agent can search and open only its own third of the collection, and every agent (and the orchestrator) is told how it is divided. The single agent always searches everything. On 4 of these 10 questions the answer pages sit in only one agent’s third, so on those, the team can answer only if that agent’s finding gets through.</p>
+  </section>
+
+  <section>
+    <div class="sectionhead">
+      <h2>Results</h2>
+      <p id="resultsnote"></p>
+    </div>
+    <div class="chartbox">
+      <div class="legend"><span><i style="background:var(--s1)"></i>Whole collection</span><span><i style="background:var(--s2)"></i>Split three ways</span></div>
+      <div id="dumbbell"></div>
+      <figcaption id="dumbcap"></figcaption>
+    </div>
+    <div class="tablewrap"><table id="restable"></table></div>
+    <p class="note">Correct: the judge’s verdict. Formatting ignored: also accepting answers the judge rejected only over case, punctuation or accents. Seconds per question aren’t comparable across rows: up to four setups shared one GPU per job.</p>
+  </section>
+
+  <section>
+    <div class="sectionhead">
+      <h2>Question by question</h2>
+      <p>Which setups answered each question. Highlighted ids are the 4 questions whose answer pages sit in a single agent’s third when the collection is split.</p>
+    </div>
+    <div class="tablewrap"><table id="grid" style="min-width:980px"></table></div>
+    <p class="note">Question ids are BrowseComp-Plus’s own. The questions and answers stay off this page: BrowseComp asks that they never appear as plain text online.</p>
+  </section>
+
+  <section>
+    <div class="sectionhead">
+      <h2>What the agent-driven teams did</h2>
+      <p>Per team, over its 10 questions. “By choice” counts only what agents decided to send; proposals are part of the answer protocol and are counted separately.</p>
+    </div>
+    <div class="tablewrap"><table id="driven" style="min-width:860px"></table></div>
+    <ul class="list" id="drivenlist"></ul>
+  </section>
+
+  <section>
+    <div class="sectionhead"><h2>Reading this run</h2><p>One run of 10 questions: each question is 10 points, and a second run can easily move a setup by 10–20. These are directions to check against runs 2 and 3.</p></div>
+    <ol class="list" id="takeaways"></ol>
+  </section>
+
+  <section>
+    <div class="sectionhead"><h2>Next</h2></div>
+    <ol class="list">
+      <li><b>Runs 2 and 3.</b><span>Nine of the 18 jobs failed overnight on one node with a broken install and were resubmitted on 8 October; this page will be rebuilt with the averages of all three runs.</span></li>
+      <li><b>Make deciding a team act.</b><span>With the first submission final, the fastest agent decides alone. A rule that accepts a submission only once every agent has endorsed it would test whether agents actually deliberate when they must.</span></li>
+      <li><b>Compare with the free control.</b><span>Taking the most confident proposal, with no deciding step at all, is the baseline any deciding rule has to beat.</span></li>
+    </ol>
+  </section>
+
+  <footer>
+    <p>Runs: tag <code>bc3-r1</code> (jobs 4068371–4068376, 7 October 2026), code at commit <code>21cc2a2</code> or later. Analysis: <code>analysis/browsecomp_bc3.py --tag bc3-r1</code>; page: <code>analysis/build_bc3_page.py</code>. Earlier BrowseComp-Plus work (setup, checks, the 100-question single-agent run, the split pilot) is on the project’s BrowseComp-Plus page.</p>
+  </footer>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script>
+(function () {
+const D = {"setups": [{"setup": "Agent-driven, A2A", "split": "split", "runs": 1, "questions": ["bc-100", "bc-1091", "bc-116", "bc-1225", "bc-228", "bc-235", "bc-503", "bc-535", "bc-67", "bc-852"], "per_run": [0.4], "mean": 0.4, "min": 0.4, "max": 0.4, "lenient_mean": 0.5, "tokens": 1226894.6, "seconds": 176.23, "complete": true, "solved": {"bc-116": 0, "bc-1225": 1, "bc-100": 0, "bc-67": 0, "bc-235": 1, "bc-852": 0, "bc-535": 0, "bc-1091": 1, "bc-503": 1, "bc-228": 0}, "chosen_messages": 0, "chosen_a2a": 0.3, "chosen_state_writes": 0, "question_runs_with_chosen_comm": 2, "question_runs": 10, "proposals": 3.6, "auto_proposals": 0.3, "comm_after_proposals": 0.1, "no_submission": 0, "reminded": 1, "right_among_proposals": 5, "right_submitted": 4, "decide_seconds": 9.014999999999986, "question_runs_talk_after": 1, "disagreed": 4, "submitted_own_when_disagreed": 4, "submitted_most_confident_when_disagreed": 1, "most_confident_rule": 3}, {"setup": "Agent-driven, A2A", "split": "unsplit", "runs": 1, "questions": ["bc-100", "bc-1091", "bc-116", "bc-1225", "bc-228", "bc-235", "bc-503", "bc-535", "bc-67", "bc-852"], "per_run": [0.3], "mean": 0.3, "min": 0.3, "max": 0.3, "lenient_mean": 0.5, "tokens": 948981.3, "seconds": 154.9, "complete": true, "solved": {"bc-116": 0, "bc-1225": 1, "bc-100": 0, "bc-67": 0, "bc-235": 1, "bc-852": 0, "bc-535": 0, "bc-1091": 0, "bc-503": 1, "bc-228": 0}, "chosen_messages": 0, "chosen_a2a": 0.4, "chosen_state_writes": 0, "question_runs_with_chosen_comm": 3, "question_runs": 10, "proposals": 3.5, "auto_proposals": 0.1, "comm_after_proposals": 0.2, "no_submission": 0, "reminded": 0, "right_among_proposals": 5, "right_submitted": 3, "decide_seconds": 4.294999999999995, "question_runs_talk_after": 1, "disagreed": 4, "submitted_own_when_disagreed": 2, "submitted_most_confident_when_disagreed": 1, "most_confident_rule": 5}, {"setup": "Agent-driven, all channels", "split": "split", "runs": 1, "questions": ["bc-100", "bc-1091", "bc-116", "bc-1225", "bc-228", "bc-235", "bc-503", "bc-535", "bc-67", "bc-852"], "per_run": [0.3], "mean": 0.3, "min": 0.3, "max": 0.3, "lenient_mean": 0.3, "tokens": 1021110.4, "seconds": 170.78, "complete": true, "solved": {"bc-116": 0, "bc-1225": 1, "bc-100": 0, "bc-67": 0, "bc-235": 1, "bc-852": 1, "bc-535": 0, "bc-1091": 0, "bc-503": 0, "bc-228": 0}, "chosen_messages": 0.8, "chosen_a2a": 0.1, "chosen_state_writes": 0, "question_runs_with_chosen_comm": 5, "question_runs": 10, "proposals": 3.8, "auto_proposals": 0.1, "comm_after_proposals": 0.2, "no_submission": 0, "reminded": 1, "right_among_proposals": 3, "right_submitted": 3, "decide_seconds": 8.210000000000008, "question_runs_talk_after": 1, "disagreed": 8, "submitted_own_when_disagreed": 4, "submitted_most_confident_when_disagreed": 3, "most_confident_rule": 2}, {"setup": "Agent-driven, all channels", "split": "unsplit", "runs": 1, "questions": ["bc-100", "bc-1091", "bc-116", "bc-1225", "bc-228", "bc-235", "bc-503", "bc-535", "bc-67", "bc-852"], "per_run": [0.3], "mean": 0.3, "min": 0.3, "max": 0.3, "lenient_mean": 0.4, "tokens": 1166084.5, "seconds": 176.6, "complete": true, "solved": {"bc-116": 0, "bc-1225": 1, "bc-100": 0, "bc-67": 0, "bc-235": 1, "bc-852": 0, "bc-535": 0, "bc-1091": 0, "bc-503": 1, "bc-228": 0}, "chosen_messages": 0.3, "chosen_a2a": 0, "chosen_state_writes": 0, "question_runs_with_chosen_comm": 3, "question_runs": 10, "proposals": 3.6, "auto_proposals": 0.1, "comm_after_proposals": 0, "no_submission": 0, "reminded": 3, "right_among_proposals": 4, "right_submitted": 3, "decide_seconds": 7.189999999999998, "question_runs_talk_after": 0, "disagreed": 3, "submitted_own_when_disagreed": 2, "submitted_most_confident_when_disagreed": 2, "most_confident_rule": 4}, {"setup": "Agent-driven, shared state", "split": "split", "runs": 1, "questions": ["bc-100", "bc-1091", "bc-116", "bc-1225", "bc-228", "bc-235", "bc-503", "bc-535", "bc-67", "bc-852"], "per_run": [0.4], "mean": 0.4, "min": 0.4, "max": 0.4, "lenient_mean": 0.4, "tokens": 1067966.9, "seconds": 169.88, "complete": true, "solved": {"bc-116": 0, "bc-1225": 1, "bc-100": 0, "bc-67": 0, "bc-235": 1, "bc-852": 0, "bc-535": 1, "bc-1091": 0, "bc-503": 1, "bc-228": 0}, "chosen_messages": 0, "chosen_a2a": 0, "chosen_state_writes": 0.1, "question_runs_with_chosen_comm": 1, "question_runs": 10, "proposals": 3.5, "auto_proposals": 0.5, "comm_after_proposals": 0.1, "no_submission": 0, "reminded": 0, "right_among_proposals": 5, "right_submitted": 4, "decide_seconds": 6.385000000000005, "question_runs_talk_after": 1, "disagreed": 4, "submitted_own_when_disagreed": 3, "submitted_most_confident_when_disagreed": 2, "most_confident_rule": 5}, {"setup": "Agent-driven, shared state", "split": "unsplit", "runs": 1, "questions": ["bc-100", "bc-1091", "bc-116", "bc-1225", "bc-228", "bc-235", "bc-503", "bc-535", "bc-67", "bc-852"], "per_run": [0.4], "mean": 0.4, "min": 0.4, "max": 0.4, "lenient_mean": 0.5, "tokens": 1117266.8, "seconds": 171.53, "complete": true, "solved": {"bc-116": 0, "bc-1225": 1, "bc-100": 0, "bc-67": 0, "bc-235": 1, "bc-852": 0, "bc-535": 1, "bc-1091": 0, "bc-503": 1, "bc-228": 0}, "chosen_messages": 0, "chosen_a2a": 0, "chosen_state_writes": 0.3, "question_runs_with_chosen_comm": 1, "question_runs": 10, "proposals": 3.4, "auto_proposals": 0.3, "comm_after_proposals": 0.3, "no_submission": 0, "reminded": 1, "right_among_proposals": 5, "right_submitted": 4, "decide_seconds": 5.715000000000003, "question_runs_talk_after": 1, "disagreed": 5, "submitted_own_when_disagreed": 3, "submitted_most_confident_when_disagreed": 4, "most_confident_rule": 4}, {"setup": "Agent-driven, text", "split": "split", "runs": 1, "questions": ["bc-100", "bc-1091", "bc-116", "bc-1225", "bc-228", "bc-235", "bc-503", "bc-535", "bc-67", "bc-852"], "per_run": [0.2], "mean": 0.2, "min": 0.2, "max": 0.2, "lenient_mean": 0.3, "tokens": 1218715.3, "seconds": 184.68, "complete": true, "solved": {"bc-116": 0, "bc-1225": 0, "bc-100": 0, "bc-67": 0, "bc-235": 0, "bc-852": 0, "bc-535": 1, "bc-1091": 0, "bc-503": 1, "bc-228": 0}, "chosen_messages": 0.8, "chosen_a2a": 0, "chosen_state_writes": 0, "question_runs_with_chosen_comm": 5, "question_runs": 10, "proposals": 3.5, "auto_proposals": 0.3, "comm_after_proposals": 0.5, "no_submission": 0, "reminded": 1, "right_among_proposals": 5, "right_submitted": 2, "decide_seconds": 6.694999999999993, "question_runs_talk_after": 3, "disagreed": 8, "submitted_own_when_disagreed": 5, "submitted_most_confident_when_disagreed": 2, "most_confident_rule": 2}, {"setup": "Agent-driven, text", "split": "unsplit", "runs": 1, "questions": ["bc-100", "bc-1091", "bc-116", "bc-1225", "bc-228", "bc-235", "bc-503", "bc-535", "bc-67", "bc-852"], "per_run": [0.2], "mean": 0.2, "min": 0.2, "max": 0.2, "lenient_mean": 0.2, "tokens": 958944.2, "seconds": 164.18, "complete": true, "solved": {"bc-116": 0, "bc-1225": 0, "bc-100": 0, "bc-67": 0, "bc-235": 1, "bc-852": 0, "bc-535": 0, "bc-1091": 0, "bc-503": 1, "bc-228": 0}, "chosen_messages": 0.3, "chosen_a2a": 0, "chosen_state_writes": 0, "question_runs_with_chosen_comm": 3, "question_runs": 10, "proposals": 3.5, "auto_proposals": 0.2, "comm_after_proposals": 0.2, "no_submission": 0, "reminded": 1, "right_among_proposals": 4, "right_submitted": 2, "decide_seconds": 4.420000000000002, "question_runs_talk_after": 2, "disagreed": 6, "submitted_own_when_disagreed": 2, "submitted_most_confident_when_disagreed": 2, "most_confident_rule": 3}, {"setup": "Centralized", "split": "split", "runs": 1, "questions": ["bc-100", "bc-1091", "bc-116", "bc-1225", "bc-228", "bc-235", "bc-503", "bc-535", "bc-67", "bc-852"], "per_run": [0.2], "mean": 0.2, "min": 0.2, "max": 0.2, "lenient_mean": 0.3, "tokens": 1589601.7, "seconds": 243.11, "complete": true, "solved": {"bc-116": 0, "bc-1225": 1, "bc-100": 0, "bc-67": 0, "bc-235": 0, "bc-852": 0, "bc-535": 1, "bc-1091": 0, "bc-503": 0, "bc-228": 0}}, {"setup": "Centralized", "split": "unsplit", "runs": 1, "questions": ["bc-100", "bc-1091", "bc-116", "bc-1225", "bc-228", "bc-235", "bc-503", "bc-535", "bc-67", "bc-852"], "per_run": [0.3], "mean": 0.3, "min": 0.3, "max": 0.3, "lenient_mean": 0.5, "tokens": 1296580.8, "seconds": 238.85, "complete": true, "solved": {"bc-116": 0, "bc-1225": 1, "bc-100": 0, "bc-67": 0, "bc-235": 1, "bc-852": 0, "bc-535": 0, "bc-1091": 0, "bc-503": 1, "bc-228": 0}}, {"setup": "Decentralized", "split": "split", "runs": 1, "questions": ["bc-100", "bc-1091", "bc-116", "bc-1225", "bc-228", "bc-235", "bc-503", "bc-535", "bc-67", "bc-852"], "per_run": [0.4], "mean": 0.4, "min": 0.4, "max": 0.4, "lenient_mean": 0.4, "tokens": 1447525.5, "seconds": 226.62, "complete": true, "solved": {"bc-116": 0, "bc-1225": 1, "bc-100": 0, "bc-67": 0, "bc-235": 1, "bc-852": 1, "bc-535": 0, "bc-1091": 0, "bc-503": 1, "bc-228": 0}}, {"setup": "Decentralized", "split": "unsplit", "runs": 1, "questions": ["bc-100", "bc-1091", "bc-116", "bc-1225", "bc-228", "bc-235", "bc-503", "bc-535", "bc-67", "bc-852"], "per_run": [0.5], "mean": 0.5, "min": 0.5, "max": 0.5, "lenient_mean": 0.6, "tokens": 1529010.3, "seconds": 218.2, "complete": true, "solved": {"bc-116": 0, "bc-1225": 0, "bc-100": 0, "bc-67": 0, "bc-235": 1, "bc-852": 1, "bc-535": 1, "bc-1091": 1, "bc-503": 1, "bc-228": 0}}, {"setup": "Hybrid", "split": "split", "runs": 1, "questions": ["bc-100", "bc-1091", "bc-116", "bc-1225", "bc-228", "bc-235", "bc-503", "bc-535", "bc-67", "bc-852"], "per_run": [0.2], "mean": 0.2, "min": 0.2, "max": 0.2, "lenient_mean": 0.2, "tokens": 1884045.7, "seconds": 286.73, "complete": true, "solved": {"bc-116": 0, "bc-1225": 0, "bc-100": 0, "bc-67": 0, "bc-235": 1, "bc-852": 0, "bc-535": 0, "bc-1091": 0, "bc-503": 1, "bc-228": 0}}, {"setup": "Hybrid", "split": "unsplit", "runs": 1, "questions": ["bc-100", "bc-1091", "bc-116", "bc-1225", "bc-228", "bc-235", "bc-503", "bc-535", "bc-67", "bc-852"], "per_run": [0.3], "mean": 0.3, "min": 0.3, "max": 0.3, "lenient_mean": 0.5, "tokens": 1703231.1, "seconds": 253.1, "complete": true, "solved": {"bc-116": 0, "bc-1225": 1, "bc-100": 0, "bc-67": 0, "bc-235": 1, "bc-852": 0, "bc-535": 0, "bc-1091": 0, "bc-503": 1, "bc-228": 0}}, {"setup": "Independent", "split": "split", "runs": 1, "questions": ["bc-100", "bc-1091", "bc-116", "bc-1225", "bc-228", "bc-235", "bc-503", "bc-535", "bc-67", "bc-852"], "per_run": [0.4], "mean": 0.4, "min": 0.4, "max": 0.4, "lenient_mean": 0.5, "tokens": 761730.9, "seconds": 126.47, "complete": true, "solved": {"bc-116": 0, "bc-1225": 1, "bc-100": 0, "bc-67": 0, "bc-235": 1, "bc-852": 0, "bc-535": 1, "bc-1091": 0, "bc-503": 1, "bc-228": 0}}, {"setup": "Independent", "split": "unsplit", "runs": 1, "questions": ["bc-100", "bc-1091", "bc-116", "bc-1225", "bc-228", "bc-235", "bc-503", "bc-535", "bc-67", "bc-852"], "per_run": [0.3], "mean": 0.3, "min": 0.3, "max": 0.3, "lenient_mean": 0.4, "tokens": 692291.6, "seconds": 127.11, "complete": true, "solved": {"bc-116": 0, "bc-1225": 1, "bc-100": 0, "bc-67": 0, "bc-235": 1, "bc-852": 0, "bc-535": 0, "bc-1091": 0, "bc-503": 1, "bc-228": 0}}, {"setup": "Single agent", "split": "unsplit", "runs": 1, "questions": ["bc-100", "bc-1091", "bc-116", "bc-1225", "bc-228", "bc-235", "bc-503", "bc-535", "bc-67", "bc-852"], "per_run": [0.3], "mean": 0.3, "min": 0.3, "max": 0.3, "lenient_mean": 0.4, "tokens": 256583.7, "seconds": 93.38, "complete": true, "solved": {"bc-116": 0, "bc-1225": 1, "bc-100": 0, "bc-67": 0, "bc-235": 1, "bc-852": 1, "bc-535": 0, "bc-1091": 0, "bc-503": 0, "bc-228": 0}}], "questions": ["bc-67", "bc-100", "bc-116", "bc-228", "bc-235", "bc-503", "bc-535", "bc-852", "bc-1091", "bc-1225"], "gold_parts": {"bc-100": 1, "bc-1091": 3, "bc-116": 1, "bc-1225": 3, "bc-228": 1, "bc-235": 3, "bc-503": 2, "bc-535": 3, "bc-67": 1, "bc-852": 3}};
+const NS = "http://www.w3.org/2000/svg";
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const pct = (v) => Math.round(v * 100) + "%";
+const k = (v) => (v >= 1e6 ? (v / 1e6).toFixed(1) + "M" : Math.round(v / 1000) + "k");
+function el(tag, attrs, text) { const e = document.createElementNS(NS, tag); for (const a in attrs) e.setAttribute(a, attrs[a]); if (text !== undefined) e.textContent = text; return e; }
+const tip = document.getElementById("tip");
+function hover(node, html) {
+  const move = (e) => { tip.style.left = Math.min(e.clientX + 14, innerWidth - tip.offsetWidth - 8) + "px"; tip.style.top = Math.min(e.clientY + 14, innerHeight - tip.offsetHeight - 8) + "px"; };
+  node.addEventListener("pointerenter", (e) => { tip.innerHTML = html; tip.hidden = false; move(e); });
+  node.addEventListener("pointermove", move); node.addEventListener("pointerleave", () => { tip.hidden = true; });
+}
+const card = (big, text) => `<div class="card"><span class="big">${esc(big)}</span><p>${esc(text)}</p></div>`;
+
+const ORDER = ["Single agent", "Independent", "Centralized", "Decentralized", "Hybrid", "Agent-driven, text", "Agent-driven, A2A", "Agent-driven, shared state", "Agent-driven, all channels"];
+const SHORT = { "Single agent": "Single", "Independent": "Indep.", "Centralized": "Central.", "Decentralized": "Decent.", "Hybrid": "Hybrid",
+  "Agent-driven, text": "AD text", "Agent-driven, A2A": "AD A2A", "Agent-driven, shared state": "AD shared", "Agent-driven, all channels": "AD all" };
+const get = (name, split) => D.setups.find((s) => s.setup === name && s.split === split);
+const runs = Math.max(...D.setups.map((s) => s.runs));
+const driven = D.setups.filter((s) => s.proposals !== undefined);
+const sum = (f) => driven.reduce((a, s) => a + f(s), 0);
+const single = get("Single agent", "unsplit"), decU = get("Decentralized", "unsplit"), decS = get("Decentralized", "split");
+const drMeans = driven.map((s) => s.mean);
+const qr = sum((s) => s.question_runs);
+const chosenPerQ = sum((s) => (s.chosen_messages + s.chosen_a2a + s.chosen_state_writes) * s.question_runs) / qr;
+
+document.getElementById("lede").textContent = `The single agent, the scaling paper’s four multi-agent setups and four agent-driven teams (one per communication channel), each run on the same 10 questions with every agent searching the whole collection and, for the teams, again with the collection split three ways so that agents have to share what they find. ${runs === 1 ? "This is the first of three runs; the other two are still in progress." : `Averages over ${runs} runs.`}`;
+
+const best = D.setups.reduce((a, b) => (b.mean > a.mean ? b : a));
+document.getElementById("cards").innerHTML = [
+  card(pct(best.mean), `${best.setup}${best.split === "split" ? ", split" : ""}: the best score in this run. Its fixed debate rounds pass every agent’s answer to the others.`),
+  card(pct(single.mean), `The single agent, at ${k(single.tokens)} tokens per question, against about ${k(decU.tokens)} for decentralized.`),
+  card(`${pct(Math.min(...drMeans))}–${pct(Math.max(...drMeans))}`, `The eight agent-driven teams, at ${k(Math.min(...driven.map((s) => s.tokens)))}–${k(Math.max(...driven.map((s) => s.tokens)))} tokens per question.`),
+  card(chosenPerQ.toFixed(1), `Messages, A2A tasks and shared-state writes per question that agent-driven agents chose to send, across all eight teams.`),
+].join("");
+
+document.getElementById("resultsnote").textContent = `${runs === 1 ? "One run" : `Mean of ${runs} runs`} on 10 questions, so each question is ${runs === 1 ? "10 points" : `${Math.round(10 / runs * 10) / 10} points`}. The single agent has no split version.`;
+
+// dumbbell: whole collection vs split, per setup
+(function () {
+  const W = 760, rowH = 34, left = 230, right = 120, top = 8, H = top + ORDER.length * rowH + 30, xmax = 0.6;
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Share of 10 questions answered correctly, whole collection against split, per setup" });
+  const x = (v) => left + (W - left - right) * v / xmax;
+  [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6].forEach((v) => { svg.append(el("line", { x1: x(v), x2: x(v), y1: top, y2: H - 24, class: "gridline" })); svg.append(el("text", { x: x(v), y: H - 8, "text-anchor": "middle", class: "lbl" }, pct(v))); });
+  ORDER.forEach((name, i) => {
+    const y = top + i * rowH + rowH / 2, u = get(name, "unsplit"), s = get(name, "split");
+    svg.append(el("text", { x: left - 12, y: y + 4, "text-anchor": "end", class: "cat" + (name.startsWith("Agent") ? " team" : "") }, name));
+    if (u && s) svg.append(el("line", { x1: x(Math.min(u.mean, s.mean)), x2: x(Math.max(u.mean, s.mean)), y1: y, y2: y, stroke: "var(--line)", "stroke-width": 3 }));
+    const dots = [[u, "var(--s1)", "Whole collection", -4], [s, "var(--s2)", "Split three ways", 4]].filter(([d]) => d);
+    const same = u && s && u.mean === s.mean;
+    dots.forEach(([d, c, lab, dy]) => {
+      const cy = same ? y + dy : y;
+      svg.append(el("circle", { cx: x(d.mean), cy, r: 6.5, fill: c, stroke: "var(--surface)", "stroke-width": 2 }));
+      const hit = el("circle", { cx: x(d.mean), cy, r: 13, fill: "transparent" });
+      hover(hit, `<b>${esc(name)}</b><br>${lab}: ${pct(d.mean)} (${Math.round(d.mean * 10)} of 10)<br>${k(d.tokens)} tokens per question`); svg.append(hit);
+    });
+    const txt = u && s ? `${pct(u.mean)} → ${pct(s.mean)}` : pct((u || s).mean);
+    svg.append(el("text", { x: x(Math.max(u ? u.mean : 0, s ? s.mean : 0)) + 14, y: y + 4, class: "val" }, txt));
+  });
+  document.getElementById("dumbbell").append(svg);
+})();
+const paperDrop = ["Centralized", "Hybrid", "Decentralized"].map((n) => get(n, "unsplit").mean - get(n, "split").mean);
+const dropTxt = Math.min(...paperDrop) === Math.max(...paperDrop) ? `${Math.round(paperDrop[0] * 100)} points each` : `${Math.round(Math.min(...paperDrop) * 100)}–${Math.round(Math.max(...paperDrop) * 100)} points`;
+document.getElementById("dumbcap").textContent = `Share of the 10 questions answered correctly. Splitting the collection costs centralized, hybrid and decentralized ${dropTxt} in this run; independent and the agent-driven teams don’t lose.`;
+
+// results table
+document.getElementById("restable").innerHTML = `<tr><th>Setup</th><th class="n">Correct, whole</th><th class="n">Correct, split</th><th class="n">Formatting ignored (whole / split)</th><th class="n">Tokens per question (whole / split)</th><th class="n">Seconds per question (whole / split)</th></tr>` +
+  ORDER.map((name) => { const u = get(name, "unsplit"), s = get(name, "split");
+    const two = (f) => [u, s].map((d) => (d ? f(d) : "–")).join(" / ");
+    return `<tr><td>${esc(name)}</td><td class="n"><b>${u ? pct(u.mean) : "–"}</b></td><td class="n"><b>${s ? pct(s.mean) : "–"}</b></td><td class="n">${two((d) => pct(d.lenient_mean))}</td><td class="n">${two((d) => k(d.tokens))}</td><td class="n">${two((d) => Math.round(d.seconds))}</td></tr>`; }).join("");
+
+// question grid
+(function () {
+  const cols = ORDER.map((n) => ["unsplit", n]).concat(ORDER.filter((n) => n !== "Single agent").map((n) => ["split", n]));
+  const qs = D.questions;
+  const head1 = `<tr><th rowspan="2">Question</th><th class="group" colspan="${ORDER.length}">Whole collection</th><th class="group" colspan="${ORDER.length - 1}">Split three ways</th></tr>`;
+  const head2 = `<tr>${cols.map(([sp, n], i) => `<th class="c${i === 0 || i === ORDER.length ? " gstart" : ""}">${esc(SHORT[n])}</th>`).join("")}</tr>`;
+  const body = qs.map((q) => {
+    const one = D.gold_parts[q] === 1;
+    return `<tr><td><span class="qid">${esc(q)}</span>${one ? ` <span class="mark one" title="Answer pages in one agent’s third">one part</span>` : ""}</td>` +
+      cols.map(([sp, n], i) => { const s = get(n, sp); const v = s && s.solved[q] != null ? s.solved[q] : null;
+        const cls = i === 0 || i === ORDER.length ? ' class="c gstart"' : ' class="c"';
+        return `<td${cls}>${v == null ? "–" : v > 0 ? `<span class="mark yes">${runs === 1 ? "✓" : v + "/" + s.runs}</span>` : `<span class="mark no">${runs === 1 ? "·" : "0/" + s.runs}</span>`}</td>`; }).join("") + `</tr>`;
+  }).join("");
+  document.getElementById("grid").innerHTML = head1 + head2 + body;
+})();
+
+// agent-driven table
+(function () {
+  const teams = ["Agent-driven, text", "Agent-driven, A2A", "Agent-driven, shared state", "Agent-driven, all channels"];
+  const cols = teams.flatMap((t) => [[t, "unsplit"], [t, "split"]]).map(([t, sp]) => get(t, sp)).filter(Boolean);
+  const head = `<tr><th rowspan="2">Per team, 10 questions</th>${teams.map((t) => `<th class="group" colspan="2">${esc(t.replace("Agent-driven, ", ""))}</th>`).join("")}</tr><tr>${cols.map((c, i) => `<th class="c${i % 2 === 0 ? " gstart" : ""}">${c.split === "split" ? "split" : "whole"}</th>`).join("")}</tr>`;
+  const row = (label, f) => `<tr><td>${label}</td>${cols.map((c, i) => `<td class="n${i % 2 === 0 ? " gstart" : ""}">${f(c)}</td>`).join("")}</tr>`;
+  document.getElementById("driven").innerHTML = head +
+    row("<b>Correct</b>", (c) => `<b>${Math.round(c.mean * 10)}</b>`) +
+    row("Messages by choice, per question", (c) => c.chosen_messages.toFixed(1)) +
+    row("A2A tasks and updates by choice, per question", (c) => c.chosen_a2a.toFixed(1)) +
+    row("Shared-state writes by choice, per question", (c) => c.chosen_state_writes.toFixed(1)) +
+    row("Proposals per question (made automatically)", (c) => `${c.proposals.toFixed(1)} (${c.auto_proposals.toFixed(1)})`) +
+    row("Questions where proposals disagreed", (c) => c.disagreed) +
+    row("…where the submitter sent its own proposal", (c) => c.submitted_own_when_disagreed) +
+    row("…where it sent the most confident one", (c) => c.submitted_most_confident_when_disagreed) +
+    row("Median seconds from last proposal to submission", (c) => (c.decide_seconds == null ? "–" : c.decide_seconds.toFixed(0))) +
+    row("Questions with any talk after the proposals", (c) => c.question_runs_talk_after) +
+    row("Reminded to submit / never submitted", (c) => `${c.reminded} / ${c.no_submission}`) +
+    row("Right answer among the proposals", (c) => c.right_among_proposals) +
+    row("…and submitted", (c) => c.right_submitted) +
+    row("Taking the most confident proposal instead", (c) => c.most_confident_rule);
+  const dis = sum((s) => s.disagreed), own = sum((s) => s.submitted_own_when_disagreed), conf = sum((s) => s.submitted_most_confident_when_disagreed);
+  const talk = sum((s) => s.question_runs_talk_after), lost = sum((s) => s.right_among_proposals - s.right_submitted);
+  const dec = driven.map((s) => s.decide_seconds).filter((v) => v != null).sort((a, b) => a - b);
+  const items = [
+    ["Agents still barely chose to communicate.", `Across the eight teams, agents sent ${chosenPerQ.toFixed(1)} messages, A2A tasks or shared-state writes per question by choice, even with the collection split. A2A and the shared store went almost unused.`],
+    ["The propose step worked.", `Every team proposed and submitted on every question; ${sum((s) => s.no_submission)} of ${qr} question-runs ended without a submission, and proposals rarely had to be taken automatically (${sum((s) => s.auto_proposals * s.question_runs).toFixed(0)} of ${sum((s) => s.proposals * s.question_runs).toFixed(0)}).`],
+    ["Deciding was not a team act.", `The team’s answer arrived a median ${dec[Math.floor(dec.length / 2)].toFixed(0)} seconds after the last proposal, with any talk in between on only ${talk} of ${qr} questions. When proposals disagreed (${dis} questions), the submitter sent its own proposal ${own} times and the most confident one ${conf} times: usually whichever agent got there first decided.`],
+    ["Right answers were lost in deciding.", `On ${lost} questions a right answer was among the proposals and the team submitted a different one. Taking the most confident proposal, with no deciding step, would have answered ${sum((s) => s.most_confident_rule)} questions right across the eight teams, against the ${sum((s) => Math.round(s.mean * s.question_runs))} they delivered.`],
+  ];
+  document.getElementById("drivenlist").innerHTML = items.map(([b, x]) => `<li><b>${esc(b)}</b><span>${esc(x)}</span></li>`).join("");
+})();
+
+// takeaways
+(function () {
+  const ind = [get("Independent", "unsplit"), get("Independent", "split")];
+  const items = [
+    ["Fixed debate rounds did best.", `Decentralized scored ${pct(decU.mean)} on the whole collection, the best of any setup, and ${pct(decS.mean)} split, tied for best. Its rounds hand every agent’s answer and reasoning to the others whether or not anyone chooses to share.`],
+    ["One agent is the cheapest way to these scores.", `The single agent reached ${pct(single.mean)} at ${k(single.tokens)} tokens per question; every team spent ${(Math.min(...D.setups.filter((s) => s.setup !== "Single agent").map((s) => s.tokens)) / single.tokens).toFixed(0)}–${(Math.max(...D.setups.map((s) => s.tokens)) / single.tokens).toFixed(0)} times as much, and only some scored higher.`],
+    ["Splitting cost the round-based setups one question each.", `Centralized, hybrid and decentralized each lost ${dropTxt.replace(" each", "")} (one question) when split; independent (${pct(ind[0].mean)} → ${pct(ind[1].mean)}) and the agent-driven teams held steady. One question is within the noise of a single run.`],
+    ["Channel type made little visible difference.", `Text, A2A, shared state and all channels span ${pct(Math.min(...drMeans))}–${pct(Math.max(...drMeans))}, a spread of two questions, and agents barely used any channel. The text team scored lowest of the four in both columns, mostly because it lost right proposals in deciding.`],
+  ];
+  document.getElementById("takeaways").innerHTML = items.map(([b, x]) => `<li><b>${esc(b)}</b><span>${esc(x)}</span></li>`).join("");
+})();
+})();
+</script>

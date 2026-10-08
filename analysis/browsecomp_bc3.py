@@ -50,6 +50,7 @@ def label(kind):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--tag", default="bc3-r")
+    ap.add_argument("--out", default="browsecomp_bc3.json", help="file name in analysis/")
     args = ap.parse_args()
     tasks = {t["id"]: t for t in bc.load_tasks()}
     runs = defaultdict(list)  # (name, split) -> [(tag, rows, run dir)]
@@ -78,12 +79,25 @@ def main():
         if driven:
             n = len(driven)
             c = lambda key: st.mean((r["comm"].get(key) or 0) for r, _ in driven)  # noqa: E731
-            right_proposed = right_submitted = 0
+            right_proposed = right_submitted = disagreed = own = most_conf = conf_rule = 0
+            decide = []
             for r, t in driven:
                 gold = tasks[r["id"]]["answer"]
-                if any(contains(p["answer"], gold) for p in t.get("proposals", [])):
+                last = {}
+                for p in t.get("proposals", []):
+                    last[p["agent"]] = p  # each agent's latest proposal
+                if any(contains(p["answer"], gold) for p in last.values()):
                     right_proposed += 1
                     right_submitted += bool(r["correct"])
+                final = t.get("final") or {}
+                best = max(last.values(), key=lambda p: p["confidence"] if isinstance(p["confidence"], int) else -1) if last else {}
+                conf_rule += contains(best.get("answer", ""), gold)
+                if len({bc._norm(p["answer"]) for p in last.values()}) > 1:
+                    disagreed += 1
+                    own += bc._norm(final.get("answer", "")) == bc._norm(last.get(final.get("by"), {}).get("answer", ""))
+                    most_conf += bc._norm(final.get("answer", "")) == bc._norm(best.get("answer", ""))
+                if r["comm"].get("decided_at") and r["comm"].get("proposals_at"):
+                    decide.append(r["comm"]["decided_at"] - r["comm"]["proposals_at"])
             s.update({
                 "chosen_messages": c("messages"), "chosen_a2a": c("a2a_tasks") + c("a2a_updates"),
                 "chosen_state_writes": c("state_writes"),
@@ -93,11 +107,15 @@ def main():
                 "no_submission": sum(r["comm"].get("answer_rule") == "no_submission" for r, _ in driven),
                 "reminded": sum(bool(r["comm"].get("team_nudged")) for r, _ in driven),
                 "right_among_proposals": right_proposed, "right_submitted": right_submitted,
-                "decide_seconds": st.mean([r["comm"]["decided_at"] - r["comm"]["proposals_at"] for r, _ in driven
-                                           if r["comm"].get("decided_at") and r["comm"].get("proposals_at")] or [0]),
+                "decide_seconds": st.median(decide) if decide else None,
+                "question_runs_talk_after": sum(r["comm"].get("comm_after_proposals", 0) > 0 for r, _ in driven),
+                "disagreed": disagreed, "submitted_own_when_disagreed": own,
+                "submitted_most_confident_when_disagreed": most_conf, "most_confident_rule": conf_rule,
             })
         out["setups"].append(s)
-    (HERE / "browsecomp_bc3.json").write_text(json.dumps(out, indent=1))
+    # Per question: in how many of the 3 parts of a split collection its answer (gold) pages sit.
+    out["gold_parts"] = {i: len({bc.shard_of(d, 3) for d in tasks[i]["gold_docs"]}) for s in out["setups"] for i in s["questions"]}
+    (HERE / args.out).write_text(json.dumps(out, indent=1))
     print(f"{'setup':30s} {'split':8s} {'runs':>4s} {'mean':>5s} {'range':>9s} {'tokens/q':>9s} {'s/q':>5s}  driven: chosen comm per q | proposals (auto) | no submission | right proposed -> submitted")
     for s in out["setups"]:
         extra = ""
