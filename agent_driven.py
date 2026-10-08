@@ -115,6 +115,7 @@ class Team:
         self.inbox = {a: [] for a in self.ids}
         self.idle, self.finished, self.done = set(), set(), False
         self.wakes = Counter()
+        self.final_replies = {}                  # each agent's latest full final reply (the log keeps 800 characters)
         self.state = {}                          # shared key-value store: key -> {value, version, by}
         self.state_history = []
         self.a2a = {}                            # A2A tasks: id -> {...}
@@ -319,6 +320,8 @@ class Team:
                 self.wakes[me] += 1
                 self.event(me, "active", wake=self.wakes[me])
                 r = agent.send(message)
+                if (r["final"] or "").strip():
+                    self.final_replies[me] = r["final"]
                 self.event(me, "idle", reply=(r["final"] or "")[:800], stop=r["stop"])
                 with self.cond:
                     self.idle.add(me)
@@ -357,6 +360,8 @@ class Team:
             # Nobody submitted or said anything: one tool-free call to the first agent, as the single agent gets.
             first = self.agents[self.ids[0]]
             reply = first.reply("The team stopped without submitting an answer. " + self.bc.OUT_OF_TURNS)
+            if reply.strip():
+                self.final_replies[self.ids[0]] = reply
             self.event(self.ids[0], "idle", reply=reply[:800], stop="fallback_answer")
         return self.result()
 
@@ -380,10 +385,7 @@ class Team:
         if self.bc:
             # The team's answer is the last submission; if nobody submitted, a majority vote over each member's
             # last reply (ties to the first agent).
-            last = {}
-            for e in self.events:
-                if e["kind"] == "idle" and e["reply"].strip():
-                    last[e["agent"]] = e["reply"]
+            last = self.final_replies  # full replies: the logged ones are cut at 800 characters, often before the answer
             a = self.team_answer
             if a:
                 answer, rule, vote = (f"Exact Answer: {a['answer']}\nConfidence: "
