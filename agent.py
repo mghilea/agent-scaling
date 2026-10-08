@@ -354,6 +354,10 @@ def main():
                          "with no rounds and a shared workspace (agent_driven.py); workbench only")
     ap.add_argument("--comm", default="all", choices=["all", "text", "a2a", "shared", "none"],
                     help="agent-driven: channels the agents may use (all = free choice)")
+    ap.add_argument("--team-answer", default="propose", choices=["propose", "vote"],
+                    help="agent-driven, browsecomp: how the team answers. propose: each agent proposes, then the team "
+                         "decides and one agent submits (the first submission is final). vote: the last submission, "
+                         "else a majority vote over final replies (runs before 7 October)")
     ap.add_argument("--coordinate", action="store_true",
                     help="agent-driven: ask agents to agree on who does what before changing anything")
     ap.add_argument("--agents", type=int, default=3, help="multi-agent: number of worker agents (paper: 3)")
@@ -402,6 +406,7 @@ def main():
         import agent_driven
     topo_name = f"agent-driven-{args.comm}{'-coord' if args.coordinate else ''}" if driven else args.topology
     topo_name += f"-split{args.split}" if args.split else ""
+    topo_name += "-propose" if driven and bc and args.team_answer == "propose" else ""
     kind = "ask" if args.ask else ("sas" if not multi else topo_name) + ("-workbench" if wb else "-browsecomp" if bc else "")
     run_dir = ROOT / "runs" / f"{datetime.now():%Y%m%d-%H%M%S}-{kind}-{args.model}{'-' + args.tag if args.tag else ''}"
     (run_dir / "traces").mkdir(parents=True)
@@ -423,7 +428,8 @@ def main():
         try:
             if driven:
                 r = agent_driven.run(t["question"], make_agent, args.agents, args.comm, log_message, seed=t["id"],
-                                     coordinate=args.coordinate, browsecomp=bool(bc), split=args.split)
+                                     coordinate=args.coordinate, browsecomp=bool(bc), split=args.split,
+                                     answer_rule=args.team_answer)
                 actions = r["actions"]
             elif multi:
                 r = mas.run(args.topology, t["question"], make_agent, args.agents, args.rounds, log_message,

@@ -26,11 +26,17 @@ BrowseComp-Plus (browsecomp=True): the document collection is read-only, so ther
 see each other's work in; each agent has its own search tools, and teammates learn what others found only
 by communicating. The team gives one answer: a shared submit_team_answer slot that any agent can fill, where
 each submission replaces the last and the one standing when the team stops is graded; if nobody submits, the
-team's answer is a majority vote over the members' final replies. With split=n (BrowseComp only) each agent
+team's answer is a majority vote over the members' final replies (answer_rule="vote", the earlier runs).
+With answer_rule="propose" (the default since 7 October) the team answers in two steps instead: each agent
+proposes an answer with its confidence and evidence (propose_answer, delivered to every teammate whatever the
+channels), and once all have proposed, everyone receives all the proposals, gets DECIDE_CALLS more calls to
+discuss and check them, and one agent submits the team's answer (submit_team_answer). The first submission is
+final and ends the task; with no submission the team has no answer. With split=n (BrowseComp only) each agent
 searches and opens only its own 1/n of the collection (browsecomp.Session(shard=...)), and every agent is told so.
 """
 import json
 import random
+import re
 import threading
 import time
 from collections import Counter
@@ -46,6 +52,7 @@ TURNS_PER_WAKE = 12     # model calls per activation before the agent must pause
 TIME_LIMIT = 900        # seconds per task
 # BrowseComp-Plus: each agent gets the single agent's 30 calls, usable in one go (research takes many searches).
 TURN_BUDGET_BC = TURNS_PER_WAKE_BC = 30
+DECIDE_CALLS = 8        # propose rule: extra calls per agent once all proposals are in, to discuss and decide
 
 TEAM_PROMPT = """You are {me}, one of {n} agents on a team; your teammates are {others}. You all received the same request from the user, and you all work in one shared workspace: the same email, calendar, CRM, project board and analytics. Every change any of you makes happens once in that workspace and everyone can see it, so a change made twice happens twice.
 
@@ -79,6 +86,18 @@ Nobody has assigned roles or a plan. Decide as a team how to answer the question
 {channels}
 
 Your turn ends when you reply without calling a tool. If a teammate contacts you afterwards, you will be woken up. The task is over when nobody has anything left to do."""
+TEAM_PROMPT_BC_PROPOSE = """You are {me}, one of {n} agents on a team; your teammates are {others}. You all received the same question, and each of you searches the document collection with your own search tools. Nobody sees another agent's searches, documents or reasoning.{split}
+
+The team gives one answer, in two steps. When you have a candidate answer, call propose_answer with it, your confidence and the key evidence; every teammate receives your proposal. When all {n} of you have proposed, everyone receives all the proposals. Then decide together which answer is best supported, and once the team agrees, one of you calls submit_team_answer. The first submission is the team's final answer and ends the task, so submit only when the team agrees. If nobody submits, the team has no answer.
+
+Nobody has assigned roles or a plan. Decide as a team how to answer the question.{hint}
+
+{channels}
+
+Your turn ends when you reply without calling a tool. If a teammate contacts you afterwards, you will be woken up."""
+PROPOSE_NUDGE = ("Before you stop, propose your answer with propose_answer (your answer, your confidence and the key "
+                 "evidence), so that your teammates see it.")
+TASK_OVER = "The team's final answer has been submitted, so the task is over. Reply without calling any tool."
 COORDINATE_HINT_BC = " Before you start searching, agree with your teammates on who investigates what, so that no work is done twice."
 NO_CHANNELS_BC = "You have no way to contact your teammates."
 
@@ -100,9 +119,13 @@ def _as_object(data):
 
 
 class Team:
-    def __init__(self, task, make_agent, n_agents, comm, log, seed, coordinate=False, browsecomp=False, split=0):
+    def __init__(self, task, make_agent, n_agents, comm, log, seed, coordinate=False, browsecomp=False, split=0,
+                 answer_rule="vote"):
         self.task, self.log, self.channels = task, log, CHANNELS[comm]
         self.split = split
+        self.propose = browsecomp and answer_rule == "propose"
+        self.answer_rule = answer_rule if browsecomp else None
+        self.proposals, self.final, self.announced, self.team_nudged = {}, None, None, False
         self.bc = None
         if browsecomp:
             import browsecomp as bc
@@ -136,8 +159,11 @@ class Team:
             fields = dict(me=me, n=n_agents, others=", ".join(a for a in self.ids if a != me), channels=channels, hint=hint)
             if browsecomp:
                 fields["split"] = " " + self.bc.split_note(self.ids.index(me), self.ids) if split else ""
-            prompt = (TEAM_PROMPT_BC if browsecomp else TEAM_PROMPT).format(**fields)
-            agent = make_agent(name=me, tools={**self._env_tools(me), **self._comm_tools(me)},
+            prompt = (TEAM_PROMPT_BC_PROPOSE if self.propose else TEAM_PROMPT_BC if browsecomp else TEAM_PROMPT).format(**fields)
+            tools = {**self._env_tools(me), **self._comm_tools(me)}
+            if self.propose:  # once the team's answer is in, every tool just says the task is over
+                tools = {n: (self._unless_over(fn), schema) for n, (fn, schema) in tools.items()}
+            agent = make_agent(name=me, tools=tools,
                                system_prompt=(self.bc.system_prompt() if browsecomp else wb.SYSTEM_PROMPT) + "\n\n" + prompt)
             agent.inbox = lambda me=me: self._drain(me)
             self.agents[me] = agent
@@ -161,6 +187,61 @@ class Team:
 
     def expired(self):
         return time.time() - self.t0 > TIME_LIMIT
+
+    def over(self):
+        return self.done or (self.propose and self.final is not None)
+
+    def _unless_over(self, fn):
+        def run(**kwargs):
+            return TASK_OVER if self.final is not None else fn(**kwargs)
+        return run
+
+    def budget(self):
+        if not self.bc:
+            return TURN_BUDGET
+        return TURN_BUDGET_BC + (DECIDE_CALLS if self.announced is not None else 0)
+
+    @staticmethod
+    def _proposal_text(me, p):
+        note = " (taken from its final reply: it stopped without proposing)" if p.get("auto") else ""
+        return (f"{me}{note}: answer: {p['answer']} | confidence: {p['confidence'] if p['confidence'] is not None else '?'}"
+                f" | evidence: {p['evidence'] or '(none given)'}")
+
+    def _record_proposal(self, me, answer, confidence, evidence, auto=False):
+        with self.cond:
+            p = {"answer": str(answer).strip(), "confidence": confidence, "evidence": str(evidence or "")[:1500],
+                 "auto": auto, "t": round(time.time() - self.t0, 2)}
+            again = me in self.proposals
+            self.proposals[me] = p
+            self.event(me, "proposal", answer=p["answer"], confidence=confidence, evidence=p["evidence"], auto=auto,
+                       revised=again)
+            for other in self.ids:
+                if other != me:
+                    self._deliver(other, f"[{'revised ' if again else ''}proposal from {self._proposal_text(me, p)}]", "proposal")
+            if self.announced is None and len(self.proposals) == len(self.ids):
+                self.announced = round(time.time() - self.t0, 2)
+                listing = "\n".join("- " + self._proposal_text(a, self.proposals[a]) for a in self.ids)
+                text = (f"[All {len(self.ids)} proposals are in]\n{listing}\n\nDecide together which answer is best "
+                        "supported. A teammate's proposal may rest on pages only they can see, so ask them if you need to. "
+                        "When the team agrees, one of you calls submit_team_answer: the first submission is final and ends "
+                        f"the task. You each have {DECIDE_CALLS} more calls for this.")
+                self.event(me, "proposals_complete")
+                for a in self.ids:
+                    self._deliver(a, text, "proposal")
+
+    def _auto_propose(self, me):
+        """An agent that stops without proposing: its final reply (or one tool-free call) becomes its proposal."""
+        reply = self.final_replies.get(me, "")
+        if not reply.strip():
+            try:
+                reply = self.agents[me].reply(self.bc.OUT_OF_TURNS)
+            except Exception as e:  # e.g. its context is full
+                self.event(me, "error", error=f"auto-propose: {type(e).__name__}: {e}")
+                reply = ""
+        m = re.search(r"exact answer\W*:?\**\s*(.+)", reply, re.I)
+        c = re.search(r"confidence\W*:?\W*(\d{1,3})", reply, re.I)
+        answer = (m.group(1) if m else reply).strip().strip("*").strip()[:300] or "(no answer)"
+        self._record_proposal(me, answer, int(c.group(1)) if c else None, "", auto=True)
 
     # ---- tools -------------------------------------------------------------------------------
     def _env_tools(self, me):
@@ -193,6 +274,47 @@ class Team:
                 self.event(me, "tool", tool=_name, args=kwargs, out=out[:600])
                 return out
             tools[name] = (run, schema)
+
+        if self.propose:
+            def propose_answer(answer="", confidence_score=None, evidence=""):
+                if not str(answer).strip():
+                    return "[error] answer is required"
+                self._record_proposal(me, answer, confidence_score, evidence)
+                return (f"Proposal sent to {', '.join(a for a in self.ids if a != me)}." +
+                        (" All proposals are in; decide together, then one of you submits." if self.announced is not None
+                         else " When everyone has proposed, you'll all receive the proposals."))
+
+            def submit_final(answer="", confidence_score=None):
+                with self.cond:
+                    missing = [a for a in self.ids if a not in self.proposals]
+                    if missing:
+                        return (f"[error] The team can submit only after everyone has proposed; still waiting for "
+                                f"{', '.join(missing)}. You'll be told when all proposals are in.")
+                    if self.final is not None:
+                        return TASK_OVER
+                    self.final = {"answer": str(answer), "confidence": confidence_score, "by": me,
+                                  "t": round(time.time() - self.t0, 2)}
+                    self.submissions.append(dict(self.final))
+                    self.event(me, "team_answer", answer=str(answer), confidence=confidence_score, final=True)
+                    for a in self.ids:
+                        if a != me:
+                            self._deliver(a, f"[{me} submitted the team's final answer: {answer}] {TASK_OVER}", "final")
+                    self.done = True
+                    self.cond.notify_all()
+                return "Submitted. This is the team's final answer, and the task is over."
+            tools["propose_answer"] = (propose_answer, _schema(
+                "propose_answer", "Propose your answer to the team, with your confidence and the key evidence. Every "
+                "teammate receives it. You can propose again to revise it.",
+                {"answer": {"type": "string", "description": "Your exact answer"},
+                 "confidence_score": {"type": "integer", "description": "Confidence from 0 to 100"},
+                 "evidence": {"type": "string", "description": "The key evidence, with the docids it comes from"}},
+                ["answer", "confidence_score", "evidence"]))
+            tools["submit_team_answer"] = (submit_final, _schema(
+                "submit_team_answer", "Submit the team's final answer, once the team agrees. Allowed only after "
+                "everyone has proposed. The first submission is final and ends the task.",
+                {"answer": {"type": "string", "description": "The exact final answer"},
+                 "confidence_score": {"type": "integer", "description": "Confidence from 0 to 100"}}, ["answer"]))
+            return tools
 
         def submit_team_answer(answer="", confidence_score=None):
             with self.cond:
@@ -311,24 +433,45 @@ class Team:
     def _loop(self, me):
         agent = self.agents[me]
         message = self.bc.task_prompt(self.task) if self.bc else f"Request from the user: {self.task}"
+        asked_to_propose = False
         try:
-            while True:
-                left = (TURN_BUDGET_BC if self.bc else TURN_BUDGET) - agent.stats["turns"]
-                if left <= 0 or self.expired():
+            while not self.over() and not self.expired():
+                left = self.budget() - agent.stats["turns"]
+                if left > 0:
+                    agent.max_turns = min(TURNS_PER_WAKE_BC if self.bc else TURNS_PER_WAKE, left)
+                    self.wakes[me] += 1
+                    self.event(me, "active", wake=self.wakes[me])
+                    r = agent.send(message)
+                    if (r["final"] or "").strip():
+                        self.final_replies[me] = r["final"]
+                    if self.propose and not self.over() and me not in self.proposals:
+                        if not asked_to_propose and self.budget() - agent.stats["turns"] > 0:
+                            asked_to_propose = True
+                            self.event(me, "idle", reply=(r["final"] or "")[:800], stop=r["stop"])
+                            message = PROPOSE_NUDGE
+                            continue
+                        self._auto_propose(me)
+                    self.event(me, "idle", reply=(r["final"] or "")[:800], stop=r["stop"])
+                elif not self.propose or self.announced is not None:
                     break
-                agent.max_turns = min(TURNS_PER_WAKE_BC if self.bc else TURNS_PER_WAKE, left)
-                self.wakes[me] += 1
-                self.event(me, "active", wake=self.wakes[me])
-                r = agent.send(message)
-                if (r["final"] or "").strip():
-                    self.final_replies[me] = r["final"]
-                self.event(me, "idle", reply=(r["final"] or "")[:800], stop=r["stop"])
+                elif me not in self.proposals:  # out of calls before everyone proposed: propose, then wait
+                    self._auto_propose(me)
                 with self.cond:
                     self.idle.add(me)
                     self.cond.notify_all()
-                    while not self.inbox[me] and not self.done:
+                    while not self.inbox[me] and not self.over():
                         waiting = set(self.ids) - self.finished
                         if self.idle >= waiting and not any(self.inbox[a] for a in waiting):
+                            if (self.propose and self.final is None and self.announced is not None
+                                    and not self.team_nudged):
+                                # Everyone went quiet without submitting: remind them once.
+                                self.team_nudged = True
+                                self.event(me, "team_nudge")
+                                for a in waiting:
+                                    self._deliver(a, "[Nobody has submitted the team's final answer. Agree on one and "
+                                                     "submit it with submit_team_answer now; if nobody submits, the "
+                                                     "team has no answer.]", "nudge")
+                                continue
                             self.done = True           # everyone idle, nothing in flight
                             self.cond.notify_all()
                             break
@@ -337,13 +480,18 @@ class Team:
                             self.cond.notify_all()
                             break
                         self.cond.wait(timeout=2)
-                    if not self.inbox[me]:
+                    if not self.inbox[me] or self.over():
                         break
                     self.idle.discard(me)
                 message = self._drain(me) or "Continue."
         except Exception as e:  # one crashed agent shouldn't hang the team
             self.event(me, "error", error=f"{type(e).__name__}: {e}")
         finally:
+            if self.propose and me not in self.proposals and not self.over():
+                try:  # a crashed agent's last reply still becomes its proposal, so the team isn't left waiting
+                    self._auto_propose(me)
+                except Exception as e:
+                    self.event(me, "error", error=f"final auto-propose: {type(e).__name__}: {e}")
             with self.cond:
                 self.finished.add(me)
                 self.idle.add(me)
@@ -355,7 +503,7 @@ class Team:
             th.start()
         for th in threads:
             th.join(TIME_LIMIT + 60)
-        if self.bc and self.team_answer is None and not any(
+        if self.bc and not self.propose and self.team_answer is None and not any(
                 e["kind"] == "idle" and e["reply"].strip() for e in self.events):
             # Nobody submitted or said anything: one tool-free call to the first agent, as the single agent gets.
             first = self.agents[self.ids[0]]
@@ -387,7 +535,12 @@ class Team:
             # last reply (ties to the first agent).
             last = self.final_replies  # full replies: the logged ones are cut at 800 characters, often before the answer
             a = self.team_answer
-            if a:
+            if self.propose:
+                f = self.final
+                answer = (f"Exact Answer: {f['answer']}\nConfidence: {f['confidence'] if f['confidence'] is not None else 100}%"
+                          if f else "")
+                rule, vote = ("submitted" if f else "no_submission"), None
+            elif a:
                 answer, rule, vote = (f"Exact Answer: {a['answer']}\nConfidence: "
                                       f"{a['confidence'] if a['confidence'] is not None else 100}%"), "submitted", None
             else:
@@ -400,7 +553,16 @@ class Team:
                          "docs_seen_by_several": sum(1 for c in seen.values() if c > 1),
                          "repeated_queries": sum(c - 1 for c in queries.values() if c > 1)})
             extra = {"answer": answer, "sessions": list(self.sessions.values())}
+            if self.propose:
+                after = [e for e in self.events if e["kind"] in ("message", "a2a_send", "a2a_update", "state_write")
+                         and self.announced is not None and e["t"] >= self.announced]
+                comm.update({"proposals": sum(e["kind"] == "proposal" for e in self.events),
+                             "auto_proposals": sum(e["kind"] == "proposal" and e.get("auto") for e in self.events),
+                             "comm_after_proposals": len(after), "team_nudged": self.team_nudged,
+                             "decided_at": self.final["t"] if self.final else None, "proposals_at": self.announced})
             trace_extra = {"team_answers": self.submissions, "answer_rule": rule, "vote": vote, "split": self.split,
+                           "proposals": [e for e in self.events if e["kind"] == "proposal"], "final": self.final,
+                           "rule": self.answer_rule,
                            "blocked_opens": {x: s.blocked for x, s in self.sessions.items() if s.blocked}}
             comm["answer_rule"] = rule
         return {
@@ -420,5 +582,5 @@ class Team:
 
 
 def run(task, make_agent, n_agents=3, comm="all", log=lambda label, text: None, seed=0, coordinate=False,
-        browsecomp=False, split=0):
-    return Team(task, make_agent, n_agents, comm, log, seed, coordinate, browsecomp, split).run()
+        browsecomp=False, split=0, answer_rule="vote"):
+    return Team(task, make_agent, n_agents, comm, log, seed, coordinate, browsecomp, split, answer_rule).run()
