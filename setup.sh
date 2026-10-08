@@ -64,6 +64,13 @@ _agent_setup() {
         echo "==> Installing vLLM $vllm_version (takes a few minutes on a fresh node)"
         uv venv --allow-existing --python 3.12 "$WORK/venv" || { exec {lock}>&-; return 1; }
         uv pip install --python "$WORK/venv/bin/python" "vllm==$vllm_version" || { exec {lock}>&-; return 1; }
+        # A venv left half-built on this node can have the package without its command; uv then skips it.
+        if [[ ! -x "$WORK/venv/bin/vllm" ]]; then
+            echo "==> vLLM's command is missing; reinstalling the vllm package"
+            uv pip install --python "$WORK/venv/bin/python" --reinstall-package vllm "vllm==$vllm_version" \
+                || { exec {lock}>&-; return 1; }
+        fi
+        [[ -x "$WORK/venv/bin/vllm" ]] || { echo "vLLM install is broken in $WORK/venv" >&2; exec {lock}>&-; return 1; }
     fi
     source "$WORK/venv/bin/activate"
 
