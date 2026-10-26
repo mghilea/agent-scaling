@@ -1,7 +1,7 @@
 """Agent-driven teams with the write-ahead log (--wal) against the hard-slice baselines' 10 runs each.
 
-    python analysis/wal_compare.py                 # every run tagged wal-p1 or walNN
-    python analysis/wal_compare.py runs/A runs/B   # these WAL runs
+    python analysis/wal_compare.py                 # the WAL repeats (runs tagged wal01..wal10)
+    python analysis/wal_compare.py runs/A runs/B   # these WAL runs (e.g. the pilot, tagged wal-p1)
 
 For each system: mean accuracy over its runs (and the range of single runs), split by task size (3-4 vs 5+
 changes) and by whether the task is cap-bound (its main action is needed more than 5 times, so one search,
@@ -63,7 +63,7 @@ def system(run_dirs):
 
 
 def main():
-    wal_dirs = sys.argv[1:] or sorted(glob.glob(str(ROOT / "runs" / "*-wal-workbench-*-wal*")))
+    wal_dirs = sys.argv[1:] or sorted(glob.glob(str(ROOT / "runs" / "*-wal-workbench-*-wal[0-9][0-9]")))
     wal = {}
     for d in wal_dirs:
         if (Path(d) / "results.jsonl").exists():

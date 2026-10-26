@@ -1,0 +1,5 @@
+# The write-ahead log (--wal) on the 64 hard tasks (3+ changes), for each agent-driven channel condition that has
+# a 10-run baseline (suites/hard-a.txt, hard-b.txt). Submit with --tag walNN, NN = 01..10.
+--benchmark workbench --min-changes 3 --topology agent-driven --comm none --wal
+--benchmark workbench --min-changes 3 --topology agent-driven --comm text --coordinate --wal
+--benchmark workbench --min-changes 3 --topology agent-driven --comm all --coordinate --wal
