@@ -1,4 +1,4 @@
-"""Agent-driven teams with the write-ahead log (--wal) against the hard-slice baselines' 10 runs each.
+"""Teams with the write-ahead log (--wal) against the hard-slice baselines' 10 runs each.
 
     python analysis/wal_compare.py                 # the WAL repeats (runs tagged wal01..wal10)
     python analysis/wal_compare.py runs/A runs/B   # these WAL runs (e.g. the pilot, tagged wal-p1)
@@ -7,12 +7,16 @@ For each system: mean accuracy over its runs (and the range of single runs), spl
 changes) and by whether the task is cap-bound (its main action is needed more than 5 times, so one search,
 which returns at most 5 results, can't find everything), plus tokens and seconds per task.
 
-Then each WAL condition against each baseline. A WAL condition with few runs is compared with a baseline's
-per-task solve rates (from its 10 runs): if the WAL team were no better than the baseline, each task would be
-solved with the baseline's rate p_i, so the WAL team's number of solved tasks per run would follow the
-Poisson-binomial distribution of those p_i. p(>=) is the chance of solving at least as many tasks as the WAL
-runs did on average, p(<=) of solving at most as many.
+Then each WAL condition against its own system without the log, the single agent and decentralized:
+- several WAL runs: a permutation test on per-run accuracy. If the log made no difference, the runs' labels
+  (WAL or baseline) would be exchangeable; p(>=) is the share of all relabellings in which the WAL runs' mean
+  is at least as far above the baseline's as observed, p(<=) at least as far below.
+- one WAL run (e.g. the pilot): against the baseline's per-task solve rates p_i from its 10 runs. If the WAL
+  team were no better, each task would be solved with probability p_i, so its solved count would follow the
+  Poisson-binomial distribution of the p_i; p(>=) is the chance of solving at least as many tasks, p(<=) at
+  most as many.
 """
+from itertools import combinations
 import glob
 import json
 import sys
@@ -22,14 +26,9 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 from compare import load  # noqa: E402
 
-BASELINES = {
-    "Single agent": "sas",
-    "Decentralized": "decentralized",
-    "Independent": "independent",
-    "Driven, no channels": "agent-driven-none",
-    "Driven, text + coord": "agent-driven-text-coord",
-    "Driven, all + coord": "agent-driven-all-coord",
-}
+# The run-directory kinds of the systems with 10 hard-slice runs (labelled as compare.py labels them).
+BASELINES = ["sas", "independent", "centralized", "decentralized", "hybrid", "agent-driven-none",
+             "agent-driven-text-coord", "agent-driven-all-coord"]
 TASKS = json.loads((ROOT / "analysis" / "hard64_repeats.json").read_text())["tasks"]
 
 
@@ -39,6 +38,21 @@ def poisson_binomial(ps):
     for p in ps:
         dist = [a * (1 - p) + b * p for a, b in zip(dist + [0.0], [0.0] + dist)]
     return dist
+
+
+def permutation(a, b):
+    """One-sided p-values for mean(a) - mean(b) under random relabelling of the runs (exact)."""
+    pooled, k, n = a + b, len(a), len(a) + len(b)
+    observed = sum(a) / len(a) - sum(b) / len(b)
+    total, above, below = sum(pooled), 0, 0
+    count = 0
+    for idx in combinations(range(n), k):
+        x = sum(pooled[i] for i in idx)
+        d = x / k - (total - x) / (n - k)
+        above += d >= observed - 1e-9
+        below += d <= observed + 1e-9
+        count += 1
+    return above / count, below / count
 
 
 def system(run_dirs):
@@ -56,7 +70,7 @@ def system(run_dirs):
     per_run = [sum(bool(r[i]["correct"]) for i in TASKS) / len(TASKS) for r in runs]
     rows = [r[i] for r in runs for i in TASKS]
     return {"runs": len(runs), "acc": {k: acc(v) for k, v in groups.items()},
-            "range": (min(per_run), max(per_run)),
+            "range": (min(per_run), max(per_run)), "per_run": per_run,
             "rate": {i: sum(bool(r[i]["correct"]) for r in runs) / len(runs) for i in TASKS},
             "tokens": sum(x["prompt_tokens"] + x["completion_tokens"] for x in rows) / len(rows),
             "seconds": sum(x["seconds"] for x in rows) / len(rows)}
@@ -69,14 +83,15 @@ def main():
         if (Path(d) / "results.jsonl").exists():
             wal.setdefault(load(d)[0], []).append(d)
     systems = {}
-    for name, kind in BASELINES.items():
-        s = system(sorted(glob.glob(str(ROOT / "runs" / f"*-{kind}-workbench-gpt-oss-20b-rep??"))))
+    for kind in BASELINES:
+        dirs = sorted(glob.glob(str(ROOT / "runs" / f"*-{kind}-workbench-gpt-oss-20b-rep??")))
+        s = system(dirs) if dirs else None
         if s:
-            systems[name] = s
+            systems[load(dirs[0])[0]] = s
     for label, dirs in wal.items():
         s = system(dirs)
         if s:
-            systems[label.replace("driven/", "Driven, ").replace("+", " + ")] = s
+            systems[label] = s
     sizes = {k: sum(1 for t in TASKS.values() if f(t)) for k, f in
              {"3-4": lambda t: t["changes"] <= 4, "5+": lambda t: t["changes"] >= 5, "cap": lambda t: t["cap"],
               "not cap": lambda t: not t["cap"]}.items()}
@@ -91,21 +106,26 @@ def main():
         print(f"{name:<{width}}{s['runs']:>5}{a['all']:>10.0%}{one_run:>12}"
               f"{a['3-4']:>7.0%}{a['5+']:>7.0%}{a['cap']:>7.0%}{a['not cap']:>9.0%}{s['tokens']:>10,.0f}{s['seconds']:>9.0f}")
 
-    print("\nWAL condition vs baseline: solved tasks per run, and how likely that is if the WAL team were no "
-          "better (p >=) or no worse (p <=) than the baseline")
-    for label in wal:
-        name = label.replace("driven/", "Driven, ").replace("+", " + ")
+    print("\nWAL condition vs baseline: mean solved tasks per run, and how likely a difference that large is if the "
+          "log made no difference (p >=: WAL at least that much better; p <=: at least that much worse)")
+    for name in wal:
         if name not in systems:
             continue
         w = systems[name]
         solved = round(w["acc"]["all"] * len(TASKS))
-        for base in ("Single agent", "Decentralized", "Driven, no channels", "Driven, text + coord"):
+        for base in dict.fromkeys([name.removesuffix("+wal"), "single", "decentralized"]):
             if base not in systems:
                 continue
-            dist = poisson_binomial([systems[base]["rate"][i] for i in TASKS])
-            expected = sum(k * p for k, p in enumerate(dist))
-            print(f"  {name:<28} vs {base:<22} {solved:>3} vs {expected:5.1f} expected   "
-                  f"p(>=) {sum(dist[solved:]):.3f}   p(<=) {sum(dist[:solved + 1]):.3f}")
+            b = systems[base]
+            if w["runs"] > 1 and b["runs"] > 1:
+                above, below = permutation(w["per_run"], b["per_run"])
+                test = f"permutation over {w['runs']}+{b['runs']} runs"
+            else:
+                dist = poisson_binomial([b["rate"][i] for i in TASKS])
+                above, below = sum(dist[solved:]), sum(dist[:solved + 1])
+                test = "one WAL run vs the baseline's per-task rates"
+            print(f"  {name:<24} vs {base:<16} {w['acc']['all'] * len(TASKS):5.1f} vs {b['acc']['all'] * len(TASKS):5.1f}"
+                  f"   p(>=) {above:.3f}   p(<=) {below:.3f}   ({test})")
 
 
 if __name__ == "__main__":

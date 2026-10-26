@@ -361,8 +361,9 @@ def main():
     ap.add_argument("--coordinate", action="store_true",
                     help="agent-driven: ask agents to agree on who does what before changing anything")
     ap.add_argument("--wal", action="store_true",
-                    help="agent-driven, workbench: a write-ahead log agents must read and post their intent to "
-                         "before each change (see agent_driven.py)")
+                    help="multi-agent, workbench: a write-ahead log agents must read and post their intent to "
+                         "before each change (wal.py). Agent-driven teams share one workspace; the paper's topologies "
+                         "keep a private copy per worker, and the log shows each what the others are doing")
     ap.add_argument("--agents", type=int, default=3, help="multi-agent: number of worker agents (paper: 3)")
     ap.add_argument("--rounds", type=int,
                     help="multi-agent: max rounds (default as in the paper: 5 centralized/hybrid, 3 decentralized)")
@@ -393,8 +394,8 @@ def main():
     multi = args.topology != "single"
     if multi and not (wb or bc):
         sys.exit("the multi-agent topologies need --benchmark workbench or browsecomp")
-    if args.wal and not (wb and args.topology == "agent-driven"):
-        sys.exit("--wal needs --benchmark workbench and --topology agent-driven")
+    if args.wal and not (wb and multi):
+        sys.exit("--wal needs --benchmark workbench and a multi-agent topology")
     if args.split and not (bc and multi and args.split == args.agents):
         sys.exit("--split needs --benchmark browsecomp, a multi-agent topology, and one part per agent (--agents)")
 
@@ -410,6 +411,7 @@ def main():
     if driven:
         import agent_driven
     topo_name = f"agent-driven-{args.comm}{'-coord' if args.coordinate else ''}{'-wal' if args.wal else ''}" if driven else args.topology
+    topo_name += "-wal" if args.wal and not driven else ""
     topo_name += f"-split{args.split}" if args.split else ""
     topo_name += "-propose" if driven and bc and args.team_answer == "propose" else ""
     kind = "ask" if args.ask else ("sas" if not multi else topo_name) + ("-workbench" if wb else "-browsecomp" if bc else "")
@@ -438,7 +440,7 @@ def main():
                 actions = r["actions"]
             elif multi:
                 r = mas.run(args.topology, t["question"], make_agent, args.agents, args.rounds, log_message,
-                            env=mas.BrowseCompEnv(split=args.split) if bc else None)
+                            env=mas.BrowseCompEnv(split=args.split) if bc else None, wal=args.wal)
                 actions = r["actions"]
             elif wb:
                 sandbox = wb.Sandbox()

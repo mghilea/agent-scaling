@@ -16,7 +16,7 @@ worker writes a summary, and the harness delivers it. Here the agents decide all
               versioned (a stale expected_version is refused) and teammates are notified of changes.
   --comm all offers all three, so we can see which the agents choose; none offers no channel.
   --coordinate adds one sentence asking agents to agree on who does what first (not how).
-- --wal adds a write-ahead log (WorkBench only), on top of any channel condition: an append-only list of
+- --wal adds a write-ahead log (wal.py; WorkBench only), on top of any channel condition: an append-only list of
   intents and changes that every agent reads. Before changing the workspace an agent must read the log
   (wal_read), append its intent (wal_append: a plan plus each resource it will change and how, e.g.
   create calendar "meeting with Lena on 12-01 at 10:00"), and only then make the change. The harness
@@ -52,6 +52,7 @@ import time
 from collections import Counter
 from itertools import count
 
+import wal as wallog
 import workbench as wb
 
 CHANNELS = {"all": ["message", "a2a", "shared"], "text": ["message"], "a2a": ["a2a"],
@@ -111,36 +112,8 @@ TASK_OVER = "The team's final answer has been submitted, so the task is over. Re
 COORDINATE_HINT_BC = " Before you start searching, agree with your teammates on who investigates what, so that no work is done twice."
 NO_CHANNELS_BC = "You have no way to contact your teammates."
 
-# --wal: the write-ahead log's protocol, added after the channels, and the no-channels line when the log is the only link.
-WAL_TEXT = """The team keeps a write-ahead log (WAL): an append-only list, shared by all of you, of what each agent intends to change and what it has changed. Before you change anything in the workspace:
-1. Read the WAL (wal_read) to see your teammates' intents and changes.
-2. Append your intent (wal_append): your plan, and each resource you will change and how, for example: create calendar "meeting with Lena on 2023-12-01 at 10:00", update crm "customer 00000076".
-3. Then make the change.
-The workspace refuses a change if the WAL has entries you haven't read, or if your latest intent doesn't declare that change; it then tells you why and shows you any entries you missed. Every change you make is added to the WAL automatically. Searches and lookups don't need the WAL."""
+# --wal: the no-channels line when the write-ahead log (wal.py) is the agents' only link.
 NO_CHANNELS_WAL = "Apart from the write-ahead log below, you have no way to contact your teammates; you can only see the changes they make in the workspace."
-# Each WorkBench write tool as the (resource, access) an intent must declare to use it.
-WAL_WRITES = {
-    "email_send_email": ("email", "create"), "email_forward_email": ("email", "create"),
-    "email_reply_email": ("email", "create"), "email_delete_email": ("email", "delete"),
-    "calendar_create_event": ("calendar", "create"), "calendar_update_event": ("calendar", "update"),
-    "calendar_delete_event": ("calendar", "delete"), "analytics_create_plot": ("analytics", "create"),
-    "project_management_create_task": ("projects", "create"), "project_management_update_task": ("projects", "update"),
-    "project_management_delete_task": ("projects", "delete"),
-    "customer_relationship_manager_add_customer": ("crm", "create"),
-    "customer_relationship_manager_update_customer": ("crm", "update"),
-    "customer_relationship_manager_delete_customer": ("crm", "delete"),
-}
-WAL_RESOURCES = ["email", "calendar", "crm", "projects", "analytics"]
-WAL_ACCESS = ["create", "update", "delete", "read"]
-# What agents may write instead of the canonical names.
-_RESOURCE_ALIASES = {"emails": "email", "inbox": "email", "calendar_events": "calendar", "events": "calendar",
-                     "event": "calendar", "customer_relationship_manager": "crm", "customers": "crm",
-                     "customer": "crm", "project_management": "projects", "project": "projects",
-                     "project_tasks": "projects", "tasks": "projects", "task": "projects", "plots": "analytics",
-                     "plot": "analytics"}
-_ACCESS_ALIASES = {"add": "create", "send": "create", "forward": "create", "reply": "create", "insert": "create",
-                   "modify": "update", "edit": "update", "change": "update", "reschedule": "update",
-                   "remove": "delete", "cancel": "delete", "search": "read", "view": "read", "lookup": "read"}
 
 
 def _schema(name, description, props, required):
@@ -166,9 +139,6 @@ class Team:
             raise ValueError("the write-ahead log is for WorkBench's shared workspace; BrowseComp has none")
         self.task, self.log, self.channels = task, log, CHANNELS[comm]
         self.use_wal = wal
-        self.wal = []                            # the write-ahead log: entry i has id i + 1
-        self.wal_seen = {}                       # agent -> id of the last entry it has seen
-        self.wal_intent = {}                     # agent -> id of its latest intent
         self.split = split
         self.propose = browsecomp and answer_rule == "propose"
         self.answer_rule = answer_rule if browsecomp else None
@@ -194,6 +164,8 @@ class Team:
         self.events = []
         self.changes = []                        # (agent, action) for every change to the workspace
         self.t0 = time.time()
+        # The write-ahead log, guarded by the lock that also guards the workspace.
+        self.wal_log = wallog.Log(t0=self.t0, lock=self.env_lock, event=self.event) if wal else None
         rng = random.Random(f"{seed}")
         self.agents = {}
         for me in self.ids:
@@ -204,13 +176,13 @@ class Team:
                         + "\n".join(CHANNEL_TEXT[c] for c in order)) if order else (
                 NO_CHANNELS_BC if browsecomp else NO_CHANNELS_WAL if wal else NO_CHANNELS)
             if wal:
-                channels += "\n\n" + WAL_TEXT
+                channels += "\n\n" + wallog.TEXT
             hint = (COORDINATE_HINT_BC if browsecomp else COORDINATE_HINT) if coordinate and order else ""
             fields = dict(me=me, n=n_agents, others=", ".join(a for a in self.ids if a != me), channels=channels, hint=hint)
             if browsecomp:
                 fields["split"] = " " + self.bc.split_note(self.ids.index(me), self.ids) if split else ""
             prompt = (TEAM_PROMPT_BC_PROPOSE if self.propose else TEAM_PROMPT_BC if browsecomp else TEAM_PROMPT).format(**fields)
-            tools = {**self._env_tools(me), **self._comm_tools(me), **(self._wal_tools(me) if wal else {})}
+            tools = {**self._env_tools(me), **self._comm_tools(me), **(self.wal_log.tools(me) if wal else {})}
             if self.propose:  # once the team's answer is in, every tool just says the task is over
                 tools = {n: (self._unless_over(fn), schema) for n, (fn, schema) in tools.items()}
             agent = make_agent(name=me, tools=tools,
@@ -297,16 +269,13 @@ class Team:
     def _env_tools(self, me):
         if self.bc:
             return self._search_tools(me)
-        # The sandbox names tools like calendar_create_event (WorkBench's calendar.create_event).
-        if self.use_wal and set(WAL_WRITES) != {re.sub(r"[^a-zA-Z0-9_-]", "_", t) for t in wb.WRITE_TOOLS}:
-            raise RuntimeError("WAL_WRITES doesn't match WorkBench's write tools")
         tools = {}
         for name, (fn, schema) in self.sandbox.tools.items():
             def run(_fn=fn, _name=name, **kwargs):
-                logged = self.use_wal and _name in WAL_WRITES
+                logged = self.use_wal and _name in wallog.WRITES
                 with self.env_lock:  # the log check, the change and its log entry happen as one step
                     if logged:
-                        refusal = self._wal_gate(me, _name)
+                        refusal = self.wal_log.gate(me, _name)
                         if refusal:
                             reason, text = refusal
                             self.event(me, "wal_refused", tool=_name, args=kwargs, reason=reason)
@@ -317,7 +286,7 @@ class Team:
                     self.changes += [(me, a) for a in new]
                     if logged:
                         call = wb.show(self.sandbox.actions[-1]) if len(self.sandbox.actions) > calls else _name
-                        self._wal_add(me, "change", intent=self.wal_intent.get(me), call=call,
+                        self.wal_log.add(me, "change", intent=self.wal_log.intent.get(me), call=call,
                                       result="done" if new else f"no change: {out[:150]}")
                 self.event(me, "tool", tool=_name, args=kwargs, out=out[:600],
                            changes=[wb.show(a) for a in new])
@@ -493,122 +462,6 @@ class Team:
                 ["key", "value"]))
         return tools
 
-    # ---- write-ahead log (--wal) -------------------------------------------------------------
-    # Callers hold self.env_lock, so reading, appending and changing the workspace never interleave.
-    @staticmethod
-    def _wal_line(e):
-        if e["kind"] == "intent":
-            res = "; ".join(f"{r['access']} {r['resource']}" + (f" {json.dumps(r['target'])}" if r["target"] else "")
-                            for r in e["resources"]) or "none declared"
-            return f"#{e['id']} {e['agent']} INTENT: {e['plan']} | resources: {res}"
-        return f"#{e['id']} {e['agent']} CHANGE (intent #{e['intent']}): {e['call']} -> {e['result']}"
-
-    def _wal_add(self, me, kind, **data):
-        e = {"id": len(self.wal) + 1, "t": round(time.time() - self.t0, 2), "agent": me, "kind": kind, **data}
-        self.wal.append(e)
-        self.wal_seen[me] = e["id"]  # only an agent that had seen every entry can add one
-        return e
-
-    def _wal_catch_up(self, me):
-        """The entries this agent hasn't seen, as text; it has now seen them."""
-        unseen = self.wal[self.wal_seen.get(me, 0):]
-        self.wal_seen[me] = len(self.wal)
-        return "\n".join(map(self._wal_line, unseen)), len(unseen)
-
-    def _wal_gate(self, me, tool):
-        """None if this change may go ahead, else (reason, what the agent is told)."""
-        intent = self.wal_intent.get(me)
-        if intent is None:
-            return "no_intent", ("[WAL] Refused: you haven't posted an intent. Read the WAL (wal_read), append your "
-                                 "intent with wal_append, declaring each resource you will change and how, then make "
-                                 "the change.")
-        unseen, n = self._wal_catch_up(me)
-        if n:
-            return "behind", (f"[WAL] Refused: the WAL has {n} entr{'y' if n == 1 else 'ies'} you hadn't read:\n{unseen}\n"
-                              "You have now seen them. If they don't affect your plan, make the change again; if they "
-                              "do, append a revised intent first.")
-        resource, access = WAL_WRITES[tool]
-        if not any(r["resource"] == resource and r["access"] == access for r in self.wal[intent - 1]["resources"]):
-            return "undeclared", (f"[WAL] Refused: your latest intent (#{intent}) doesn't declare {access} {resource}. "
-                                  "Append an intent with wal_append that declares it, then make the change.")
-        return None
-
-    @staticmethod
-    def _wal_resources(resources):
-        """The declared resources as [{resource, access, target}], or an error message."""
-        if isinstance(resources, str):
-            try:
-                resources = json.loads(resources)
-            except json.JSONDecodeError:
-                return None, "[error] resources must be a JSON list of {resource, access, target} objects"
-        if isinstance(resources, dict):
-            resources = [resources]
-        if not isinstance(resources, list):
-            return None, "[error] resources must be a list of {resource, access, target} objects"
-        out = []
-        for r in resources:
-            if not isinstance(r, dict):
-                return None, f"[error] each resource must be an object with resource, access and target, not {r!r}"
-            res = str(r.get("resource", "")).strip().lower()
-            res = _RESOURCE_ALIASES.get(res, res)
-            acc = str(r.get("access", "")).strip().lower()
-            acc = _ACCESS_ALIASES.get(acc, acc)
-            if res not in WAL_RESOURCES or acc not in WAL_ACCESS:
-                return None, (f"[error] resource must be one of {WAL_RESOURCES} and access one of {WAL_ACCESS}; "
-                              f"got resource={r.get('resource')!r}, access={r.get('access')!r}")
-            out.append({"resource": res, "access": acc, "target": str(r.get("target") or "").strip()})
-        return out, None
-
-    def _wal_tools(self, me):
-        def wal_read(all=False):
-            with self.env_lock:
-                if all in (True, "true", "True", 1):
-                    text, n = "\n".join(map(self._wal_line, self.wal)), len(self.wal)
-                    self.wal_seen[me] = len(self.wal)
-                else:
-                    text, n = self._wal_catch_up(me)
-            self.event(me, "wal_read", n=n, whole=bool(all))
-            if n:
-                return text
-            return "The WAL is empty." if not self.wal else "No new entries since you last read the WAL."
-
-        def wal_append(plan="", resources=None):
-            if not str(plan).strip():
-                return "[error] plan is required"
-            declared, error = self._wal_resources(resources if resources is not None else [])
-            if error:
-                return error
-            with self.env_lock:
-                unseen, n = self._wal_catch_up(me)
-                if n:
-                    self.event(me, "wal_append_refused", unseen=n)
-                    return (f"[WAL] Not appended: the WAL has {n} entr{'y' if n == 1 else 'ies'} you hadn't read:\n"
-                            f"{unseen}\nYou have now seen them. Append your intent again, revised if they overlap with it.")
-                e = self._wal_add(me, "intent", plan=str(plan).strip(), resources=declared)
-                self.wal_intent[me] = e["id"]
-            self.event(me, "wal_append", id=e["id"], plan=e["plan"], resources=declared)
-            return f"Appended as intent #{e['id']}. You can now make the changes it declares."
-
-        return {
-            "wal_read": (wal_read, _schema(
-                "wal_read", "Read the team's write-ahead log: every intent and change since you last read it.",
-                {"all": {"type": "boolean", "description": "Show the whole log, not only the entries you haven't seen"}},
-                [])),
-            "wal_append": (wal_append, _schema(
-                "wal_append", "Append your intent to the write-ahead log, before changing the workspace: your plan "
-                "and each resource you will change and how. Your latest intent is the one your changes are checked "
-                "against.",
-                {"plan": {"type": "string", "description": "What you will do and why"},
-                 "resources": {"type": "array", "description": "Each resource you will change (or rely on) and how",
-                               "items": {"type": "object", "properties": {
-                                   "resource": {"type": "string", "enum": WAL_RESOURCES},
-                                   "access": {"type": "string", "enum": WAL_ACCESS},
-                                   "target": {"type": "string", "description": "Which record: its id, or for a new "
-                                              "one a short description (e.g. meeting with Lena on 2023-12-01 10:00)"}},
-                                   "required": ["resource", "access", "target"]}}},
-                ["plan", "resources"])),
-        }
-
     # ---- running -----------------------------------------------------------------------------
     def _loop(self, me):
         agent = self.agents[me]
@@ -711,12 +564,8 @@ class Team:
         }
         extra, trace_extra = {}, {}
         if self.use_wal:
-            refused = Counter(e["reason"] for e in self.events if e["kind"] == "wal_refused")
-            comm.update({"wal_intents": kinds["wal_append"], "wal_reads": kinds["wal_read"],
-                         "wal_changes": sum(e["kind"] == "change" for e in self.wal),
-                         "wal_append_refused": kinds["wal_append_refused"],
-                         **{f"wal_refused_{r}": refused[r] for r in ("no_intent", "behind", "undeclared")}})
-            trace_extra["wal_log"] = self.wal
+            comm.update(self.wal_log.counts(self.events))
+            trace_extra["wal_log"] = self.wal_log.entries
         if self.bc:
             # The team's answer is the last submission; if nobody submitted, a majority vote over each member's
             # last reply (ties to the first agent).

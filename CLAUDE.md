@@ -7,7 +7,9 @@ Current stage: single agent (`agent.py`) plus the paper's four multi-agent topol
 `agent.py --topology independent|centralized|decentralized|hybrid`, WorkBench only), following the
 authors' released code (github.com/ybkim95/agent-scaling). Our own extension, `agent_driven.py`
 (`--topology agent-driven --comm all|text|a2a|shared|none [--coordinate] [--wal]`), drops the fixed rounds:
-peers share one workspace and choose whether and how to communicate. `compare.py` tabulates runs with the
+peers share one workspace and choose whether and how to communicate. `--wal` (`wal.py`) adds a write-ahead
+log to any multi-agent WorkBench team: agents must read it and post their intent before each change (in the paper's
+topologies each worker still changes only its own private copy; the log shows it what the others are doing). `compare.py` tabulates runs with the
 paper's metrics; `show_trace.py` prints a task's trace as a timeline; `trace_viz.py` builds an animated
 HTML replay of one task across runs. Toy tasks in `tasks.jsonl`, outputs in `runs/`.
 Benchmark: WorkBench (`workbench.py`, `agent.py --benchmark workbench --limit N`), one of the

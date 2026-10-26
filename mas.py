@@ -17,6 +17,10 @@ are adapted from its prompts/multi-agent/ files:
                  its peers' previous-round summaries and revises its answer (debate).
 - hybrid:        centralized, then one extra round in which each worker also gets its peers'
                  summaries directly (first 400 characters of each).
+- --wal (our addition, WorkBench): the workers also share a write-ahead log (wal.py). Before changing its
+                 own private copy a worker must read the log and post its intent there, and its changes are
+                 logged, so each worker knows what the others intend and have done in their copies. Everything
+                 else, including how the team's changes are combined, is unchanged.
 
 BrowseComp-Plus (env=BrowseCompEnv()): every worker searches the same read-only document collection with
 its own tools, and an answer is text, combined as the paper's code does for question answering:
@@ -44,6 +48,7 @@ import re
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 
+import wal as wallog
 import workbench as wb
 
 TOPOLOGIES = ["independent", "centralized", "decentralized", "hybrid"]
@@ -266,12 +271,15 @@ def exact_answer(text):
 class Worker:
     """A tool-using sub-agent with its own sandbox and a conversation that persists across rounds."""
 
-    def __init__(self, make_agent, agent_id, task, objective, focus, role, env, index=None, ids=()):
+    def __init__(self, make_agent, agent_id, task, objective, focus, role, env, index=None, ids=(), wal_log=None):
         self.id, self.objective, self.focus, self.env = agent_id, objective, focus, env
         self.task = env.task_text(task)
         self.sandbox = env.session(index)
-        self.agent = make_agent(name=agent_id, tools=self.sandbox.tools,
-                                system_prompt=env.system_prompt + "\n\n" + role + env.worker_note(index, ids))
+        tools, prompt = self.sandbox.tools, env.system_prompt + "\n\n" + role + env.worker_note(index, ids)
+        if wal_log:  # --wal: its writes go through the team's log, which shows it what the others are doing
+            tools = {**wal_log.guard(agent_id, self.sandbox), **wal_log.tools(agent_id)}
+            prompt += "\n\n" + wallog.TEXT_PRIVATE
+        self.agent = make_agent(name=agent_id, tools=tools, system_prompt=prompt)
         self.summaries = []  # what it sent the team at the end of each round
         self.writes = []     # (round, action) for every change it made (rejected writes excluded)
         self.answers = []    # text benchmarks: its answer at the end of each round
@@ -332,9 +340,13 @@ def parse_json(text):
 class Team:
     """Bookkeeping for one multi-agent run: its agents, the messages between them, and a trace."""
 
-    def __init__(self, topology, task, make_agent, n_agents, log, env):
+    def __init__(self, topology, task, make_agent, n_agents, log, env, wal=False):
+        if wal and env.text_answers:
+            raise ValueError("the write-ahead log is for WorkBench's workspaces; text benchmarks have none")
         self.topology, self.task, self.make_agent, self.n, self.log = topology, task, make_agent, n_agents, log
         self.env = env
+        # --wal: one log for the team; each worker still changes only its own private copy.
+        self.wal_log = wallog.Log(private=True) if wal else None
         self.workers = []
         self.orchestrator = None
         self.messages = []  # every inter-agent message: {"round", "from", "to", "text"}
@@ -345,7 +357,7 @@ class Team:
     def add_worker(self, agent_id, objective, focus):
         ids = [f"agent_{i}" for i in range(1, self.n + 1)]
         w = Worker(self.make_agent, agent_id, self.task, objective, focus, WORKER_ROLE[self.topology], self.env,
-                   index=len(self.workers), ids=ids)
+                   index=len(self.workers), ids=ids, wal_log=self.wal_log)
         self.workers.append(w)
         return w
 
@@ -385,7 +397,10 @@ class Team:
                                                  if text else {}),
             "stop": "final", **stats,
             "agents": len(self.workers), "rounds": self.rounds, "agent_messages": len(self.messages),
+            **({"comm": self.wal_log.counts(self.wal_log.events)} if self.wal_log else {}),
             "trace": {"topology": self.topology, **self.trace, "worker_errors": errors,
+                      **({"wal": True, "wal_log": self.wal_log.entries, "wal_events": self.wal_log.events}
+                         if self.wal_log else {}),
                       "messages": self.messages,
                       # Every orchestrator call is its system prompt plus one prompt from orchestrator_calls.
                       "orchestrator_system": self.orchestrator.system_prompt if self.orchestrator else None,
@@ -546,8 +561,10 @@ def decentralized(team, rounds):
     return actions
 
 
-def run(topology, task, make_agent, n_agents=3, rounds=None, log=lambda label, text: None, env=None):
-    """Run one task through a multi-agent topology. Returns its final answer (WorkBench: changes), stats and trace."""
-    team = Team(topology, task, make_agent, n_agents, log, env or WorkBenchEnv())
+def run(topology, task, make_agent, n_agents=3, rounds=None, log=lambda label, text: None, env=None, wal=False):
+    """Run one task through a multi-agent topology. Returns its final answer (WorkBench: changes), stats and trace.
+
+    wal: the workers share a write-ahead log (wal.py) while each keeps its own private copy (WorkBench only)."""
+    team = Team(topology, task, make_agent, n_agents, log, env or WorkBenchEnv(), wal)
     answer = globals()[topology](team, rounds or DEFAULT_ROUNDS[topology])
     return team.result(answer)

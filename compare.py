@@ -22,6 +22,8 @@ def load(run_dir):
     name = config.get("topology", "single")
     if name == "agent-driven":  # one label per channel condition
         name = f"driven/{config.get('comm', 'all')}{'+coord' if config.get('coordinate') else ''}{'+wal' if config.get('wal') else ''}"
+    elif config.get("wal"):
+        name += "+wal"
     return name, {r["id"]: r for r in rows}
 
 
