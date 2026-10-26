@@ -360,6 +360,9 @@ def main():
                          "else a majority vote over final replies (runs before 7 October)")
     ap.add_argument("--coordinate", action="store_true",
                     help="agent-driven: ask agents to agree on who does what before changing anything")
+    ap.add_argument("--wal", action="store_true",
+                    help="agent-driven, workbench: a write-ahead log agents must read and post their intent to "
+                         "before each change (see agent_driven.py)")
     ap.add_argument("--agents", type=int, default=3, help="multi-agent: number of worker agents (paper: 3)")
     ap.add_argument("--rounds", type=int,
                     help="multi-agent: max rounds (default as in the paper: 5 centralized/hybrid, 3 decentralized)")
@@ -390,6 +393,8 @@ def main():
     multi = args.topology != "single"
     if multi and not (wb or bc):
         sys.exit("the multi-agent topologies need --benchmark workbench or browsecomp")
+    if args.wal and not (wb and args.topology == "agent-driven"):
+        sys.exit("--wal needs --benchmark workbench and --topology agent-driven")
     if args.split and not (bc and multi and args.split == args.agents):
         sys.exit("--split needs --benchmark browsecomp, a multi-agent topology, and one part per agent (--agents)")
 
@@ -404,7 +409,7 @@ def main():
         args.rounds = args.rounds or mas.DEFAULT_ROUNDS[args.topology]
     if driven:
         import agent_driven
-    topo_name = f"agent-driven-{args.comm}{'-coord' if args.coordinate else ''}" if driven else args.topology
+    topo_name = f"agent-driven-{args.comm}{'-coord' if args.coordinate else ''}{'-wal' if args.wal else ''}" if driven else args.topology
     topo_name += f"-split{args.split}" if args.split else ""
     topo_name += "-propose" if driven and bc and args.team_answer == "propose" else ""
     kind = "ask" if args.ask else ("sas" if not multi else topo_name) + ("-workbench" if wb else "-browsecomp" if bc else "")
@@ -429,7 +434,7 @@ def main():
             if driven:
                 r = agent_driven.run(t["question"], make_agent, args.agents, args.comm, log_message, seed=t["id"],
                                      coordinate=args.coordinate, browsecomp=bool(bc), split=args.split,
-                                     answer_rule=args.team_answer)
+                                     answer_rule=args.team_answer, wal=args.wal)
                 actions = r["actions"]
             elif multi:
                 r = mas.run(args.topology, t["question"], make_agent, args.agents, args.rounds, log_message,

@@ -143,7 +143,8 @@ def show_multi(p, t):
 
 def show_driven(p, t):
     """Agent-driven runs have no rounds: print every event in time order."""
-    print(dim(f"channels: {t['comm']}" + ("  (asked to coordinate)" if t.get("coordinate") else "")))
+    print(dim(f"channels: {t['comm']}" + ("  (asked to coordinate)" if t.get("coordinate") else "")
+              + ("  + write-ahead log" if t.get("wal") else "")))
     print(bold("\nTIMELINE") + dim("  (seconds since start)"))
     for e in t["events"]:
         k, who = e["kind"], f"{e['t']:6.1f}s  {e['agent']:<8} "
@@ -163,6 +164,16 @@ def show_driven(p, t):
             p.block(0, who + green(f"shared state {'created' if e['created'] else 'updated'} \"{e['key']}\" v{e['version']}:"), e["value"], 400)
         elif k in ("state_read", "a2a_get"):
             print(who + dim(f"{k.replace('_', ' ')} {e.get('key') or ''}"))
+        elif k == "wal_append":
+            res = "; ".join(f"{r['access']} {r['resource']}" + (f" {r['target']!r}" if r["target"] else "")
+                            for r in e["resources"]) or "none declared"
+            p.block(0, who + green(f"WAL intent #{e['id']}:"), f"{e['plan']}  | resources: {res}", 500)
+        elif k == "wal_refused":
+            print(who + yellow(f"WAL refused {e['tool']} ({e['reason'].replace('_', ' ')})"))
+        elif k == "wal_append_refused":
+            print(who + yellow(f"WAL append refused: {e['unseen']} unread entries"))
+        elif k == "wal_read":
+            print(who + dim(f"WAL read: {e['n']} entries"))
         elif k == "state_conflict":
             print(who + yellow(f"write conflict on \"{e['key']}\" (expected v{e['expected']}, was v{e['actual']})"))
         elif k == "idle":

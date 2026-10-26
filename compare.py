@@ -21,7 +21,7 @@ def load(run_dir):
     rows = [json.loads(line) for line in open(run_dir / "results.jsonl")]
     name = config.get("topology", "single")
     if name == "agent-driven":  # one label per channel condition
-        name = f"driven/{config.get('comm', 'all')}{'+coord' if config.get('coordinate') else ''}"
+        name = f"driven/{config.get('comm', 'all')}{'+coord' if config.get('coordinate') else ''}{'+wal' if config.get('wal') else ''}"
     return name, {r["id"]: r for r in rows}
 
 
