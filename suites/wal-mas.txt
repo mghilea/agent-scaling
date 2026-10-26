@@ -1,0 +1,7 @@
+# The paper's four topologies with the write-ahead log (--wal) on the 64 hard tasks (3+ changes): each worker still
+# changes only its own private copy; the log shows it what the others intend and have done. Their 10-run baselines
+# without the log are in suites/hard-a.txt, hard-b.txt. Submit with --tag walNN, NN = 01..10.
+--benchmark workbench --min-changes 3 --topology hybrid --wal
+--benchmark workbench --min-changes 3 --topology centralized --wal
+--benchmark workbench --min-changes 3 --topology decentralized --wal
+--benchmark workbench --min-changes 3 --topology independent --wal
