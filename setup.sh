@@ -9,6 +9,8 @@
 #
 # Safe to re-run: each step is skipped if it's already done on this node.
 # In a second terminal on the same node, re-sourcing it just restores the environment.
+# /scratch deletes files more than two weeks old but leaves their directories, so each step checks the
+# files it needs rather than the directory, and redoes the step if any are gone.
 # Overrides: PORT (default 8000), TP (tensor-parallel size, default = GPUs allocated),
 # VLLM_VERSION (default 0.30.0, the version first tested on Neuronic), VLLM_LOG (log path),
 # VLLM_GPU_UTIL (share of GPU memory for the model, default 0.9, or 0.7 with BROWSECOMP).
@@ -52,7 +54,7 @@ _agent_setup() {
 
     # Two jobs landing on one fresh node must not install or download into $WORK at the same time.
     local lock
-    exec {lock}>"$WORK/.setup.lock"
+    exec {lock}>>"$WORK/.setup.lock"  # >> so noclobber doesn't refuse the existing file
     flock "$lock"
     if [[ ! -x "$WORK/bin/uv" ]]; then
         echo "==> Installing uv"
@@ -60,39 +62,35 @@ _agent_setup() {
             | env UV_INSTALL_DIR="$WORK/bin" UV_NO_MODIFY_PATH=1 sh || { exec {lock}>&-; return 1; }
     fi
 
-    if [[ ! -x "$WORK/venv/bin/vllm" ]]; then
+    # A venv the purge emptied (or one left half-built) can't be repaired: uv stops at the packages' missing
+    # metadata. So unless vllm imports, start over, with an empty download cache as well: the cache may have lost
+    # files too, and uv hardlinks from it, which would give the new venv the old files' dates.
+    if [[ ! -x "$WORK/venv/bin/vllm" ]] || ! "$WORK/venv/bin/python" -c "import vllm" >/dev/null 2>&1; then
         echo "==> Installing vLLM $vllm_version (takes a few minutes on a fresh node)"
-        uv venv --allow-existing --python 3.12 "$WORK/venv" || { exec {lock}>&-; return 1; }
+        rm -rf "$WORK/venv" "$WORK/uv-cache"
+        uv venv --python 3.12 "$WORK/venv" || { exec {lock}>&-; return 1; }
         uv pip install --python "$WORK/venv/bin/python" "vllm==$vllm_version" || { exec {lock}>&-; return 1; }
-        # A venv left half-built on this node can have the package without its command; uv then skips it.
-        if [[ ! -x "$WORK/venv/bin/vllm" ]]; then
-            echo "==> vLLM's command is missing; reinstalling the vllm package"
-            uv pip install --python "$WORK/venv/bin/python" --reinstall-package vllm "vllm==$vllm_version" \
-                || { exec {lock}>&-; return 1; }
+        if [[ ! -x "$WORK/venv/bin/vllm" ]] || ! "$WORK/venv/bin/python" -c "import vllm" >/dev/null 2>&1; then
+            echo "vLLM install is broken in $WORK/venv" >&2; exec {lock}>&-; return 1
         fi
-        [[ -x "$WORK/venv/bin/vllm" ]] || { echo "vLLM install is broken in $WORK/venv" >&2; exec {lock}>&-; return 1; }
     fi
     source "$WORK/venv/bin/activate"
 
     # WorkBench benchmark (agent.py --benchmark workbench): its tools, tasks and evaluator.
     # Pinned so scores stay comparable; pandas is pinned to the version in WorkBench's uv.lock.
     export WORKBENCH_DIR="$WORK/WorkBench"
-    if [[ ! -d "$WORKBENCH_DIR/.git" ]]; then
-        echo "==> Cloning WorkBench"
-        git clone -q https://github.com/olly-styles/WorkBench.git "$WORKBENCH_DIR" || { exec {lock}>&-; return 1; }
-        git -C "$WORKBENCH_DIR" checkout -q 49c7dfd || { exec {lock}>&-; return 1; }
-    fi
+    _clone https://github.com/olly-styles/WorkBench.git "$WORKBENCH_DIR" 49c7dfd || { exec {lock}>&-; return 1; }
     if ! python -c "import pandas" 2>/dev/null; then
         echo "==> Installing pandas for WorkBench"
         uv pip install --python "$WORK/venv/bin/python" "pandas==2.3.3" || { exec {lock}>&-; return 1; }
     fi
 
     local model_dir="$WORK/models/$name"
-    if [[ ! -f "$model_dir/.complete" ]]; then
+    if ! _intact "$model_dir"; then
         echo "==> Downloading openai/$name"
         hf download "openai/$name" --exclude "original/*" --exclude "metal/*" \
             --local-dir "$model_dir" || { exec {lock}>&-; return 1; }
-        touch "$model_dir/.complete"
+        _mark_intact "$model_dir"
     fi
     if [[ -n "$BROWSECOMP" ]]; then
         _browsecomp_data || { exec {lock}>&-; return 1; }
@@ -157,29 +155,53 @@ _agent_setup() {
     echo "Next:   python ~/agent-scaling/agent.py"
 }
 
+# A download is complete when its .complete marker lists the files it fetched and they're all still there.
+# (Markers from before this check are empty, so those downloads are checked again once; hf skips files it has.)
+_intact() {
+    local f
+    [[ -s "$1/.complete" ]] || return 1
+    while IFS= read -r f; do
+        [[ -f "$1/$f" ]] || return 1
+    done < "$1/.complete"
+}
+
+_mark_intact() {
+    (cd "$1" && find . -type f ! -name .complete ! -path "*/.cache/*" -printf '%P\n') >| "$1/.complete"
+}
+
+# A git clone at a pinned commit. A clone the purge emptied still has its .git directory, so check that git can
+# read it, that it's at the commit, and that no tracked file is missing; otherwise clone it again.
+_clone() {
+    local url="$1" dir="$2" commit="$3" changes
+    if changes=$(git -C "$dir" status --porcelain --untracked-files=no 2>/dev/null) && [[ -z "$changes" ]] \
+        && [[ "$(git -C "$dir" rev-parse HEAD 2>/dev/null)" == "$commit"* ]]; then
+        return 0
+    fi
+    echo "==> Cloning $url"
+    rm -rf "$dir"
+    git clone -q "$url" "$dir" && git -C "$dir" checkout -q "$commit"
+}
+
 # BrowseComp-Plus data: documents, the Qwen3-Embedding-4B index, the questions (decrypted on this node only),
 # the embedding model, and the paper's code for its 100-question sample and grader prompt.
 _browsecomp_data() {
     export BROWSECOMP_DIR="$WORK/browsecomp" PAPER_REPO="$WORK/agent-scaling-paper"
     local d="$BROWSECOMP_DIR"
     mkdir -p "$d" || return 1
-    if [[ ! -f "$d/.complete" ]]; then
+    if ! _intact "$d"; then
         echo "==> Downloading BrowseComp-Plus (about 6 GB)"
         hf download Tevatron/browsecomp-plus-corpus --repo-type dataset --local-dir "$d/corpus" || return 1
         hf download Tevatron/browsecomp-plus-indexes --repo-type dataset --include "qwen3-embedding-4b/*" \
             --local-dir "$d/indexes" || return 1
         hf download Tevatron/browsecomp-plus --repo-type dataset --local-dir "$d/queries" || return 1
-        touch "$d/.complete"
+        _mark_intact "$d"
     fi
-    if [[ ! -f "$WORK/models/Qwen3-Embedding-4B/.complete" ]]; then
+    if ! _intact "$WORK/models/Qwen3-Embedding-4B"; then
         echo "==> Downloading Qwen/Qwen3-Embedding-4B"
         hf download Qwen/Qwen3-Embedding-4B --local-dir "$WORK/models/Qwen3-Embedding-4B" || return 1
-        touch "$WORK/models/Qwen3-Embedding-4B/.complete"
+        _mark_intact "$WORK/models/Qwen3-Embedding-4B"
     fi
-    if [[ ! -d "$PAPER_REPO/.git" ]]; then
-        git clone -q https://github.com/ybkim95/agent-scaling.git "$PAPER_REPO" || return 1
-        git -C "$PAPER_REPO" checkout -q 6f3bfb7 || return 1
-    fi
+    _clone https://github.com/ybkim95/agent-scaling.git "$PAPER_REPO" 6f3bfb7 || return 1
     python -c "import pyarrow" 2>/dev/null || uv pip install --python "$WORK/venv/bin/python" pyarrow || return 1
     [[ -f "$d/questions.jsonl" ]] || python "$(dirname "${BASH_SOURCE[0]}")/browsecomp.py" || return 1
 }
