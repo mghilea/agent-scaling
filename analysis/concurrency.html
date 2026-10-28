@@ -1,0 +1,443 @@
+<title>Concurrency on WorkBench</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one reading column of sections; tables and logs scroll inside their own boxes. Same system as the other analysis pages. */
+:root {
+  --ground: #f3f5f8; --surface: #fbfcfd; --sunken: #e7ebf1; --ink: #16202e; --ink-2: #3e4a5c; --muted: #5d6879; --line: #d2d9e3; --grid: #e3e8ee;
+  --before: #eb6834; --after: #2a78d6; --accent: #2a78d6; --pass: #22784a; --pass-soft: #dcf1e5; --fail: #b3261e; --fail-soft: #fbe2df; --warn-soft: #fdf0d5; --warn: #8a5a00;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  --cond: "IBM Plex Sans Condensed", "IBM Plex Sans", "Arial Narrow", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, "Courier New", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground: #0e131a; --surface: #151c26; --sunken: #1d2632; --ink: #e5eaf1; --ink-2: #c3ccd8; --muted: #9aa7b8; --line: #2e3a4a; --grid: #232d3a;
+    --before: #d95926; --after: #3987e5; --accent: #5c9cec; --pass: #53c487; --pass-soft: #163527; --fail: #f2786d; --fail-soft: #3d1c1a; --warn-soft: #3a2c10; --warn: #e8b55c;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #0e131a; --surface: #151c26; --sunken: #1d2632; --ink: #e5eaf1; --ink-2: #c3ccd8; --muted: #9aa7b8; --line: #2e3a4a; --grid: #232d3a;
+  --before: #d95926; --after: #3987e5; --accent: #5c9cec; --pass: #53c487; --pass-soft: #163527; --fail: #f2786d; --fail-soft: #3d1c1a; --warn-soft: #3a2c10; --warn: #e8b55c;
+}
+* { box-sizing: border-box; }
+body { background: var(--ground); color: var(--ink); font: 16px/1.6 var(--sans); }
+.wrap { max-width: 1080px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 36px 64px; display: grid; gap: 52px; }
+header { display: grid; gap: 14px; }
+.eyebrow { margin: 0; font: 600 12px/1.4 var(--sans); letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+h1 { margin: 0; font: 600 clamp(30px, 4.4vw, 44px)/1.1 var(--cond); text-wrap: balance; max-width: 26ch; }
+h2 { margin: 0; font: 600 clamp(23px, 3vw, 29px)/1.2 var(--cond); text-wrap: balance; }
+h3 { margin: 0; font: 600 18px/1.3 var(--cond); text-wrap: balance; }
+p { margin: 0; }
+.lede { font-size: 18px; color: var(--ink-2); max-width: 72ch; }
+code { font-family: var(--mono); font-size: 13px; background: var(--sunken); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+section { display: grid; gap: 18px; min-width: 0; }
+.sectionhead { display: grid; gap: 6px; }
+.sectionhead p { color: var(--muted); max-width: 76ch; }
+.prose { display: grid; gap: 10px; max-width: 76ch; }
+.prose p, .prose li { color: var(--ink-2); }
+ul.points { margin: 0; padding-left: 20px; display: grid; gap: 6px; max-width: 80ch; }
+ul.points li { color: var(--ink-2); }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 4px; align-content: start; min-width: 0; }
+.card .k { font: 600 11.5px/1.4 var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.card .v { font: 600 26px/1.15 var(--cond); font-variant-numeric: tabular-nums; }
+.card .v .arrow { color: var(--muted); font-weight: 400; padding-inline: 4px; }
+.card p { color: var(--muted); font-size: 14.5px; }
+.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.step { border-top: 2px solid var(--accent); padding-top: 10px; display: grid; gap: 4px; min-width: 0; }
+.step b { font: 600 15px/1.3 var(--cond); }
+.step span { color: var(--muted); font-size: 14.5px; }
+.tablewrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; min-width: 0; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; font-variant-numeric: tabular-nums; }
+table.wide { min-width: 760px; }
+th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 600 11.5px/1.4 var(--sans); letter-spacing: .05em; text-transform: uppercase; color: var(--muted); background: var(--sunken); }
+td.n, th.n { text-align: right; white-space: nowrap; }
+tr:last-child td { border-bottom: none; }
+tr.group td { background: var(--sunken); font-weight: 600; color: var(--ink-2); }
+table.wide td:first-child { min-width: 170px; }
+.delta { font-size: 12.5px; color: var(--muted); }
+.good { color: var(--pass); } .bad { color: var(--fail); }
+.pill { display: inline-block; font: 600 11.5px/1.5 var(--sans); padding: 1px 8px; border-radius: 999px; white-space: nowrap; }
+.pill.harm { background: var(--fail-soft); color: var(--fail); }
+.pill.ok { background: var(--pass-soft); color: var(--pass); }
+.pill.na { background: var(--sunken); color: var(--muted); }
+.note { font-size: 14px; color: var(--muted); max-width: 86ch; }
+.chartbox { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 10px; position: relative; min-width: 0; }
+.chartbox svg { display: block; width: 100%; height: auto; overflow: visible; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13.5px; color: var(--ink-2); }
+.legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+figure { margin: 0; display: grid; gap: 8px; }
+figcaption { font-size: 14px; color: var(--muted); max-width: 86ch; }
+.lbl { fill: var(--muted); font: 12px var(--sans); }
+.cat { fill: var(--ink); font: 500 13px var(--sans); }
+.val { fill: var(--ink-2); font: 500 12px var(--sans); font-variant-numeric: tabular-nums; }
+.gridline { stroke: var(--grid); stroke-width: 1; }
+.bar { cursor: default; }
+.bar:hover { opacity: .85; }
+.tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--ground); font: 13px/1.4 var(--sans); padding: 6px 9px; border-radius: 6px; max-width: 260px; z-index: 5; }
+.log { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow-x: auto; font: 12.5px/1.65 var(--mono); padding: 12px 14px; min-width: 0; }
+.log .row { display: grid; grid-template-columns: 54px 1fr; gap: 10px; white-space: pre-wrap; min-width: 520px; }
+.log .t { color: var(--muted); text-align: right; }
+.log .intent { color: var(--accent); }
+.log .chg { color: var(--ink); }
+.log .side { color: var(--muted); font-style: italic; }
+.log .refused { color: var(--fail); }
+.task { font-size: 15px; color: var(--ink-2); border-left: 3px solid var(--line); padding-left: 12px; max-width: 80ch; }
+.two { display: grid; grid-template-columns: 1fr; gap: 22px; }
+.two > * { min-width: 0; }
+details summary { cursor: pointer; color: var(--accent); font-weight: 500; }
+details[open] summary { margin-bottom: 10px; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 520px) { .card .v { font-size: 22px; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">WorkBench · 64 hard tasks · gpt-oss-20b · 10 runs per setup</p>
+    <h1>What a write-ahead log does to concurrency conflicts</h1>
+    <p class="lede" id="lede"></p>
+    <div class="cards" id="cards"></div>
+  </header>
+
+  <section id="how">
+    <div class="sectionhead">
+      <h2>How the log works</h2>
+      <p>Every agent on the team reads and writes one append-only log. The harness enforces the order of operations; the agents decide what to do about what they see.</p>
+    </div>
+    <div class="steps">
+      <div class="step"><b>1. Read the log</b><span><code>wal_read</code> returns every intent and change the agent hasn't seen yet.</span></div>
+      <div class="step"><b>2. Post an intent</b><span><code>wal_append</code>: a plan plus each resource it will change and how, e.g. <code>update crm "00000187"</code>.</span></div>
+      <div class="step"><b>3. Make the change</b><span>The write runs and is added to the log automatically, with its outcome.</span></div>
+    </div>
+    <ul class="points">
+      <li>A post is refused while the agent has unread entries, and the missed entries are shown instead. Of two agents planning at the same moment, the second always sees the first's intent.</li>
+      <li>A write is refused if the agent has unread entries, has posted no intent, or its latest intent doesn't declare that resource and operation (create, update or delete).</li>
+      <li>The check, the write and its log entry happen as one atomic step, so an agent can only write once it has been shown every earlier entry.</li>
+      <li>Nobody is notified of new entries, and the log blocks nothing on its own: it guarantees agents see each other's work, not that they act on it.</li>
+    </ul>
+    <figure>
+      <figcaption id="ex1cap"></figcaption>
+      <div class="log" id="ex1"></div>
+    </figure>
+  </section>
+
+  <section id="before-after">
+    <div class="sectionhead">
+      <h2>Conflicts before and after the log</h2>
+      <p id="baintro"></p>
+    </div>
+    <div class="chartbox" id="chart1box">
+      <div class="legend"><span><i style="background:var(--before)"></i>Without the log</span><span><i style="background:var(--after)"></i>With the log</span></div>
+      <svg id="chart1" role="img" aria-labelledby="chart1title"><title id="chart1title">Share of task-runs with each kind of conflict, without and with the write-ahead log</title></svg>
+      <div class="tip" id="tip" hidden></div>
+    </div>
+    <div class="tablewrap"><table class="wide" id="conflicts"></table></div>
+    <p class="note" id="conflictsnote"></p>
+  </section>
+
+  <section id="open">
+    <div class="sectionhead">
+      <h2>What the log leaves open</h2>
+      <p id="openintro"></p>
+    </div>
+    <div class="tablewrap"><table class="wide" id="remaining"></table></div>
+    <ul class="points" id="openpoints"></ul>
+    <div class="two">
+      <figure>
+        <h3>A stale plan: deleting what a teammate already deleted</h3>
+        <div class="log" id="ex2"></div>
+        <figcaption id="ex2cap"></figcaption>
+      </figure>
+      <figure>
+        <h3>A shared misreading: the duplicate email</h3>
+        <div class="log" id="ex3"></div>
+        <figcaption id="ex3cap"></figcaption>
+      </figure>
+    </div>
+    <div class="sectionhead">
+      <h3>Closing the rest: checking targets, not just operations</h3>
+      <p>Today the log checks that an agent has seen everything and declared the kind of change. Two further checks would compare the change itself with teammates' logged changes, either warning the agent or refusing unless it gives a reason.</p>
+    </div>
+    <div class="tablewrap"><table class="wide" id="fixes"></table></div>
+  </section>
+
+  <section id="cost">
+    <div class="sectionhead">
+      <h2>What the log costs</h2>
+      <p>Per task, averaged over all 640 task-runs of each setup. The log adds model calls (reads, posts, refused posts), and every extra call re-reads the conversation, which is where most of the extra tokens go.</p>
+    </div>
+    <div class="tablewrap"><table class="wide" id="costtable"></table></div>
+    <p class="note">Wall time is measured on different days with different numbers of runs sharing a GPU (baselines ran four setups per GPU, the agent-driven WAL runs three), so treat the time column as approximate. Tokens and calls are exact.</p>
+  </section>
+
+  <section id="usage">
+    <div class="sectionhead">
+      <h2>How agents use the log</h2>
+      <p>Counted from every log event in the WAL runs. Agents follow the protocol; the rule that posting requires having read everything is where most coordination happens.</p>
+    </div>
+    <div class="tablewrap"><table class="wide" id="usagetable"></table></div>
+    <p class="note" id="usagenote"></p>
+  </section>
+
+  <section id="accuracy">
+    <div class="sectionhead">
+      <h2>Accuracy, for reference</h2>
+      <p id="accintro"></p>
+    </div>
+    <div class="tablewrap"><table class="wide" id="acctable"></table></div>
+    <p class="note">p is an exact permutation test over the 10 + 10 runs: the share of relabellings of the runs (with log / without) in which the difference is at least as large in the same direction.</p>
+  </section>
+
+  <section id="private">
+    <div class="sectionhead">
+      <h2>The paper's topologies: private copies</h2>
+      <p>In independent, centralized, decentralized and hybrid, each worker changes only its own copy of the workspace, so there are no write conflicts to remove. The log only tells each worker what the others are doing. What that does depends on how the team combines its work.</p>
+    </div>
+    <div class="tablewrap"><table class="wide" id="votetable"></table></div>
+    <ul class="points" id="privatepoints"></ul>
+    <figure>
+      <figcaption id="ex4cap"></figcaption>
+      <div class="log" id="ex4"></div>
+    </figure>
+  </section>
+
+  <section id="method">
+    <div class="sectionhead"><h2>Definitions and data</h2></div>
+    <ul class="points">
+      <li><b>Task-run</b>: one task in one run. Each setup has 10 runs of the same 64 WorkBench tasks whose correct answer makes 3 or more changes (640 task-runs). Teams have 3 agents on gpt-oss-20b.</li>
+      <li><b>Duplicate insert</b>: two agents each created the same thing: an email with the same recipient and subject, a reply or forward of the same email, an event with the same name and start, a customer or task with the same name, or the same plot.</li>
+      <li><b>Write to a deleted record</b>: a write that failed with "not found" because a teammate had already deleted that record.</li>
+      <li><b>Redundant write</b>: a write that changed nothing because a teammate had already made the same change to that record.</li>
+      <li><b>Lost update</b>: two agents set the same field of the same record to different values; the later one wins.</li>
+      <li>Conflicts are counted only for the agent-driven teams, where all agents share one live workspace. Scripts: <code>analysis/concurrency.py</code> (this page's numbers), <code>analysis/conflicts.py</code>, <code>analysis/wal_compare.py</code>; the log itself is <code>wal.py</code>.</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+const D = /*DATA*/null;
+const $ = (id) => document.getElementById(id);
+const pct = (x, d = 0) => (100 * x).toFixed(d) + "%";
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const k = (x) => (x / 1000).toFixed(0) + "k";
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+const SETUPS = ["none", "text-coord", "all-coord"];
+const TYPES = [["duplicate", "Duplicate inserts", true], ["gone", "Writes to deleted records", false],
+               ["redundant", "Redundant writes", false], ["lost", "Lost updates", true]];
+const C = D.conflicts, R = D.remaining;
+const rate = (s, t) => (s.task_runs_with[t] || 0) / s.task_runs;
+const inst = (s, t) => s.instances[t] || 0;
+const total = (s) => TYPES.reduce((a, [t]) => a + inst(s, t), 0);
+const items = R.items, dups = items.filter((i) => i.type === "duplicate"), other = items.filter((i) => i.type === "gone" || i.type === "redundant");
+const dupRuns = SETUPS.reduce((a, s) => a + C[s + "+wal"].duplicate_runs, 0);
+const dupPass = SETUPS.reduce((a, s) => a + C[s + "+wal"].duplicate_runs_pass_without, 0);
+const base = C["none"], wal = C["none+wal"];
+const cost = D.cost["agent-driven-none-wal"];
+const tok = (s) => s.prompt_tokens + s.completion_tokens;
+
+// ---- header ----
+$("lede").textContent = `With no other way to coordinate, three agents sharing one workspace collided on ${total(base).toLocaleString()} writes across ${base.task_runs} task-runs: ` +
+  `duplicate emails, writes to records a teammate had already deleted, repeated updates. With the log they collided on ${total(wal)}. ` +
+  `The ${items.length} conflicts left in all three agent-driven setups are not races: in each, the second agent had been shown its teammate's change before acting.`;
+const cards = [
+  ["Duplicate inserts", `${pct(rate(base, "duplicate"))}<span class="arrow">→</span>${pct(rate(wal, "duplicate"))}`, "of task-runs, no-channel team. All are duplicate emails."],
+  ["All conflicts", `${total(base).toLocaleString()}<span class="arrow">→</span>${total(wal)}`, `conflicting writes in ${base.task_runs} task-runs, no-channel team.`],
+  ["Extra tokens", `+${pct(tok(cost.wal) / tok(cost.base) - 1)}`, `per task (${k(tok(cost.base))} → ${k(tok(cost.wal))}), no-channel team.`],
+  ["Left open", `${items.length}`, `conflicts in ${R.task_runs} of ${R.total_task_runs.toLocaleString()} task-runs across the three agent-driven setups; ${dups.length} are duplicate emails.`],
+];
+$("cards").innerHTML = cards.map(([a, b, c]) => `<div class="card"><span class="k">${a}</span><span class="v">${b}</span><p>${c}</p></div>`).join("");
+
+// ---- logs ----
+function logRows(log, other, opts = {}) {
+  const ev = [...log.map((e) => ({ ...e, src: "log" })), ...other.map((e) => ({ ...e, src: "ev" }))].sort((a, b) => a.t - b.t);
+  return ev.map((e) => {
+    let cls = "side", text;
+    if (e.src === "log" && e.kind === "intent") {
+      cls = "intent";
+      const res = e.resources.map((r) => `${r.access} ${r.resource}${r.target ? " " + JSON.stringify(r.target) : ""}`).join("; ") || "none declared";
+      text = `#${e.id} ${e.agent} INTENT: ${e.plan}\n     resources: ${res}`;
+    } else if (e.src === "log") {
+      cls = "chg";
+      text = `#${e.id} ${e.agent} CHANGE${opts.private ? " in its own copy" : ""}: ${e.call} -> ${e.result}`;
+    } else if (e.kind === "wal_read") {
+      text = `   ${e.agent} reads the log (${e.n} new entr${e.n === 1 ? "y" : "ies"})`;
+    } else if (e.kind === "wal_append_refused") {
+      cls = "refused"; text = `   ${e.agent} tries to post its intent: refused, shown ${e.unseen} unread entr${e.unseen === 1 ? "y" : "ies"}`;
+    } else {
+      cls = "refused"; text = `   ${e.agent} tries ${e.tool}: refused (${String(e.reason).replace("_", " ")})`;
+    }
+    return `<div class="row"><span class="t">${e.t.toFixed(1)}s</span><span class="${cls}">${esc(text)}</span></div>`;
+  }).join("");
+}
+const ex1 = D.examples.coordination;
+$("ex1cap").innerHTML = `<b>Example, no-channel team with the log (pilot run).</b> Task: “${esc(ex1.task)}” agent_2 claims four customers and updates them. agent_1 tries to post an intent for all five, is refused and shown agent_2's entries, and narrows its intent to the one customer agent_2 missed. agent_3 reads the log and changes nothing. Every customer is updated exactly once.`;
+$("ex1").innerHTML = logRows(ex1.log, ex1.other);
+
+// ---- before / after ----
+$("baintro").textContent = `The no-channel team shows the clearest effect, because the log is its only link between agents. The chart shows the share of its ${base.task_runs} task-runs with at least one conflict of each kind; the table below gives raw counts for all three agent-driven setups.`;
+(function chart() {
+  const svg = $("chart1"), W = 720, rowH = 46, top = 6, left = 190, right = 64, H = top + TYPES.length * rowH + 26;
+  const max = Math.max(...TYPES.map(([t]) => rate(base, t))), scaleMax = Math.ceil(max * 10) / 10;
+  const x = (v) => left + (W - left - right) * v / scaleMax;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  let s = "";
+  for (let v = 0; v <= scaleMax + 1e-9; v += 0.1) {
+    s += `<line class="gridline" x1="${x(v)}" x2="${x(v)}" y1="${top}" y2="${H - 22}"/><text class="lbl" x="${x(v)}" y="${H - 6}" text-anchor="middle">${pct(v)}</text>`;
+  }
+  TYPES.forEach(([t, label], i) => {
+    const y0 = top + i * rowH + 8;
+    s += `<text class="cat" x="${left - 12}" y="${y0 + 15}" text-anchor="end">${label}</text>`;
+    [[base, "before", "Without the log"], [wal, "after", "With the log"]].forEach(([set, cls, name], j) => {
+      const v = rate(set, t), y = y0 + j * 16, w = v > 0 ? Math.max(x(v) - left, 4) : 0;
+      const tipText = `${label}, ${name.toLowerCase()}: ${pct(v, 1)} of task-runs (${inst(set, t)} conflicts in ${set.task_runs} task-runs)`;
+      if (w > 0) s += `<path class="bar" d="M${left},${y} h${w - 4} a4,4 0 0 1 4,4 v6 a4,4 0 0 1 -4,4 h-${w - 4} z" fill="var(--${cls})" data-tip="${esc(tipText)}" tabindex="0"/>`;
+      s += `<text class="val" x="${left + w + 6}" y="${y + 11}">${pct(v)}</text>`;
+    });
+  });
+  svg.insertAdjacentHTML("beforeend", s);
+  const tip = $("tip"), box = $("chart1box");
+  const show = (e) => {
+    const el = e.target.closest("[data-tip]"); if (!el) { tip.hidden = true; return; }
+    tip.textContent = el.dataset.tip; tip.hidden = false;
+    const r = box.getBoundingClientRect(), b = el.getBoundingClientRect();
+    tip.style.left = Math.min(b.right - r.left + 8, r.width - 270) + "px"; tip.style.top = (b.top - r.top - 8) + "px";
+  };
+  svg.addEventListener("mousemove", show); svg.addEventListener("focusin", show);
+  svg.addEventListener("mouseleave", () => tip.hidden = true); svg.addEventListener("focusout", () => tip.hidden = true);
+})();
+{
+  let h = `<thead><tr><th>Conflict</th><th>Harm</th>${SETUPS.map((s) => `<th class="n">${C[s].label}<br>without → with</th>`).join("")}</tr></thead><tbody>`;
+  TYPES.forEach(([t, label, harmful]) => {
+    h += `<tr><td>${label}</td><td>${harmful ? '<span class="pill harm">wrong final state</span>' : '<span class="pill na">wasted call</span>'}</td>` +
+      SETUPS.map((s) => `<td class="n">${inst(C[s], t)} → <b>${inst(C[s + "+wal"], t)}</b><div class="delta">${pct(rate(C[s], t), 1)} → ${pct(rate(C[s + "+wal"], t), 1)} of task-runs</div></td>`).join("") + "</tr>";
+  });
+  h += `<tr><td><b>All conflicts</b></td><td></td>${SETUPS.map((s) => `<td class="n"><b>${total(C[s]).toLocaleString()} → ${total(C[s + "+wal"])}</b><div class="delta">−${pct(1 - total(C[s + "+wal"]) / total(C[s]))}</div></td>`).join("")}</tr>`;
+  const kinds = (s) => Object.entries(s.duplicate_kinds).sort((a, b) => b[1] - a[1]).map(([kk, v]) => `${v} ${kk}`).join(", ") || "none";
+  h += `<tr class="group"><td colspan="${2 + SETUPS.length}">Duplicate inserts in detail</td></tr>`;
+  h += `<tr><td>What was duplicated</td><td></td>${SETUPS.map((s) => `<td class="n">${kinds(C[s])}<div class="delta">with the log: ${kinds(C[s + "+wal"])}</div></td>`).join("")}</tr>`;
+  h += `<tr><td>Median time between the two copies</td><td></td>${SETUPS.map((s) => `<td class="n">${C[s].duplicate_gap_median.toFixed(1)} s → ${C[s + "+wal"].duplicate_gap_median.toFixed(1)} s</td>`).join("")}</tr>`;
+  h += `<tr><td>Task-runs with a duplicate that would pass without it</td><td></td>${SETUPS.map((s) => `<td class="n">${C[s].duplicate_runs_pass_without} of ${C[s].duplicate_runs} → ${C[s + "+wal"].duplicate_runs_pass_without} of ${C[s + "+wal"].duplicate_runs}</td>`).join("")}</tr>`;
+  $("conflicts").innerHTML = h + "</tbody>";
+  $("conflictsnote").textContent = `Without the log, duplicates are races: the two copies land a few seconds apart, inside one model turn, before the second agent could have seen the first. ` +
+    `With the log the gap grows, because the second copy now comes after the first was shown to the second agent. ` +
+    `The last row re-scores each task-run with the later duplicate removed: removing the duplicate alone rarely makes a task pass, because the agents had usually misread the task as well.`;
+}
+
+// ---- what's left ----
+$("openintro").textContent = `Across the three agent-driven setups with the log (${R.total_task_runs.toLocaleString()} task-runs), ${items.length} conflicts remain in ${R.task_runs} task-runs. ` +
+  `In every remaining duplicate, the second agent posted its intent after its teammate's change was already in the log, so it had been shown that change.`;
+{
+  const groups = [["duplicate", "Duplicate inserts", "harm"], ["gone", "Writes to deleted records", "na"], ["redundant", "Redundant writes", "na"], ["lost", "Lost updates", "harm"]];
+  let h = `<thead><tr><th>Remaining conflict</th><th class="n">Count</th><th>Harm</th><th class="n">Shown the first change before posting</th><th class="n">Intent named the same record</th><th class="n">Identical copy</th><th class="n">Retried after a refusal</th></tr></thead><tbody>`;
+  groups.forEach(([t, label, harm]) => {
+    const g = items.filter((i) => i.type === t); if (!g.length) return;
+    const share = (f) => `${g.filter(f).length} of ${g.length}`;
+    h += `<tr><td>${label}</td><td class="n">${g.length}</td><td>${harm === "harm" ? '<span class="pill harm">wrong final state</span>' : '<span class="pill na">wasted call</span>'}</td>` +
+      `<td class="n">${share((i) => i.shown_before)}</td><td class="n">${t === "duplicate" ? "–" : share((i) => i.named_in_intent)}</td>` +
+      `<td class="n">${share((i) => i.identical)}</td><td class="n">${share((i) => i.retried_after_refusal)}</td></tr>`;
+  });
+  $("remaining").innerHTML = h + "</tbody>";
+  const kindsLeft = [...new Set(dups.map((d) => d.kind))];
+  const topTasks = R.duplicate_tasks.slice(0, 4), topN = topTasks.reduce((a, [, n]) => a + n, 0);
+  const followups = dups.filter((d) => d.followup).length;
+  $("openpoints").innerHTML = [
+    `<b>They are not races.</b> The log check, the write and its entry are one atomic step, so every agent that wrote had been shown every earlier entry. What remains is agents acting on what they were shown, or failing to.`,
+    `<b>Stale plans.</b> In ${other.filter((i) => i.named_in_intent).length} of ${other.length} writes to deleted records and redundant writes, the agent's posted intent named the exact record its teammate had already changed. It read the log, then planned from its own earlier search results without checking one against the other.`,
+    `<b>Duplicates are only ${kindsLeft.join(", ")}s, and concentrated.</b> ${topN} of ${dups.length} come from ${topTasks.length} tasks (${topTasks.map(([t]) => t).join(", ")}) whose last step is a single email. Each agent does the whole investigation and its plan ends with sending it. In ${followups} cases the second agent called its email a follow-up or a corrected version.`,
+    `<b>Blocking them would barely change accuracy.</b> Re-scored without the duplicate, ${dupPass} of ${dupRuns} task-runs would pass: in these tasks both agents misread the request the same way, so the duplicate is two agents carrying out one wrong plan. The same held before the log: duplicates came with failures but were rarely their only cause.`,
+  ].map((x) => `<li>${x}</li>`).join("");
+  // examples: a stale-plan delete, and a duplicate email from a top task
+  const stale = other.find((i) => i.type === "gone" && i.named_in_intent && /calendar/.test(i.second.call)) || other.find((i) => i.named_in_intent);
+  const dupEx = dups.find((d) => d.task === (topTasks[0] || [])[0]) || dups[0];
+  const pair = (i) => [
+    `<div class="row"><span class="t">${i.first.t.toFixed(1)}s</span><span class="chg">${esc(i.first.agent + " CHANGE: " + i.first.change)}</span></div>`,
+    `<div class="row"><span class="t"></span><span class="side">${esc("   … " + i.second.agent + " has now been shown that entry and posts:")}</span></div>`,
+    `<div class="row"><span class="t"></span><span class="intent">${esc(i.second.agent + " INTENT: " + (i.intent || "") + (i.intent_targets ? "\n     targets: " + i.intent_targets : ""))}</span></div>`,
+    `<div class="row"><span class="t">${i.second.t.toFixed(1)}s</span><span class="${i.type === "duplicate" ? "refused" : "chg"}">${esc(i.second.agent + (i.type === "duplicate" ? " CHANGE: " + i.second.call : " tries " + i.second.call + " -> " + i.second.out))}</span></div>`].join("");
+  if (stale) { $("ex2").innerHTML = pair(stale); $("ex2cap").textContent = `${stale.task}, ${C[stale.setup].label.toLowerCase()}, run ${stale.run}. The second agent's own intent names the record its teammate deleted ${stale.gap} s earlier.`; }
+  if (dupEx) { $("ex3").innerHTML = pair(dupEx); $("ex3cap").textContent = `${dupEx.task}, ${C[dupEx.setup].label.toLowerCase()}, run ${dupEx.run}. The task asks to email a named colleague and reassign leads to them in the CRM; both agents instead email the requester with the leads listed in the body. The second sends the same email ${dupEx.gap} s later.`; }
+  const fx = [
+    ["At posting: record IDs in the intent are checked against teammates' changes", `${other.filter((i) => i.named_in_intent).length} of ${other.length} writes to deleted records and redundant writes`, "none of the duplicate emails (their intents name “email to user”, not an ID)"],
+    ["At writing: the call's record, or a new item's identity (recipient + subject, name + start), is checked against teammates' changes", `all ${items.length}`, `all ${dups.length} duplicate emails`],
+  ];
+  $("fixes").innerHTML = `<thead><tr><th>Check</th><th>Would have caught</th><th>Of the harmful ones</th></tr></thead><tbody>` +
+    fx.map((r) => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join("") +
+    `<tr><td colspan="3"><b>Warn</b> lets the change through and names the teammate's entry; <b>refuse</b> blocks it unless the agent re-issues it with a reason, which is logged. Both run inside the same atomic step as today's check, so the log's atomicity is unaffected.</td></tr></tbody>`;
+}
+
+// ---- cost ----
+{
+  const order = ["agent-driven-none-wal", "agent-driven-text-coord-wal", "agent-driven-all-coord-wal", "independent-wal", "centralized-wal", "decentralized-wal", "hybrid-wal"];
+  const ch = (a, b, d = 0) => { const r = b / a - 1; return `<div class="delta">${r >= 0 ? "+" : ""}${pct(r, d)}</div>`; };
+  let h = `<thead><tr><th>Setup</th><th class="n">Tokens per task<br>without → with</th><th class="n">of which generated</th><th class="n">Model calls</th><th class="n">Log calls per task<br>reads · posts · refused posts</th><th class="n">Seconds per task</th></tr></thead><tbody>`;
+  order.forEach((key, i) => {
+    const c = D.cost[key]; if (!c) return;
+    if (i === 3) h += `<tr class="group"><td colspan="6">The paper's topologies (each worker has a private copy)</td></tr>`;
+    if (i === 0) h += `<tr class="group"><td colspan="6">Agent-driven teams (one shared workspace)</td></tr>`;
+    const L = c.wal.log || {};
+    h += `<tr><td>${cap(c.label.replace("Agent-driven, ", ""))}</td>` +
+      `<td class="n">${k(tok(c.base))} → <b>${k(tok(c.wal))}</b>${ch(tok(c.base), tok(c.wal))}</td>` +
+      `<td class="n">${k(c.base.completion_tokens)} → ${k(c.wal.completion_tokens)}${ch(c.base.completion_tokens, c.wal.completion_tokens)}</td>` +
+      `<td class="n">${c.base.turns.toFixed(1)} → ${c.wal.turns.toFixed(1)}${ch(c.base.turns, c.wal.turns)}</td>` +
+      `<td class="n">${(L.reads || 0).toFixed(1)} · ${(L.intents || 0).toFixed(1)} · ${(L.append_refused || 0).toFixed(1)}</td>` +
+      `<td class="n">${c.base.seconds.toFixed(0)} → ${c.wal.seconds.toFixed(0)}${ch(c.base.seconds, c.wal.seconds)}</td></tr>`;
+  });
+  $("costtable").innerHTML = h + "</tbody>";
+}
+
+// ---- usage ----
+{
+  const order = ["agent-driven-none-wal", "agent-driven-text-coord-wal", "agent-driven-all-coord-wal", "independent-wal", "decentralized-wal", "centralized-wal", "hybrid-wal"];
+  const name = (key) => (D.cost[key] ? D.cost[key].label : key).replace("Agent-driven, ", "Driven, ");
+  let h = `<thead><tr><th>Setup</th><th class="n">Starts by reading</th><th class="n">Resources per intent</th><th class="n">Targets with a record ID</th><th class="n">Changes named in intent</th><th class="n">Read, then did nothing</th></tr></thead><tbody>`;
+  order.forEach((key) => {
+    const b = D.behaviour[key]; if (!b) return;
+    h += `<tr><td>${name(key)}</td><td class="n">${pct(b.first_action.read || 0)}</td><td class="n">${b.resources_per_intent.toFixed(1)}</td>` +
+      `<td class="n">${pct(b.targets["record id"] || 0)}</td><td class="n">${pct(b.change_named_in_intent)}</td><td class="n">${pct(b.holding_back)}</td></tr>`;
+  });
+  $("usagetable").innerHTML = h + "</tbody>";
+  $("usagenote").textContent = `“Changes named in the agent's intent”: of updates and deletes, the share whose record ID appeared in the intent that authorized them. ` +
+    `“Read, then did nothing”: agents that read the log but never posted or changed anything. In a shared workspace that is often the right call: a teammate is already doing the work. In private copies it can be the wrong one (below).`;
+}
+
+// ---- accuracy ----
+{
+  const A = D.accuracy;
+  const label = { "driven/none": "Agent-driven, no channels", "driven/text+coord": "Agent-driven, text + coordinate", "driven/all+coord": "Agent-driven, all channels + coordinate" };
+  $("accintro").textContent = `The log removes conflicts everywhere, but accuracy moves only where conflicts or missing information were what held a team back. For comparison, the single agent scores ${pct(A.single)} and decentralized (the best system without the log) ${pct(A.decentralized)}.`;
+  let h = `<thead><tr><th>Setup</th><th class="n">Without the log</th><th class="n">With the log</th><th class="n">Change</th><th class="n">p</th></tr></thead><tbody>`;
+  A.rows.forEach((r) => {
+    const d = r.wal - r.base, p = d >= 0 ? r.p_better : r.p_worse, sig = p < 0.05;
+    h += `<tr><td>${label[r.setup] || r.setup[0].toUpperCase() + r.setup.slice(1)}</td><td class="n">${pct(r.base)}<div class="delta">runs ${pct(r.base_range[0])}–${pct(r.base_range[1])}</div></td>` +
+      `<td class="n">${pct(r.wal)}<div class="delta">runs ${pct(r.wal_range[0])}–${pct(r.wal_range[1])}</div></td>` +
+      `<td class="n ${sig ? (d > 0 ? "good" : "bad") : ""}">${Math.round(100 * d) > 0 ? "+" : Math.round(100 * d) < 0 ? "−" : ""}${Math.abs(Math.round(100 * d))} pts</td><td class="n">${p < 0.001 ? "< 0.001" : p.toFixed(3)}${sig ? "" : " (n.s.)"}</td></tr>`;
+  });
+  $("acctable").innerHTML = h + "</tbody>";
+}
+
+// ---- private copies ----
+{
+  const V = D.vote;
+  const rows = [["Accuracy", "accuracy"], ["Workers that changed anything (of 3)", "workers_changing", 1], ["No answer had a majority", "no_majority"],
+                ["The winning answer was empty", "winner_empty"], ["Share of the team's distinct changes the winner kept", "winner_share"],
+                ["Accuracy if the team kept every distinct change", "union_accuracy"]];
+  $("votetable").innerHTML = `<thead><tr><th>Decentralized team</th><th class="n">Without the log</th><th class="n">With the log</th></tr></thead><tbody>` +
+    rows.map(([l, key, num]) => `<tr><td>${l}</td><td class="n">${num ? V.base[key].toFixed(1) : pct(V.base[key])}</td><td class="n"><b>${num ? V.wal[key].toFixed(1) : pct(V.wal[key])}</b></td></tr>`).join("") + "</tbody>";
+  const acc = Object.fromEntries(D.accuracy.rows.map((r) => [r.setup, r]));
+  $("privatepoints").innerHTML = [
+    `<b>Decentralized loses ${(100 * (V.base.accuracy - V.wal.accuracy)).toFixed(0)} points.</b> Aware workers divide the work, but the team answer is a majority vote over complete answers. Workers aren't told how answers are combined, so re-combining their recorded answers is an exact counterfactual: keeping every distinct change scores ${pct(V.wal.union_accuracy)}. The work is there; the vote discards it.`,
+    acc.independent ? `<b>Independent gains ${(100 * (acc.independent.wal - acc.independent.base)).toFixed(0)} points</b> (${pct(acc.independent.base)} → ${pct(acc.independent.wal)}). Its team answer is every distinct change, so aware workers produce fewer overlapping variants of the same change.` : "",
+    `<b>Centralized and hybrid don't move.</b> Their bottleneck is the orchestrator's final choice of which changes to apply, which the log doesn't touch.`,
+  ].filter(Boolean).map((x) => `<li>${x}</li>`).join("");
+  const ex = D.examples.vote;
+  $("ex4cap").innerHTML = `<b>Example, decentralized with the log.</b> Task: “${esc(ex.task)}” agent_1 makes every change in its own copy. agent_2 and agent_3 see that in the log and leave their copies untouched. The vote: ${Object.entries(ex.vote).map(([a, n]) => `${a} ${n} changes`).join(", ")}. The empty answer wins two votes to one.`;
+  $("ex4").innerHTML = logRows(ex.log, ex.other, { private: true });
+}
+</script>
