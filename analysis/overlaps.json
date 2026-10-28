@@ -1,0 +1,106 @@
+{
+ "independent": {
+  "task_runs": 640,
+  "instances": {
+   "duplicate": 263,
+   "overlap": 2344,
+   "lost": 32
+  },
+  "task_runs_with": {
+   "duplicate": 101,
+   "overlap": 556,
+   "lost": 12
+  }
+ },
+ "independent+wal": {
+  "task_runs": 640,
+  "instances": {
+   "duplicate": 66,
+   "overlap": 1098,
+   "lost": 18
+  },
+  "task_runs_with": {
+   "duplicate": 43,
+   "overlap": 321,
+   "lost": 6
+  }
+ },
+ "centralized": {
+  "task_runs": 640,
+  "instances": {
+   "duplicate": 242,
+   "overlap": 2462,
+   "lost": 265
+  },
+  "task_runs_with": {
+   "duplicate": 104,
+   "overlap": 514,
+   "lost": 65
+  }
+ },
+ "centralized+wal": {
+  "task_runs": 640,
+  "instances": {
+   "duplicate": 169,
+   "overlap": 1339,
+   "lost": 69
+  },
+  "task_runs_with": {
+   "duplicate": 121,
+   "overlap": 367,
+   "lost": 19
+  }
+ },
+ "decentralized": {
+  "task_runs": 640,
+  "instances": {
+   "duplicate": 302,
+   "overlap": 2844,
+   "lost": 39
+  },
+  "task_runs_with": {
+   "duplicate": 127,
+   "overlap": 590,
+   "lost": 14
+  }
+ },
+ "decentralized+wal": {
+  "task_runs": 640,
+  "instances": {
+   "duplicate": 94,
+   "overlap": 1350,
+   "lost": 13
+  },
+  "task_runs_with": {
+   "duplicate": 62,
+   "overlap": 381,
+   "lost": 5
+  }
+ },
+ "hybrid": {
+  "task_runs": 640,
+  "instances": {
+   "duplicate": 254,
+   "overlap": 2659,
+   "lost": 255
+  },
+  "task_runs_with": {
+   "duplicate": 117,
+   "overlap": 536,
+   "lost": 52
+  }
+ },
+ "hybrid+wal": {
+  "task_runs": 640,
+  "instances": {
+   "duplicate": 142,
+   "overlap": 1435,
+   "lost": 46
+  },
+  "task_runs_with": {
+   "duplicate": 115,
+   "overlap": 389,
+   "lost": 12
+  }
+ }
+}

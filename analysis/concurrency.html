@@ -67,6 +67,13 @@ table.wide td:first-child { min-width: 170px; }
 .pill.harm { background: var(--fail-soft); color: var(--fail); }
 .pill.ok { background: var(--pass-soft); color: var(--pass); }
 .pill.na { background: var(--sunken); color: var(--muted); }
+.chip { display: inline-block; margin-top: 3px; font: 600 12px/1.5 var(--sans); padding: 0 7px; border-radius: 5px; white-space: nowrap; }
+.chip.good { background: var(--pass-soft); color: var(--pass); }
+.chip.bad { background: var(--fail-soft); color: var(--fail); }
+.chip.warn { background: var(--warn-soft); color: var(--warn); }
+.chip.flat { color: var(--muted); font-weight: 500; }
+#glancetable td.n b { font-weight: 600; }
+#glancetable td:first-child { white-space: nowrap; }
 .note { font-size: 14px; color: var(--muted); max-width: 86ch; }
 .chartbox { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 10px; position: relative; min-width: 0; }
 .chartbox svg { display: block; width: 100%; height: auto; overflow: visible; }
@@ -105,6 +112,15 @@ a { color: var(--accent); }
     <p class="lede" id="lede"></p>
     <div class="cards" id="cards"></div>
   </header>
+
+  <section id="glance">
+    <div class="sectionhead">
+      <h2>All setups at a glance</h2>
+      <p id="glanceintro"></p>
+    </div>
+    <div class="tablewrap"><table class="wide" id="glancetable"></table></div>
+    <p class="note" id="glancenote"></p>
+  </section>
 
   <section id="how">
     <div class="sectionhead">
@@ -259,6 +275,49 @@ const cards = [
   ["Left open, all three setups", `${items.length}`, `conflicts with the log: ${SETUPS.map((s) => `${total(C[s + "+wal"])} ${C[s].label.toLowerCase()}`).join(", ")}. ${dups.length} are duplicate emails.`],
 ];
 $("cards").innerHTML = cards.map(([a, b, c]) => `<div class="card"><span class="k">${a}</span><span class="v">${b}</span><p>${c}</p></div>`).join("");
+
+// ---- all setups at a glance ----
+{
+  const O = D.overlaps || {};
+  const acc = Object.fromEntries(D.accuracy.rows.map((r) => [r.setup, r]));
+  const sum = (s) => s ? Object.values(s.instances).reduce((a, b) => a + b, 0) : null;
+  const groups = [
+    ["Agent-driven teams: one shared workspace", [
+      ["No channels", () => [total(C["none"]), total(C["none+wal"])], "driven/none", "agent-driven-none-wal"],
+      ["Text + coordinate", () => [total(C["text-coord"]), total(C["text-coord+wal"])], "driven/text+coord", "agent-driven-text-coord-wal"],
+      ["All channels + coordinate", () => [total(C["all-coord"]), total(C["all-coord+wal"])], "driven/all+coord", "agent-driven-all-coord-wal"]]],
+    ["The paper's topologies: a private copy per worker", ["independent", "centralized", "decentralized", "hybrid"].map((t) =>
+      [cap(t), () => [sum(O[t]), sum(O[t + "+wal"])], t, t + "-wal", true])],
+  ];
+  const chip = (cls, text) => `<span class="chip ${cls}">${text}</span>`;
+  const rel = (a, b) => b / a - 1, sgn = (x) => (x > 0 ? "+" : x < 0 ? "−" : "") + Math.abs(x);
+  const cell = (a, b, fmt, rule) => `<td class="n">${fmt(a)} → <b>${fmt(b)}</b><br>${rule(a, b)}</td>`;
+  const pctRule = (up, down) => (a, b) => {
+    const r = rel(a, b), t = `${r >= 0 ? "+" : "−"}${Math.abs(Math.round(100 * r))}%`;
+    return chip(r >= up ? "warn" : r <= down ? "good" : "flat", t);
+  };
+  let h = `<thead><tr><th>Setup</th><th class="n">Accuracy</th><th class="n">Conflicts<br>(640 task-runs)</th><th class="n">Tokens per task</th><th class="n">Seconds per task</th></tr></thead><tbody>`;
+  for (const [title, rows] of groups) {
+    h += `<tr class="group"><td colspan="5">${title}</td></tr>`;
+    for (const [name, conf, accKey, costKey, priv] of rows) {
+      const a = acc[accKey], c = D.cost[costKey], [c0, c1] = conf();
+      const d = Math.round(100 * (a.wal - a.base)), p = a.wal >= a.base ? a.p_better : a.p_worse;
+      const accChip = p < 0.05 ? chip(d > 0 ? "good" : "bad", `${sgn(d)} pts`) : chip("flat", `${sgn(d)} pts, n.s.`);
+      const confCell = c0 == null ? `<td class="n">–</td>` : `<td class="n">${c0.toLocaleString()} → <b>${c1.toLocaleString()}</b>${priv ? "*" : ""}<br>${(() => {
+        const r = rel(c0, c1), t = `${r >= 0 ? "+" : "−"}${Math.abs(Math.round(100 * r))}%`;
+        return chip(r <= -0.5 ? "good" : r >= 0.5 ? "bad" : "flat", t); })()}</td>`;
+      h += `<tr><td>${name}</td><td class="n">${pct(a.base)} → <b>${pct(a.wal)}</b><br>${accChip}</td>${confCell}` +
+        cell(tok(c.base), tok(c.wal), k, pctRule(0.3, -0.05)) + cell(c.base.seconds, c.wal.seconds, (x) => x.toFixed(0), pctRule(0.3, -0.05)) + `</tr>`;
+    }
+  }
+  $("glancetable").innerHTML = h + "</tbody>";
+  $("glanceintro").textContent = `Every setup with and without the write-ahead log: 10 runs of the same 64 tasks each. ` +
+    `Highlighted: accuracy changes that are statistically significant (green up, red down), conflicts cut by half or more, and tokens or time up by 30% or more.`;
+  $("glancenote").textContent = `* In the paper's topologies each worker changes only its own copy, so nothing collides at run time. Their conflict count is the number of changes ` +
+    `that would have collided had the workers shared one workspace: the same item created by two workers, the same record updated or deleted by two workers, ` +
+    `or one field set to different values (each worker's writes replayed on a fresh copy; analysis/overlaps.py). ` +
+    `Accuracy p-values are exact permutation tests over the 10 + 10 runs. Seconds are wall time per task and only roughly comparable: runs with and without the log ran on different days with different numbers of runs sharing a GPU.`;
+}
 
 // ---- logs ----
 function logRows(log, other, opts = {}) {

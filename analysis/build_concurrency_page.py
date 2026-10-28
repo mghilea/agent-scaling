@@ -7,6 +7,8 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 data = json.load(open(HERE / "concurrency.json"))
+if (HERE / "overlaps.json").exists():  # from overlaps.py: would-be collisions between private copies
+    data["overlaps"] = json.load(open(HERE / "overlaps.json"))
 if (HERE / "wal_timing.json").exists():  # from wal_timing.py: how long the log's locked operations take
     data["timing"] = json.load(open(HERE / "wal_timing.json"))
 html = (HERE / "concurrency.html").read_text().replace("/*DATA*/null", json.dumps(data, ensure_ascii=False).replace("</", "<\\/"))

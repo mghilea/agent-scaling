@@ -1,0 +1,239 @@
+{
+ "none": {
+  "label": "No channels",
+  "pairs": 320,
+  "reps": 5,
+  "plain": {
+   "task_runs": 320,
+   "seconds": 27.89375,
+   "seconds_median": 25.5,
+   "turns": 24.771875,
+   "tokens": 215005.346875,
+   "accuracy": 0.384375,
+   "reads": 3.84375,
+   "intents": 2.125,
+   "post_refused": 1.925,
+   "write_refused": 0.19687500000000002,
+   "piggybacked": 0,
+   "piggybacked_entries": 0,
+   "conflicts": {
+    "dup_inserts": 0.028125,
+    "gone": 0.0125,
+    "redundant": 0.0125,
+    "lost_updates": 0
+   },
+   "conflict_count": 25
+  },
+  "piggyback": {
+   "task_runs": 320,
+   "seconds": 26.2353125,
+   "seconds_median": 23.15,
+   "turns": 24.35,
+   "tokens": 209426.846875,
+   "accuracy": 0.428125,
+   "reads": 3.196875,
+   "intents": 2.159375,
+   "post_refused": 1.684375,
+   "write_refused": 0.15000000000000002,
+   "piggybacked": 1.16875,
+   "piggybacked_entries": 2.54375,
+   "conflicts": {
+    "dup_inserts": 0.04375,
+    "gone": 0.015625,
+    "redundant": 0.028125,
+    "lost_updates": 0
+   },
+   "conflict_count": 44
+  },
+  "seconds_diff": [
+   -1.6584375,
+   -2.889375,
+   -0.4209375000000002
+  ],
+  "turns_diff": [
+   -0.421875,
+   -1.1125,
+   0.30625
+  ],
+  "per_rep_seconds": {
+   "pb01": [
+    27.696875,
+    27.6140625
+   ],
+   "pb02": [
+    26.3296875,
+    27.20625
+   ],
+   "pb03": [
+    26.6671875,
+    25.0109375
+   ],
+   "pb04": [
+    29.278125,
+    24.8390625
+   ],
+   "pb05": [
+    29.496875,
+    26.50625
+   ]
+  }
+ },
+ "text-coord": {
+  "label": "Text + coordinate",
+  "pairs": 320,
+  "reps": 5,
+  "plain": {
+   "task_runs": 320,
+   "seconds": 27.714375,
+   "seconds_median": 24.9,
+   "turns": 26.815625,
+   "tokens": 230338.728125,
+   "accuracy": 0.384375,
+   "reads": 3.96875,
+   "intents": 1.9375,
+   "post_refused": 1.8,
+   "write_refused": 0.21875,
+   "piggybacked": 0,
+   "piggybacked_entries": 0,
+   "conflicts": {
+    "dup_inserts": 0.028125,
+    "gone": 0.003125,
+    "redundant": 0.003125,
+    "lost_updates": 0
+   },
+   "conflict_count": 14
+  },
+  "piggyback": {
+   "task_runs": 320,
+   "seconds": 26.144375,
+   "seconds_median": 23.9,
+   "turns": 26.24375,
+   "tokens": 225721.15,
+   "accuracy": 0.3875,
+   "reads": 2.9125,
+   "intents": 2.109375,
+   "post_refused": 1.53125,
+   "write_refused": 0.18437499999999998,
+   "piggybacked": 1.703125,
+   "piggybacked_entries": 3.8375,
+   "conflicts": {
+    "dup_inserts": 0.025,
+    "gone": 0.01875,
+    "redundant": 0.003125,
+    "lost_updates": 0.00625
+   },
+   "conflict_count": 23
+  },
+  "seconds_diff": [
+   -1.5699999999999998,
+   -2.95625,
+   -0.13281249999999992
+  ],
+  "turns_diff": [
+   -0.571875,
+   -1.4375,
+   0.30625
+  ],
+  "per_rep_seconds": {
+   "pb01": [
+    27.940625,
+    26.8171875
+   ],
+   "pb02": [
+    25.7359375,
+    25.10625
+   ],
+   "pb03": [
+    28.628125,
+    26.6609375
+   ],
+   "pb04": [
+    27.9984375,
+    26.78125
+   ],
+   "pb05": [
+    28.26875,
+    25.35625
+   ]
+  }
+ },
+ "all-coord": {
+  "label": "All channels + coordinate",
+  "pairs": 320,
+  "reps": 5,
+  "plain": {
+   "task_runs": 320,
+   "seconds": 30.19,
+   "seconds_median": 27.65,
+   "turns": 26.75,
+   "tokens": 245103.8875,
+   "accuracy": 0.378125,
+   "reads": 3.15,
+   "intents": 2.159375,
+   "post_refused": 1.815625,
+   "write_refused": 0.284375,
+   "piggybacked": 0,
+   "piggybacked_entries": 0,
+   "conflicts": {
+    "dup_inserts": 0.034375,
+    "gone": 0,
+    "redundant": 0.003125,
+    "lost_updates": 0.003125
+   },
+   "conflict_count": 16
+  },
+  "piggyback": {
+   "task_runs": 320,
+   "seconds": 28.440625,
+   "seconds_median": 26.2,
+   "turns": 25.603125,
+   "tokens": 235039.409375,
+   "accuracy": 0.38125,
+   "reads": 1.578125,
+   "intents": 2.271875,
+   "post_refused": 1.690625,
+   "write_refused": 0.346875,
+   "piggybacked": 1.9625,
+   "piggybacked_entries": 4.98125,
+   "conflicts": {
+    "dup_inserts": 0.028125,
+    "gone": 0.0125,
+    "redundant": 0.015625,
+    "lost_updates": 0
+   },
+   "conflict_count": 24
+  },
+  "seconds_diff": [
+   -1.749375,
+   -3.2112499999999997,
+   -0.278125
+  ],
+  "turns_diff": [
+   -1.146875,
+   -2.109375,
+   -0.25
+  ],
+  "per_rep_seconds": {
+   "pb01": [
+    31.8796875,
+    28.4
+   ],
+   "pb02": [
+    30.1671875,
+    26.69375
+   ],
+   "pb03": [
+    29.3515625,
+    27.73125
+   ],
+   "pb04": [
+    30.0078125,
+    28.2546875
+   ],
+   "pb05": [
+    29.54375,
+    31.1234375
+   ]
+  }
+ }
+}
