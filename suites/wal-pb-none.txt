@@ -1,0 +1,4 @@
+# WAL with and without piggybacking (--wal-piggyback), side by side on one GPU so their times are comparable.
+# Submit with --tag pbNN. Analysis: analysis/piggyback.py
+--benchmark workbench --min-changes 3 --topology agent-driven --comm none --wal
+--benchmark workbench --min-changes 3 --topology agent-driven --comm none --wal --wal-piggyback

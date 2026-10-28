@@ -8,6 +8,9 @@ and create/update/delete; the target is free text and isn't checked). Appending 
 so of two agents planning at once the second always sees the first's intent. Every change is logged
 automatically. Nobody is notified of new entries, and the log decides nothing: the agents judge overlaps.
 
+With piggybacking (agent_driven.py --wal-piggyback), the entries an agent hasn't seen are also appended to the result
+of every other tool it calls, so it is usually caught up before it posts or writes; the checks are unchanged.
+
 agent_driven.py: the agents share one workspace, so the log tells them what is about to happen in it.
 mas.py: each worker has its own private copy (as in the paper), so the log is how a worker knows what the
 others intend and have done in theirs; how the team combines their work is unchanged.
@@ -23,6 +26,12 @@ import workbench as wb
 # The protocol, as each agent is told it: the shared workspace (agent_driven.py) and private copies (mas.py).
 TEXT = """The team keeps a write-ahead log (WAL): an append-only list, shared by all of you, of what each agent intends to change and what it has changed. Before you change anything in the workspace:
 1. Read the WAL (wal_read) to see your teammates' intents and changes.
+2. Append your intent (wal_append): your plan, and each resource you will change and how, for example: create calendar "meeting with Lena on 2023-12-01 at 10:00", update crm "customer 00000076".
+3. Then make the change.
+The workspace refuses a change if the WAL has entries you haven't read, or if your latest intent doesn't declare that change; it then tells you why and shows you any entries you missed. Every change you make is added to the WAL automatically. Searches and lookups don't need the WAL."""
+# --wal-piggyback: new entries ride on every tool result, so step 1 rarely needs a call of its own.
+TEXT_PIGGYBACK = """The team keeps a write-ahead log (WAL): an append-only list, shared by all of you, of what each agent intends to change and what it has changed. Before you change anything in the workspace:
+1. Check the WAL for your teammates' intents and changes. New entries are added to the end of your tool results automatically, so you are usually up to date already; wal_read shows any you haven't seen, or the whole log with all=true.
 2. Append your intent (wal_append): your plan, and each resource you will change and how, for example: create calendar "meeting with Lena on 2023-12-01 at 10:00", update crm "customer 00000076".
 3. Then make the change.
 The workspace refuses a change if the WAL has entries you haven't read, or if your latest intent doesn't declare that change; it then tells you why and shows you any entries you missed. Every change you make is added to the WAL automatically. Searches and lookups don't need the WAL."""
@@ -148,6 +157,19 @@ class Log:
             return "undeclared", (f"[WAL] Refused: your latest intent (#{intent}) doesn't declare {access} {resource}. "
                                   "Append an intent with wal_append that declares it, then make the change.")
         return None
+
+    def piggyback(self, me, fn):
+        """fn, with the log entries this agent hasn't seen appended to its result; they then count as seen."""
+        def run(**kwargs):
+            out = fn(**kwargs)
+            with self.lock:
+                text, n = self.catch_up(me)
+            if not n:
+                return out
+            self.event(me, "wal_piggyback", n=n)
+            return (f"{out}\n\n[WAL] {n} new log entr{'y' if n == 1 else 'ies'} from your teammates since you last looked "
+                    f"(you have now seen them):\n{text}")
+        return run
 
     def guard(self, me, sandbox):
         """A sandbox's tools for this agent, with every write going through the log (mas.py's private copies)."""

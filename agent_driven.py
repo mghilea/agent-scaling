@@ -26,6 +26,7 @@ worker writes a summary, and the harness delivers it. Here the agents decide all
   agent that has read the whole log, so of two agents planning at once the second always sees the
   first's intent. Every change is then logged automatically. Nobody is notified of new entries: agents
   learn of them only by reading the log, and the log decides nothing; the agents judge the overlaps.
+  --wal-piggyback also appends the entries an agent hasn't seen to the result of every other tool it calls.
 - Anything sent to a busy agent is delivered between its turns; an idle agent (one that replied
   without calling a tool) is woken when something arrives. The run ends when every agent is idle
   with an empty inbox, an agent runs out of turns, or the time limit passes.
@@ -134,11 +135,11 @@ def _as_object(data):
 
 class Team:
     def __init__(self, task, make_agent, n_agents, comm, log, seed, coordinate=False, browsecomp=False, split=0,
-                 answer_rule="vote", wal=False):
+                 answer_rule="vote", wal=False, wal_piggyback=False):
         if wal and browsecomp:
             raise ValueError("the write-ahead log is for WorkBench's shared workspace; BrowseComp has none")
         self.task, self.log, self.channels = task, log, CHANNELS[comm]
-        self.use_wal = wal
+        self.use_wal, self.wal_piggyback = wal, wal and wal_piggyback
         self.split = split
         self.propose = browsecomp and answer_rule == "propose"
         self.answer_rule = answer_rule if browsecomp else None
@@ -176,13 +177,16 @@ class Team:
                         + "\n".join(CHANNEL_TEXT[c] for c in order)) if order else (
                 NO_CHANNELS_BC if browsecomp else NO_CHANNELS_WAL if wal else NO_CHANNELS)
             if wal:
-                channels += "\n\n" + wallog.TEXT
+                channels += "\n\n" + (wallog.TEXT_PIGGYBACK if self.wal_piggyback else wallog.TEXT)
             hint = (COORDINATE_HINT_BC if browsecomp else COORDINATE_HINT) if coordinate and order else ""
             fields = dict(me=me, n=n_agents, others=", ".join(a for a in self.ids if a != me), channels=channels, hint=hint)
             if browsecomp:
                 fields["split"] = " " + self.bc.split_note(self.ids.index(me), self.ids) if split else ""
             prompt = (TEAM_PROMPT_BC_PROPOSE if self.propose else TEAM_PROMPT_BC if browsecomp else TEAM_PROMPT).format(**fields)
             tools = {**self._env_tools(me), **self._comm_tools(me), **(self.wal_log.tools(me) if wal else {})}
+            if self.wal_piggyback:  # unseen log entries ride on every other tool's result
+                tools = {n: (fn if n in ("wal_read", "wal_append") else self.wal_log.piggyback(me, fn), schema)
+                         for n, (fn, schema) in tools.items()}
             if self.propose:  # once the team's answer is in, every tool just says the task is over
                 tools = {n: (self._unless_over(fn), schema) for n, (fn, schema) in tools.items()}
             agent = make_agent(name=me, tools=tools,
@@ -565,6 +569,9 @@ class Team:
         extra, trace_extra = {}, {}
         if self.use_wal:
             comm.update(self.wal_log.counts(self.events))
+            if self.wal_piggyback:
+                piggy = [e for e in self.events if e["kind"] == "wal_piggyback"]
+                comm.update({"wal_piggybacked": len(piggy), "wal_piggybacked_entries": sum(e["n"] for e in piggy)})
             trace_extra["wal_log"] = self.wal_log.entries
         if self.bc:
             # The team's answer is the last submission; if nobody submitted, a majority vote over each member's
@@ -609,6 +616,7 @@ class Team:
             "agent_messages": deliveries, "comm": comm,
             "duplicate_changes": sum(c - 1 for c in dup.values() if c > 1),
             "trace": {"topology": "agent-driven", "comm": self.comm, "coordinate": self.coordinate, "wal": self.use_wal,
+                      **({"wal_piggyback": True} if self.wal_piggyback else {}),
                       "task": self.task, "events": self.events,
                       "changes": [{"agent": a, "change": wb.show(c)} for a, c in self.changes],
                       "shared_state": self.state, "shared_state_history": self.state_history,
@@ -618,5 +626,6 @@ class Team:
 
 
 def run(task, make_agent, n_agents=3, comm="all", log=lambda label, text: None, seed=0, coordinate=False,
-        browsecomp=False, split=0, answer_rule="vote", wal=False):
-    return Team(task, make_agent, n_agents, comm, log, seed, coordinate, browsecomp, split, answer_rule, wal).run()
+        browsecomp=False, split=0, answer_rule="vote", wal=False, wal_piggyback=False):
+    return Team(task, make_agent, n_agents, comm, log, seed, coordinate, browsecomp, split, answer_rule, wal,
+                wal_piggyback).run()
