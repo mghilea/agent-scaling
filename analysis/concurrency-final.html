@@ -245,12 +245,12 @@ const tok = (s) => s.prompt_tokens + s.completion_tokens;
 // ---- header ----
 $("lede").textContent = `With no other way to coordinate, three agents sharing one workspace collided on ${total(base).toLocaleString()} writes across ${base.task_runs} task-runs: ` +
   `duplicate emails, writes to records a teammate had already deleted, repeated updates. With the log they collided on ${total(wal)}. ` +
-  `The ${items.length} conflicts left in all three agent-driven setups are not races: in each, the second agent had been shown its teammate's change before acting.`;
+  `Across all three agent-driven setups with the log, ${items.length} conflicts are left (${SETUPS.map((s) => total(C[s + "+wal"])).join(" + ")}), and none are races: in each, the second agent had been shown its teammate's change before acting.`;
 const cards = [
   ["Duplicate inserts", `${pct(rate(base, "duplicate"))}<span class="arrow">→</span>${pct(rate(wal, "duplicate"))}`, "of task-runs, no-channel team. All are duplicate emails."],
   ["All conflicts", `${total(base).toLocaleString()}<span class="arrow">→</span>${total(wal)}`, `conflicting writes in ${base.task_runs} task-runs, no-channel team.`],
   ["Extra tokens", `+${pct(tok(cost.wal) / tok(cost.base) - 1)}`, `per task (${k(tok(cost.base))} → ${k(tok(cost.wal))}), no-channel team.`],
-  ["Left open", `${items.length}`, `conflicts in ${R.task_runs} of ${R.total_task_runs.toLocaleString()} task-runs across the three agent-driven setups; ${dups.length} are duplicate emails.`],
+  ["Left open, all three setups", `${items.length}`, `conflicts with the log: ${SETUPS.map((s) => `${total(C[s + "+wal"])} ${C[s].label.toLowerCase()}`).join(", ")}. ${dups.length} are duplicate emails.`],
 ];
 $("cards").innerHTML = cards.map(([a, b, c]) => `<div class="card"><span class="k">${a}</span><span class="v">${b}</span><p>${c}</p></div>`).join("");
 
@@ -331,7 +331,8 @@ $("baintro").textContent = `The no-channel team shows the clearest effect, becau
 }
 
 // ---- what's left ----
-$("openintro").textContent = `Across the three agent-driven setups with the log (${R.total_task_runs.toLocaleString()} task-runs), ${items.length} conflicts remain in ${R.task_runs} task-runs. ` +
+$("openintro").textContent = `Across the three agent-driven setups with the log (${R.total_task_runs.toLocaleString()} task-runs), ${items.length} conflicts remain in ${R.task_runs} task-runs: ` +
+  `${SETUPS.map((s) => `${total(C[s + "+wal"])} in the ${C[s].label.toLowerCase()} team`).join(", ")}. This section pools them. ` +
   `In every remaining duplicate, the second agent posted its intent after its teammate's change was already in the log, so it had been shown that change.`;
 {
   const groups = [["duplicate", "Duplicate inserts", "harm"], ["gone", "Writes to deleted records", "na"], ["redundant", "Redundant writes", "na"], ["lost", "Lost updates", "harm"]];
