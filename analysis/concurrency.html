@@ -175,6 +175,12 @@ a { color: var(--accent); }
     </div>
     <div class="tablewrap"><table class="wide" id="costtable"></table></div>
     <p class="note">Wall time is measured on different days with different numbers of runs sharing a GPU (baselines ran four setups per GPU, the agent-driven WAL runs three), so treat the time column as approximate. Tokens and calls are exact.</p>
+    <div class="sectionhead" id="timinghead" hidden>
+      <h3>How long the log's atomic step takes</h3>
+      <p id="timingintro"></p>
+    </div>
+    <div class="tablewrap" id="timingwrap" hidden><table id="timingtable"></table></div>
+    <p class="note" id="timingnote"></p>
   </section>
 
   <section id="usage">
@@ -391,6 +397,23 @@ $("openintro").textContent = `Across the three agent-driven setups with the log 
       `<td class="n">${c.base.seconds.toFixed(0)} → ${c.wal.seconds.toFixed(0)}${ch(c.base.seconds, c.wal.seconds)}</td></tr>`;
   });
   $("costtable").innerHTML = h + "</tbody>";
+}
+
+// ---- timing of the locked step ----
+if (D.timing) {
+  const T = D.timing, [small, big] = T.log, us = (x) => x.toFixed(1) + " µs", ms = (x) => x.toFixed(2) + " ms";
+  $("timinghead").hidden = false; $("timingwrap").hidden = false;
+  $("timingintro").textContent = `Each log operation runs under one lock: the check, the change and its log entry happen as a single step. ` +
+    `Timed on ${T.host} (${T.date}) with the real log on a real WorkBench workspace, one agent at a time, so with no waiting for the lock.`;
+  $("timingtable").innerHTML = `<thead><tr><th>Locked operation</th><th class="n">Median</th><th class="n">95th percentile</th><th>Notes</th></tr></thead><tbody>` +
+    `<tr><td>Post an intent (check the agent has read everything, append)</td><td class="n">${us(small.post_us.median)}</td><td class="n">${us(small.post_us.p95)}</td><td>${us(big.post_us.median)} with ${big.entries} entries in the log instead of ${small.entries}</td></tr>` +
+    `<tr><td>Read one new entry</td><td class="n">${us(small.read_us.median)}</td><td class="n">${us(small.read_us.p95)}</td><td>${us(big.read_us.median)} with ${big.entries} entries</td></tr>` +
+    `<tr><td>Gated write: check, WorkBench <code>update_customer</code>, log entry</td><td class="n">${ms(T.write_ms.median)}</td><td class="n">${ms(T.write_ms.p95)}</td><td>The same WorkBench call without the log: ${ms(T.write_without_log_ms.median)}</td></tr></tbody>`;
+  const c = D.cost["agent-driven-none-wal"], L = c.wal.log;
+  const calls = L.reads + L.intents + L.append_refused, lockMs = L.changes * T.write_ms.median + calls * small.post_us.median / 1000;
+  $("timingnote").textContent = `The log adds no measurable time to a write: the lock is held for about ${ms(T.write_ms.median)}, all of it WorkBench itself. ` +
+    `A no-channel task-run averages ${L.changes.toFixed(1)} writes and ${calls.toFixed(1)} other log calls, about ${lockMs.toFixed(0)} ms under the lock out of ${c.wal.seconds.toFixed(0)} s per task (${pct(lockMs / 1000 / c.wal.seconds, 2)}). ` +
+    `The extra time in the table above comes from the extra model calls (reads, posts, re-posts after a refusal), each a second or more of inference.`;
 }
 
 // ---- usage ----
