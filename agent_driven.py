@@ -27,6 +27,8 @@ worker writes a summary, and the harness delivers it. Here the agents decide all
   first's intent. Every change is then logged automatically. Nobody is notified of new entries: agents
   learn of them only by reading the log, and the log decides nothing; the agents judge the overlaps.
   --wal-piggyback also appends the entries an agent hasn't seen to the result of every other tool it calls.
+  --wal-drafts keeps an intent whose post was refused for unread entries, and records it when the agent, now caught
+  up, makes a change it covers without posting again (the agent isn't told; it saves the re-post it often skips).
 - Anything sent to a busy agent is delivered between its turns; an idle agent (one that replied
   without calling a tool) is woken when something arrives. The run ends when every agent is idle
   with an empty inbox, an agent runs out of turns, or the time limit passes.
@@ -135,11 +137,11 @@ def _as_object(data):
 
 class Team:
     def __init__(self, task, make_agent, n_agents, comm, log, seed, coordinate=False, browsecomp=False, split=0,
-                 answer_rule="vote", wal=False, wal_piggyback=False):
+                 answer_rule="vote", wal=False, wal_piggyback=False, wal_drafts=False):
         if wal and browsecomp:
             raise ValueError("the write-ahead log is for WorkBench's shared workspace; BrowseComp has none")
         self.task, self.log, self.channels = task, log, CHANNELS[comm]
-        self.use_wal, self.wal_piggyback = wal, wal and wal_piggyback
+        self.use_wal, self.wal_piggyback, self.wal_drafts = wal, wal and wal_piggyback, wal and wal_drafts
         self.split = split
         self.propose = browsecomp and answer_rule == "propose"
         self.answer_rule = answer_rule if browsecomp else None
@@ -166,7 +168,7 @@ class Team:
         self.changes = []                        # (agent, action) for every change to the workspace
         self.t0 = time.time()
         # The write-ahead log, guarded by the lock that also guards the workspace.
-        self.wal_log = wallog.Log(t0=self.t0, lock=self.env_lock, event=self.event) if wal else None
+        self.wal_log = wallog.Log(t0=self.t0, lock=self.env_lock, event=self.event, drafts=wal_drafts) if wal else None
         rng = random.Random(f"{seed}")
         self.agents = {}
         for me in self.ids:
@@ -617,6 +619,7 @@ class Team:
             "duplicate_changes": sum(c - 1 for c in dup.values() if c > 1),
             "trace": {"topology": "agent-driven", "comm": self.comm, "coordinate": self.coordinate, "wal": self.use_wal,
                       **({"wal_piggyback": True} if self.wal_piggyback else {}),
+                      **({"wal_drafts": True} if self.wal_drafts else {}),
                       "task": self.task, "events": self.events,
                       "changes": [{"agent": a, "change": wb.show(c)} for a, c in self.changes],
                       "shared_state": self.state, "shared_state_history": self.state_history,
@@ -626,6 +629,6 @@ class Team:
 
 
 def run(task, make_agent, n_agents=3, comm="all", log=lambda label, text: None, seed=0, coordinate=False,
-        browsecomp=False, split=0, answer_rule="vote", wal=False, wal_piggyback=False):
+        browsecomp=False, split=0, answer_rule="vote", wal=False, wal_piggyback=False, wal_drafts=False):
     return Team(task, make_agent, n_agents, comm, log, seed, coordinate, browsecomp, split, answer_rule, wal,
-                wal_piggyback).run()
+                wal_piggyback, wal_drafts).run()

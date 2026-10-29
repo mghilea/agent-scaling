@@ -360,6 +360,9 @@ def main():
                          "else a majority vote over final replies (runs before 7 October)")
     ap.add_argument("--wal-piggyback", action="store_true",
                     help="with --wal, agent-driven: append the log entries an agent hasn't seen to every tool result")
+    ap.add_argument("--wal-drafts", action="store_true",
+                    help="with --wal, agent-driven: keep an intent whose post was refused for unread entries, and "
+                         "record it when the agent makes a change it covers without posting again")
     ap.add_argument("--coordinate", action="store_true",
                     help="agent-driven: ask agents to agree on who does what before changing anything")
     ap.add_argument("--wal", action="store_true",
@@ -398,8 +401,8 @@ def main():
         sys.exit("the multi-agent topologies need --benchmark workbench or browsecomp")
     if args.wal and not (wb and multi):
         sys.exit("--wal needs --benchmark workbench and a multi-agent topology")
-    if args.wal_piggyback and not (args.wal and args.topology == "agent-driven"):
-        sys.exit("--wal-piggyback needs --wal and --topology agent-driven")
+    if (args.wal_piggyback or args.wal_drafts) and not (args.wal and args.topology == "agent-driven"):
+        sys.exit("--wal-piggyback and --wal-drafts need --wal and --topology agent-driven")
     if args.split and not (bc and multi and args.split == args.agents):
         sys.exit("--split needs --benchmark browsecomp, a multi-agent topology, and one part per agent (--agents)")
 
@@ -414,7 +417,7 @@ def main():
         args.rounds = args.rounds or mas.DEFAULT_ROUNDS[args.topology]
     if driven:
         import agent_driven
-    topo_name = f"agent-driven-{args.comm}{'-coord' if args.coordinate else ''}{'-wal' if args.wal else ''}{'-pb' if args.wal_piggyback else ''}" if driven else args.topology
+    topo_name = f"agent-driven-{args.comm}{'-coord' if args.coordinate else ''}{'-wal' if args.wal else ''}{'-pb' if args.wal_piggyback else ''}{'-dr' if args.wal_drafts else ''}" if driven else args.topology
     topo_name += "-wal" if args.wal and not driven else ""
     topo_name += f"-split{args.split}" if args.split else ""
     topo_name += "-propose" if driven and bc and args.team_answer == "propose" else ""
@@ -440,7 +443,8 @@ def main():
             if driven:
                 r = agent_driven.run(t["question"], make_agent, args.agents, args.comm, log_message, seed=t["id"],
                                      coordinate=args.coordinate, browsecomp=bool(bc), split=args.split,
-                                     answer_rule=args.team_answer, wal=args.wal, wal_piggyback=args.wal_piggyback)
+                                     answer_rule=args.team_answer, wal=args.wal, wal_piggyback=args.wal_piggyback,
+                                     wal_drafts=args.wal_drafts)
                 actions = r["actions"]
             elif multi:
                 r = mas.run(args.topology, t["question"], make_agent, args.agents, args.rounds, log_message,

@@ -8,6 +8,9 @@ and create/update/delete; the target is free text and isn't checked). Appending 
 so of two agents planning at once the second always sees the first's intent. Every change is logged
 automatically. Nobody is notified of new entries, and the log decides nothing: the agents judge overlaps.
 
+With drafts (agent_driven.py --wal-drafts), an intent whose post was refused for unread entries is kept, and is
+recorded when the agent, now caught up, makes a change it covers without posting again.
+
 With piggybacking (agent_driven.py --wal-piggyback), the entries an agent hasn't seen are also appended to the result
 of every other tool it calls, so it is usually caught up before it posts or writes; the checks are unchanged.
 
@@ -108,8 +111,11 @@ class Log:
     gate() and add() expect the caller to hold the lock; the tools take it themselves.
     """
 
-    def __init__(self, t0=None, lock=None, event=None, private=False):
+    def __init__(self, t0=None, lock=None, event=None, private=False, drafts=False):
         self.entries, self.seen, self.intent = [], {}, {}
+        # drafts: an intent whose post was refused for unread entries is kept, and recorded when the agent makes
+        # a change it covers without re-posting (it has seen the entries it missed by then)
+        self.drafts, self.draft = drafts, {}
         self.t0 = time.time() if t0 is None else t0
         self.lock = lock or threading.Lock()
         self.private = private
@@ -122,9 +128,10 @@ class Log:
 
     def line(self, e):
         if e["kind"] == "intent":
+            note = " (posted with its first change)" if e.get("from_draft") else ""
             res = "; ".join(f"{r['access']} {r['resource']}" + (f" {json.dumps(r['target'])}" if r["target"] else "")
                             for r in e["resources"]) or "none declared"
-            return f"#{e['id']} {e['agent']} INTENT: {e['plan']} | resources: {res}"
+            return f"#{e['id']} {e['agent']} INTENT{note}: {e['plan']} | resources: {res}"
         where = " in its own copy" if self.private else ""
         return f"#{e['id']} {e['agent']} CHANGE{where} (intent #{e['intent']}): {e['call']} -> {e['result']}"
 
@@ -142,6 +149,8 @@ class Log:
 
     def gate(self, me, tool):
         """None if this change may go ahead, else (reason, what the agent is told)."""
+        if self.drafts and me in self.draft:
+            return self._gate_with_draft(me, tool)
         intent = self.intent.get(me)
         if intent is None:
             return "no_intent", ("[WAL] Refused: you haven't posted an intent. Read the WAL (wal_read), append your "
@@ -157,6 +166,33 @@ class Log:
             return "undeclared", (f"[WAL] Refused: your latest intent (#{intent}) doesn't declare {access} {resource}. "
                                   "Append an intent with wal_append that declares it, then make the change.")
         return None
+
+    def _gate_with_draft(self, me, tool):
+        """The gate for an agent whose last post was refused: once it is caught up, a change its latest intent
+        doesn't cover but its draft does records the draft as its intent (the same checks otherwise)."""
+        unseen, n = self.catch_up(me)
+        if n:
+            return "behind", (f"[WAL] Refused: the WAL has {n} entr{'y' if n == 1 else 'ies'} you hadn't read:\n{unseen}\n"
+                              "You have now seen them. If they don't affect your plan, make the change again; if they "
+                              "do, append a revised intent first.")
+        resource, access = WRITES[tool]
+        covers = lambda rs: any(r["resource"] == resource and r["access"] == access for r in rs)  # noqa: E731
+        intent = self.intent.get(me)
+        if intent is not None and covers(self.entries[intent - 1]["resources"]):
+            return None
+        d = self.draft[me]
+        if covers(d["resources"]):
+            e = self.add(me, "intent", plan=d["plan"], resources=d["resources"], from_draft=True)
+            self.intent[me] = e["id"]
+            del self.draft[me]
+            self.event(me, "wal_draft_used", id=e["id"], tool=tool)
+            return None
+        if intent is None:
+            return "no_intent", ("[WAL] Refused: you haven't posted an intent. Read the WAL (wal_read), append your "
+                                 "intent with wal_append, declaring each resource you will change and how, then make "
+                                 "the change.")
+        return "undeclared", (f"[WAL] Refused: your latest intent (#{intent}) doesn't declare {access} {resource}. "
+                              "Append an intent with wal_append that declares it, then make the change.")
 
     def piggyback(self, me, fn):
         """fn, with the log entries this agent hasn't seen appended to its result; they then count as seen."""
@@ -216,10 +252,13 @@ class Log:
                 unseen, n = self.catch_up(me)
                 if n:
                     self.event(me, "wal_append_refused", unseen=n)
+                    if self.drafts:
+                        self.draft[me] = {"plan": str(plan).strip(), "resources": declared}
                     return (f"[WAL] Not appended: the WAL has {n} entr{'y' if n == 1 else 'ies'} you hadn't read:\n"
                             f"{unseen}\nYou have now seen them. Append your intent again, revised if they overlap with it.")
                 e = self.add(me, "intent", plan=str(plan).strip(), resources=declared)
                 self.intent[me] = e["id"]
+                self.draft.pop(me, None)
             self.event(me, "wal_append", id=e["id"], plan=e["plan"], resources=declared)
             return f"Appended as intent #{e['id']}. You can now make the changes it declares."
 
@@ -250,4 +289,5 @@ class Log:
         return {"wal_intents": kinds["wal_append"], "wal_reads": kinds["wal_read"],
                 "wal_changes": sum(e["kind"] == "change" for e in self.entries),
                 "wal_append_refused": kinds["wal_append_refused"],
-                **{f"wal_refused_{r}": refused[r] for r in ("no_intent", "behind", "undeclared")}}
+                **{f"wal_refused_{r}": refused[r] for r in ("no_intent", "behind", "undeclared")},
+                **({"wal_drafts_used": kinds["wal_draft_used"]} if self.drafts else {})}

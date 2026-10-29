@@ -1,0 +1,5 @@
+# The log alone, with piggybacking, and with piggybacking + drafts (--wal-drafts), side by side on one GPU so
+# their times are comparable. Submit with --tag drNN. Analysis: analysis/wal_variants.py --tag dr
+--benchmark workbench --min-changes 3 --topology agent-driven --comm all --coordinate --wal
+--benchmark workbench --min-changes 3 --topology agent-driven --comm all --coordinate --wal --wal-piggyback
+--benchmark workbench --min-changes 3 --topology agent-driven --comm all --coordinate --wal --wal-piggyback --wal-drafts
