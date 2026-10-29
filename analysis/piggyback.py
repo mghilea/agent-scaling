@@ -11,6 +11,7 @@ import json
 import random
 import statistics as st
 import sys
+from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -21,16 +22,45 @@ from conflicts import conflicts  # noqa: E402
 SETUPS = {"none": "No channels", "text-coord": "Text + coordinate", "all-coord": "All channels + coordinate"}
 
 
+def carriers(events):
+    """Which kind of tool call each piggybacked delivery rode on (the agent's event just before it)."""
+    out, last = Counter(), {}
+    for e in events:
+        if e["kind"] != "wal_piggyback":
+            last[e["agent"]] = e
+            continue
+        p = last.get(e["agent"], {})
+        if p.get("kind") == "tool":
+            write = any(w in p["tool"] for w in ("create", "update", "delete", "send_email", "forward", "reply", "add_customer"))
+            kind = "a write" if write else "a search or lookup"
+        elif p.get("kind") in ("message", "a2a_send", "a2a_update", "a2a_get", "state_read", "state_write"):
+            kind = "a message or shared-state call"
+        elif p.get("kind") == "wal_refused":
+            kind = "a refused write"
+        else:
+            kind = "other"
+        out[kind] += 1
+        out[kind + " (entries)"] += e["n"]
+    return out
+
+
 def load(pattern):
-    """{(rep, task): (result row, conflict counts)} for the runs matching pattern."""
+    """{(rep, task): (result row, conflict counts, piggyback carriers)} for the runs matching pattern."""
     out = {}
     for d in sorted(glob.glob(str(ROOT / "runs" / pattern))):
         rep = d.rsplit("-", 1)[-1]
         for line in open(Path(d, "results.jsonl")):
             r = json.loads(line)
             trace = json.loads(Path(d, "traces", f"{r['id']}.json").read_text())
-            out[(rep, r["id"])] = (r, conflicts(trace))
+            out[(rep, r["id"])] = (r, conflicts(trace), carriers(trace["events"]))
     return out
+
+
+def sign_flip(diffs, n=20000, seed=0):
+    """One-sided p-value that the paired differences sum to at least what was seen, if their signs were random."""
+    rng = random.Random(seed)
+    observed = sum(diffs)
+    return sum(sum(d if rng.random() < .5 else -d for d in diffs) >= observed for _ in range(n)) / n
 
 
 def ci(diffs, n=4000, seed=0):
@@ -41,8 +71,8 @@ def ci(diffs, n=4000, seed=0):
 
 
 def side(rows):
-    rs = [r for r, _ in rows]
-    cs = [c for _, c in rows]
+    rs = [r for r, _, _ in rows]
+    cs = [c for _, c, _ in rows]
     comm = lambda k: st.mean(r["comm"].get(k, 0) for r in rs)  # noqa: E731
     return {"task_runs": len(rs), "seconds": st.mean(r["seconds"] for r in rs),
             "seconds_median": st.median(r["seconds"] for r in rs),
@@ -52,12 +82,17 @@ def side(rows):
             "reads": comm("wal_reads"), "intents": comm("wal_intents"), "post_refused": comm("wal_append_refused"),
             "write_refused": comm("wal_refused_behind") + comm("wal_refused_no_intent") + comm("wal_refused_undeclared"),
             "piggybacked": comm("wal_piggybacked"), "piggybacked_entries": comm("wal_piggybacked_entries"),
+            # totals over the task-runs: rejected posts, and rejected writes by reason
+            "post_refused_total": sum(r["comm"].get("wal_append_refused", 0) for r in rs),
+            "write_refused_total": {k: sum(r["comm"].get(f"wal_refused_{k}", 0) for r in rs)
+                                    for k in ("behind", "no_intent", "undeclared")},
             "conflicts": {k: st.mean(c[k] > 0 for c in cs) for k in ("dup_inserts", "gone", "redundant", "lost_updates")},
             "conflict_count": sum(c["dup_inserts"] + c["gone"] + c["redundant"] + c["lost_updates"] for c in cs)}
 
 
 def main():
-    out = {}
+    out, pooled = {}, {"conflicts": [], "duplicates": [], "carriers": Counter()}
+    total = lambda c: c["dup_inserts"] + c["gone"] + c["redundant"] + c["lost_updates"]  # noqa: E731
     for tag, label in SETUPS.items():
         plain = load(f"*-agent-driven-{tag}-wal-workbench-*-pb[0-9][0-9]")
         piggy = load(f"*-agent-driven-{tag}-wal-pb-workbench-*-pb[0-9][0-9]")
@@ -65,6 +100,10 @@ def main():
         if not keys:
             continue
         a, b = side([plain[k] for k in keys]), side([piggy[k] for k in keys])
+        for k in keys:
+            pooled["conflicts"].append(total(piggy[k][1]) - total(plain[k][1]))
+            pooled["duplicates"].append(piggy[k][1]["dup_inserts"] - plain[k][1]["dup_inserts"])
+            pooled["carriers"].update(piggy[k][2])
         secs = [piggy[k][0]["seconds"] - plain[k][0]["seconds"] for k in keys]
         turns = [piggy[k][0]["turns"] - plain[k][0]["turns"] for k in keys]
         reps = sorted({k[0] for k in keys})
@@ -81,6 +120,11 @@ def main():
                   f"conflicts {s['conflict_count']}  dup {s['conflicts']['dup_inserts']:.1%}")
         print(f"  latency change: {m:+.1f} s per task (95% CI {lo:+.1f} to {hi:+.1f}), {m / a['seconds']:+.0%}; "
               f"per run: " + ", ".join(f"{r} {p:.0f}->{q:.0f}" for r, (p, q) in per_rep.items()))
+    c, dd = pooled["conflicts"], pooled["duplicates"]
+    out["_pooled"] = {"pairs": len(c), "conflicts_more": sum(x > 0 for x in c), "conflicts_fewer": sum(x < 0 for x in c),
+                      "conflicts_diff": sum(c), "conflicts_p": sign_flip(c), "duplicates_diff": sum(dd),
+                      "duplicates_p": sign_flip(dd), "carriers": dict(pooled["carriers"])}
+    print("\npooled:", {k: v for k, v in out["_pooled"].items() if k != "carriers"}, "\ncarriers:", out["_pooled"]["carriers"])
     (ROOT / "analysis" / "piggyback.json").write_text(json.dumps(out, indent=1))
 
 

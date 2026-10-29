@@ -16,6 +16,12 @@
    "write_refused": 0.19687500000000002,
    "piggybacked": 0,
    "piggybacked_entries": 0,
+   "post_refused_total": 616,
+   "write_refused_total": {
+    "behind": 17,
+    "no_intent": 42,
+    "undeclared": 4
+   },
    "conflicts": {
     "dup_inserts": 0.028125,
     "gone": 0.0125,
@@ -37,6 +43,12 @@
    "write_refused": 0.15000000000000002,
    "piggybacked": 1.16875,
    "piggybacked_entries": 2.54375,
+   "post_refused_total": 539,
+   "write_refused_total": {
+    "behind": 12,
+    "no_intent": 32,
+    "undeclared": 4
+   },
    "conflicts": {
     "dup_inserts": 0.04375,
     "gone": 0.015625,
@@ -95,6 +107,12 @@
    "write_refused": 0.21875,
    "piggybacked": 0,
    "piggybacked_entries": 0,
+   "post_refused_total": 576,
+   "write_refused_total": {
+    "behind": 15,
+    "no_intent": 49,
+    "undeclared": 6
+   },
    "conflicts": {
     "dup_inserts": 0.028125,
     "gone": 0.003125,
@@ -116,6 +134,12 @@
    "write_refused": 0.18437499999999998,
    "piggybacked": 1.703125,
    "piggybacked_entries": 3.8375,
+   "post_refused_total": 490,
+   "write_refused_total": {
+    "behind": 8,
+    "no_intent": 45,
+    "undeclared": 6
+   },
    "conflicts": {
     "dup_inserts": 0.025,
     "gone": 0.01875,
@@ -174,6 +198,12 @@
    "write_refused": 0.284375,
    "piggybacked": 0,
    "piggybacked_entries": 0,
+   "post_refused_total": 581,
+   "write_refused_total": {
+    "behind": 19,
+    "no_intent": 61,
+    "undeclared": 11
+   },
    "conflicts": {
     "dup_inserts": 0.034375,
     "gone": 0,
@@ -195,6 +225,12 @@
    "write_refused": 0.346875,
    "piggybacked": 1.9625,
    "piggybacked_entries": 4.98125,
+   "post_refused_total": 541,
+   "write_refused_total": {
+    "behind": 26,
+    "no_intent": 74,
+    "undeclared": 11
+   },
    "conflicts": {
     "dup_inserts": 0.028125,
     "gone": 0.0125,
@@ -234,6 +270,25 @@
     29.54375,
     31.1234375
    ]
+  }
+ },
+ "_pooled": {
+  "pairs": 960,
+  "conflicts_more": 54,
+  "conflicts_fewer": 32,
+  "conflicts_diff": 36,
+  "conflicts_p": 0.02,
+  "duplicates_diff": 4,
+  "duplicates_p": 0.3457,
+  "carriers": {
+   "a search or lookup": 1151,
+   "a search or lookup (entries)": 2471,
+   "a refused write": 46,
+   "a refused write (entries)": 115,
+   "a message or shared-state call": 349,
+   "a message or shared-state call (entries)": 1049,
+   "other": 1,
+   "other (entries)": 1
   }
  }
 }

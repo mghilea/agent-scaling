@@ -122,6 +122,20 @@ a { color: var(--accent); }
     <p class="note" id="glancenote"></p>
   </section>
 
+  <section id="piggyback" hidden>
+    <div class="sectionhead">
+      <h2>Piggybacking: log entries delivered on tool results</h2>
+      <p id="pbintro"></p>
+    </div>
+    <figure class="chartbox" id="chart2box">
+      <svg id="chart2" role="img" aria-labelledby="chart2title"><title id="chart2title">Change in seconds per task from piggybacking, with 95% intervals</title></svg>
+      <div class="tip" id="tip2" hidden></div>
+      <figcaption id="chart2cap"></figcaption>
+    </figure>
+    <div class="tablewrap"><table class="wide" id="pbtable"></table></div>
+    <ul class="points" id="pbpoints"></ul>
+  </section>
+
   <section id="how">
     <div class="sectionhead">
       <h2>How the log works</h2>
@@ -323,6 +337,83 @@ $("cards").innerHTML = cards.map(([a, b, c]) => `<div class="card"><span class="
     `that would have collided had the workers shared one workspace: the same item created by two workers, the same record updated or deleted by two workers, ` +
     `or one field set to different values (each worker's writes replayed on a fresh copy; analysis/overlaps.py). ` +
     `Accuracy p-values are exact permutation tests over the 10 + 10 runs. Seconds are wall time per task and only roughly comparable: runs with and without the log ran on different days with different numbers of runs sharing a GPU.`;
+}
+
+// ---- piggybacking ----
+if (D.piggyback) {
+  const P = D.piggyback, keys = SETUPS.filter((s) => P[s]), pool = P._pooled, car = pool.carriers;
+  $("piggyback").hidden = false;
+  $("pbintro").textContent = `With piggybacking, the log entries an agent hasn't seen are appended to the result of every other tool it calls ` +
+    `(searches, lookups, writes, messages) and then count as read, so agents learn of teammates' intents and changes without a separate read. ` +
+    `The log's checks and refusals are unchanged. Each job ran one setup with the log, with and without piggybacking, side by side on one GPU, ` +
+    `so every task-run is compared with its partner from the same job: ${P[keys[0]].reps} runs of the 64 tasks per setup, ${pool.pairs} pairs in all.`;
+  // chart: change in seconds per task, with its 95% interval, per setup
+  (function () {
+    const svg = $("chart2"), W = 720, rowH = 40, top = 8, left = 200, right = 120, H = top + keys.length * rowH + 28;
+    const lo = Math.floor(Math.min(...keys.map((s) => P[s].seconds_diff[1]))) - 0.5, hi = 1;
+    const x = (v) => left + (W - left - right) * (v - lo) / (hi - lo);
+    svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    let s = "";
+    for (let v = Math.ceil(lo); v <= hi; v += 1) {
+      s += `<line class="gridline" x1="${x(v)}" x2="${x(v)}" y1="${top}" y2="${H - 24}" ${v === 0 ? 'style="stroke:var(--muted);stroke-dasharray:4 4"' : ""}/>` +
+        `<text class="lbl" x="${x(v)}" y="${H - 8}" text-anchor="middle">${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v)} s</text>`;
+    }
+    keys.forEach((k2, i) => {
+      const [m, l, h] = P[k2].seconds_diff, y = top + i * rowH + rowH / 2, base = P[k2].plain.seconds;
+      const tipText = `${P[k2].label}: ${m.toFixed(1)} s per task (${pct(m / base)}), 95% interval ${l.toFixed(1)} to ${h.toFixed(1)} s; ${P[k2].plain.seconds.toFixed(1)} → ${P[k2].piggyback.seconds.toFixed(1)} s`;
+      s += `<text class="cat" x="${left - 12}" y="${y + 4}" text-anchor="end">${P[k2].label}</text>` +
+        `<line x1="${x(l)}" x2="${x(h)}" y1="${y}" y2="${y}" stroke="var(--after)" stroke-width="2"/>` +
+        `<line x1="${x(l)}" x2="${x(l)}" y1="${y - 5}" y2="${y + 5}" stroke="var(--after)" stroke-width="2"/>` +
+        `<line x1="${x(h)}" x2="${x(h)}" y1="${y - 5}" y2="${y + 5}" stroke="var(--after)" stroke-width="2"/>` +
+        `<circle cx="${x(m)}" cy="${y}" r="6" fill="var(--after)" stroke="var(--surface)" stroke-width="2" data-tip="${esc(tipText)}" tabindex="0"/>` +
+        `<text class="val" x="${x(hi) + 10}" y="${y + 4}">${m > 0 ? "+" : "−"}${Math.abs(m).toFixed(1)} s (${m > 0 ? "+" : "−"}${Math.abs(Math.round(100 * m / base))}%)</text>`;
+    });
+    svg.insertAdjacentHTML("beforeend", s);
+    const tip = $("tip2"), box = $("chart2box");
+    const show = (e) => {
+      const el = e.target.closest("[data-tip]"); if (!el) { tip.hidden = true; return; }
+      tip.textContent = el.dataset.tip; tip.hidden = false;
+      const r = box.getBoundingClientRect(), b = el.getBoundingClientRect();
+      tip.style.left = Math.min(b.right - r.left + 8, r.width - 270) + "px"; tip.style.top = (b.top - r.top - 8) + "px";
+    };
+    svg.addEventListener("mousemove", show); svg.addEventListener("focusin", show);
+    svg.addEventListener("mouseleave", () => tip.hidden = true); svg.addEventListener("focusout", () => tip.hidden = true);
+    $("chart2cap").textContent = `Change in the team's wall time per task from piggybacking: mean over the paired task-runs, with a 95% bootstrap interval. Left of the dashed line is faster.`;
+  })();
+  const rowsT = [
+    ["Seconds per task", (q) => q.seconds.toFixed(1), (s) => { const [m, l, h] = P[s].seconds_diff; return chip(h < 0 ? "good" : l > 0 ? "bad" : "flat", `${m > 0 ? "+" : "−"}${Math.abs(m).toFixed(1)} s, ${m > 0 ? "+" : "−"}${Math.abs(Math.round(100 * m / P[s].plain.seconds))}%`); }],
+    ["Median seconds per task", (q) => q.seconds_median.toFixed(1)],
+    ["Model calls per task-run", (q) => q.turns.toFixed(1)],
+    ["Tokens per task", (q) => k(q.tokens)],
+    ["Log reads per task-run", (q) => q.reads.toFixed(1)],
+    ["Rejected posts to the log (unread entries)", (q) => q.post_refused_total.toLocaleString(),
+      (s) => `<span class="delta">${P[s].plain.post_refused.toFixed(2)} → ${P[s].piggyback.post_refused.toFixed(2)} per task-run</span>`],
+    ["Rejected writes", (q) => Object.values(q.write_refused_total).reduce((a, b) => a + b, 0).toLocaleString(),
+      (s) => { const a = P[s].plain.write_refused_total, b = P[s].piggyback.write_refused_total;
+        return `<span class="delta">unread entries ${a.behind} → ${b.behind}<br>no intent ${a.no_intent} → ${b.no_intent}<br>undeclared ${a.undeclared} → ${b.undeclared}</span>`; }],
+    ["Deliveries on tool results per task-run", (q) => q.piggybacked.toFixed(1)],
+    ["Conflicts", (q) => String(q.conflict_count)],
+    ["Task-runs with a duplicate insert", (q) => pct(q.conflicts.dup_inserts, 1)],
+    ["Accuracy", (q) => pct(q.accuracy)],
+  ];
+  function chip(cls, text) { return `<span class="chip ${cls}">${text}</span>`; }
+  $("pbtable").innerHTML = `<thead><tr><th>Per setup: log → log + piggybacking</th>${keys.map((s) => `<th class="n">${P[s].label}</th>`).join("")}</tr></thead><tbody>` +
+    rowsT.map(([label, f, extra]) => `<tr><td>${label}</td>${keys.map((s) => `<td class="n">${f(P[s].plain)} → <b>${f(P[s].piggyback)}</b>${extra ? "<br>" + extra(s) : ""}</td>`).join("")}</tr>`).join("") + "</tbody>";
+  const kinds = ["a search or lookup", "a message or shared-state call", "a refused write"];
+  const nDel = kinds.reduce((a, kk) => a + (car[kk] || 0), 0) + (car.other || 0);
+  const plainC = keys.reduce((a, s) => a + P[s].plain.conflict_count, 0), pbC = keys.reduce((a, s) => a + P[s].piggyback.conflict_count, 0);
+  $("pbpoints").innerHTML = [
+    `<b>Latency drops about 6% in every setup</b>, and every 95% interval excludes zero. Most of the saving is fewer separate log reads: entries now arrive with results the agent asked for anyway.`,
+    `<b>Where the entries rode:</b> ${kinds.filter((kk) => car[kk]).map((kk) => `${pct(car[kk] / nDel)} on ${kk} (${(car[kk + " (entries)"] / car[kk]).toFixed(1)} entries each)`).join(", ")}. ` +
+      `Never on a successful write: a write requires being caught up, so nothing is new when it returns.`,
+    `<b>Rejected posts fall only 7–15%</b> (${keys.map((s) => `${P[s].plain.post_refused_total} → ${P[s].piggyback.post_refused_total}`).join(", ")} over ${P[keys[0]].pairs} task-runs per setup). ` +
+      `Entries arrive when a tool returns, not while the model is drafting its intent, so an agent that plans right after a search can still be behind when it posts.`,
+    `<b>Rejected writes are few either way</b> (${keys.map((s) => { const t = (q) => Object.values(q.write_refused_total).reduce((a, b) => a + b, 0); return `${t(P[s].plain)} → ${t(P[s].piggyback)}`; }).join(", ")}). ` +
+      `Most are writes with no intent posted, which piggybacking can't prevent. Writes refused for unread entries, the kind piggybacking targets, fall in two setups and rise in the all-channels team, all from small numbers.`,
+    `<b>Conflicts rose</b>, ${plainC} → ${pbC} across the ${pool.pairs} pairs (${pool.conflicts_more} task-runs had more, ${pool.conflicts_fewer} fewer; sign-flip test p = ${pool.conflicts_p.toFixed(2)}). ` +
+      `Duplicate inserts did not change significantly (${pool.duplicates_diff >= 0 ? "+" : ""}${pool.duplicates_diff}, p = ${pool.duplicates_p.toFixed(2)}): the extra conflicts are harmless writes to records a teammate had already changed. ` +
+      `Entries appended to the end of a long result seem to get less attention than a refusal, which makes the agent deal with them before posting.`,
+  ].map((x) => `<li>${x}</li>`).join("");
 }
 
 // ---- logs ----
