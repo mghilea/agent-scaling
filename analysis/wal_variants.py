@@ -42,8 +42,10 @@ def conflict_total(c):
     return c["dup_inserts"] + c["gone"] + c["redundant"] + c["lost_updates"]
 
 
-# per task-run: conflicts, whether it had a duplicate insert, whether it was solved, wall time, tokens
-METRICS = {"conflicts": lambda r, c: conflict_total(c), "duplicates": lambda r, c: int(c["dup_inserts"] > 0),
+# per task-run: conflicts, whether it had any conflict, whether it had a duplicate insert, whether it was solved,
+# wall time, tokens
+METRICS = {"conflicts": lambda r, c: conflict_total(c), "any_conflict": lambda r, c: int(conflict_total(c) > 0),
+           "duplicates": lambda r, c: int(c["dup_inserts"] > 0),
            "correct": lambda r, c: int(bool(r["correct"])), "seconds": lambda r, c: r["seconds"],
            "tokens": lambda r, c: r["prompt_tokens"] + r["completion_tokens"]}
 
@@ -105,6 +107,7 @@ def main():
             stats[v] = side(rows)
             stats[v]["drafts_used"] = st.mean(r["comm"].get("wal_drafts_used", 0) for r, _, _ in rows)
             stats[v]["drafts_used_total"] = sum(r["comm"].get("wal_drafts_used", 0) for r, _, _ in rows)
+            stats[v]["any_conflict"] = st.mean(conflict_total(c) > 0 for _, c, _ in rows)
         steps = {}
         for a, b in STEPS:
             pairs = units(runs[a], runs[b])
@@ -120,20 +123,21 @@ def main():
                   f"{s['tokens'] / 1000:4.0f}k tokens  reads {s['reads']:.1f}  intents {s['intents']:.1f}  "
                   f"posts rejected {s['post_refused_total']:4d}  writes rejected {sum(w.values()):3d} "
                   f"(no intent {w['no_intent']}, behind {w['behind']}, undeclared {w['undeclared']})  "
-                  f"drafts used {s['drafts_used_total']:3d}  conflicts {s['conflict_count'] / s['task_runs']:.2f}/task-run  "
+                  f"drafts used {s['drafts_used_total']:3d}  conflicts {s['conflict_count'] / s['task_runs']:.2f}/task-run "
+                  f"(any {s['any_conflict']:.1%})  "
                   f"dup {s['conflicts']['dup_inserts']:.1%}  accuracy {s['accuracy']:.0%}")
         for step, d in steps.items():
             m, lo, hi = d["seconds"]["ci"]
             print(f"  {step:34s} {d['units']:3d} units  {m:+5.1f} s (95% CI {lo:+.1f} to {hi:+.1f})  "
                   + "  ".join(f"{k} {d[k]['diff']:+.3f} (p {d[k]['p_more']:.3f}/{d[k]['p_fewer']:.3f})"
-                              for k in ("conflicts", "duplicates", "correct")))
+                              for k in ("conflicts", "any_conflict", "duplicates", "correct")))
     # pooled over the setups: every step's paired units from all three
     out["_pooled"] = {step: compare(pairs) for step, pairs in pooled_pairs.items()}
     print("\npooled:")
     for step, d in out["_pooled"].items():
         print(f"  {step:34s} {d['units']:3d} units  {d['seconds']['diff']:+5.1f} s  "
               + "  ".join(f"{k} {d[k]['diff']:+.3f} (p {d[k]['p_more']:.3f}/{d[k]['p_fewer']:.3f})"
-                          for k in ("conflicts", "duplicates", "correct", "tokens")))
+                          for k in ("conflicts", "any_conflict", "duplicates", "correct", "tokens")))
     (ROOT / "analysis" / f"wal_variants_{tag}.json").write_text(json.dumps(out, indent=1))
 
 
