@@ -1,34 +1,46 @@
 {
  "_variants": [
   [
-   "wal",
-   "Full log"
-  ],
-  [
-   "wal-changes-only",
-   "Changes only (no intents)"
-  ],
-  [
-   "wal-post-anytime",
-   "Posting while behind allowed"
+   "nolog",
+   "No log"
   ],
   [
    "wal-advisory",
-   "Nothing enforced"
+   "Log, nothing enforced"
+  ],
+  [
+   "wal-changes-only",
+   "+ Catch up before writing"
+  ],
+  [
+   "wal-post-anytime",
+   "+ Declare before writing"
+  ],
+  [
+   "wal",
+   "+ Catch up before posting (full log)"
   ]
  ],
  "_steps": [
   [
-   "wal",
+   "nolog",
+   "wal-advisory"
+  ],
+  [
+   "wal-advisory",
    "wal-changes-only"
   ],
   [
-   "wal",
+   "wal-changes-only",
    "wal-post-anytime"
   ],
   [
-   "wal",
-   "wal-advisory"
+   "wal-post-anytime",
+   "wal"
+  ],
+  [
+   "wal-changes-only",
+   "wal"
   ]
  ],
  "none": {
@@ -36,32 +48,61 @@
   "pairs": 320,
   "reps": 5,
   "variants": {
-   "wal": {
-    "task_runs": 320,
-    "seconds": 35.874375,
-    "seconds_median": 33.55,
-    "turns": 25.38125,
-    "tokens": 220348.8,
-    "accuracy": 0.3875,
-    "reads": 3.953125,
-    "intents": 2.2875,
-    "post_refused": 1.909375,
-    "write_refused": 0.2625,
+   "nolog": {
+    "task_runs": 640,
+    "seconds": 26.55921875,
+    "seconds_median": 23.6,
+    "turns": 22.8109375,
+    "tokens": 181548.5578125,
+    "accuracy": 0.3328125,
+    "reads": 0,
+    "intents": 0,
+    "post_refused": 0,
+    "write_refused": 0,
     "piggybacked": 0,
     "piggybacked_entries": 0,
-    "post_refused_total": 611,
+    "post_refused_total": 0,
     "write_refused_total": {
-     "behind": 25,
-     "no_intent": 56,
-     "undeclared": 3
+     "behind": 0,
+     "no_intent": 0,
+     "undeclared": 0
     },
     "conflicts": {
-     "dup_inserts": 0.03125,
-     "gone": 0.009375,
-     "redundant": 0.009375,
-     "lost_updates": 0
+     "dup_inserts": 0.1484375,
+     "gone": 0.3,
+     "redundant": 0.3390625,
+     "lost_updates": 0.0046875
     },
-    "conflict_count": 19,
+    "conflict_count": 1709,
+    "drafts_used": 0,
+    "drafts_used_total": 0
+   },
+   "wal-advisory": {
+    "task_runs": 320,
+    "seconds": 33.4034375,
+    "seconds_median": 31.0,
+    "turns": 26.359375,
+    "tokens": 223638.1375,
+    "accuracy": 0.375,
+    "reads": 2.51875,
+    "intents": 3.05625,
+    "post_refused": 0,
+    "write_refused": 0,
+    "piggybacked": 0,
+    "piggybacked_entries": 0,
+    "post_refused_total": 0,
+    "write_refused_total": {
+     "behind": 0,
+     "no_intent": 0,
+     "undeclared": 0
+    },
+    "conflicts": {
+     "dup_inserts": 0.090625,
+     "gone": 0.225,
+     "redundant": 0.35,
+     "lost_updates": 0.00625
+    },
+    "conflict_count": 694,
     "drafts_used": 0,
     "drafts_used_total": 0
    },
@@ -123,15 +164,247 @@
     "drafts_used": 0,
     "drafts_used_total": 0
    },
+   "wal": {
+    "task_runs": 320,
+    "seconds": 35.874375,
+    "seconds_median": 33.55,
+    "turns": 25.38125,
+    "tokens": 220348.8,
+    "accuracy": 0.3875,
+    "reads": 3.953125,
+    "intents": 2.2875,
+    "post_refused": 1.909375,
+    "write_refused": 0.2625,
+    "piggybacked": 0,
+    "piggybacked_entries": 0,
+    "post_refused_total": 611,
+    "write_refused_total": {
+     "behind": 25,
+     "no_intent": 56,
+     "undeclared": 3
+    },
+    "conflicts": {
+     "dup_inserts": 0.03125,
+     "gone": 0.009375,
+     "redundant": 0.009375,
+     "lost_updates": 0
+    },
+    "conflict_count": 19,
+    "drafts_used": 0,
+    "drafts_used_total": 0
+   }
+  },
+  "steps": {
+   "nolog->wal-advisory": {
+    "units": 64,
+    "conflicts": {
+     "diff": -0.5015625,
+     "p_more": 0.99875,
+     "p_fewer": 0.0014
+    },
+    "duplicates": {
+     "diff": -0.0578125,
+     "p_more": 0.9999,
+     "p_fewer": 0.00085
+    },
+    "correct": {
+     "diff": 0.0421875,
+     "p_more": 0.02375,
+     "p_fewer": 0.9841
+    },
+    "seconds": {
+     "diff": 6.8442187500000005,
+     "p_more": 0.0,
+     "p_fewer": 1.0,
+     "ci": [
+      6.8442187500000005,
+      5.08421875,
+      8.48359375
+     ]
+    },
+    "tokens": {
+     "diff": 42089.5796875,
+     "p_more": 0.0,
+     "p_fewer": 1.0
+    }
+   },
+   "wal-advisory->wal-changes-only": {
+    "units": 320,
+    "conflicts": {
+     "diff": -1.89375,
+     "p_more": 1.0,
+     "p_fewer": 0.0
+    },
+    "duplicates": {
+     "diff": -0.040625,
+     "p_more": 0.99835,
+     "p_fewer": 0.00695
+    },
+    "correct": {
+     "diff": 0.028125,
+     "p_more": 0.1383,
+     "p_fewer": 0.9143
+    },
+    "seconds": {
+     "diff": -7.8725000000000005,
+     "p_more": 1.0,
+     "p_fewer": 0.0,
+     "ci": [
+      -7.8725000000000005,
+      -9.383750000000001,
+      -6.3393749999999995
+     ]
+    },
+    "tokens": {
+     "diff": -25208.10625,
+     "p_more": 1.0,
+     "p_fewer": 0.0
+    }
+   },
+   "wal-changes-only->wal-post-anytime": {
+    "units": 320,
+    "conflicts": {
+     "diff": -0.1,
+     "p_more": 0.9751,
+     "p_fewer": 0.03275
+    },
+    "duplicates": {
+     "diff": -0.03125,
+     "p_more": 0.9981,
+     "p_fewer": 0.01105
+    },
+    "correct": {
+     "diff": -0.05,
+     "p_more": 0.9942,
+     "p_fewer": 0.0132
+    },
+    "seconds": {
+     "diff": 11.9453125,
+     "p_more": 0.0,
+     "p_fewer": 1.0,
+     "ci": [
+      11.9453125,
+      10.3590625,
+      13.5815625
+     ]
+    },
+    "tokens": {
+     "diff": 44568.196875,
+     "p_more": 0.0,
+     "p_fewer": 1.0
+    }
+   },
+   "wal-post-anytime->wal": {
+    "units": 320,
+    "conflicts": {
+     "diff": -0.115625,
+     "p_more": 0.9994,
+     "p_fewer": 0.0008
+    },
+    "duplicates": {
+     "diff": 0.0125,
+     "p_more": 0.1924,
+     "p_fewer": 0.9262
+    },
+    "correct": {
+     "diff": 0.034375,
+     "p_more": 0.08885,
+     "p_fewer": 0.9465
+    },
+    "seconds": {
+     "diff": -1.6018750000000004,
+     "p_more": 0.95895,
+     "p_fewer": 0.04105,
+     "ci": [
+      -1.6018750000000004,
+      -3.4350000000000005,
+      0.22218749999999976
+     ]
+    },
+    "tokens": {
+     "diff": -22649.428125,
+     "p_more": 1.0,
+     "p_fewer": 0.0
+    }
+   },
+   "wal-changes-only->wal": {
+    "units": 320,
+    "conflicts": {
+     "diff": -0.215625,
+     "p_more": 1.0,
+     "p_fewer": 0.0
+    },
+    "duplicates": {
+     "diff": -0.01875,
+     "p_more": 0.97255,
+     "p_fewer": 0.09005
+    },
+    "correct": {
+     "diff": -0.015625,
+     "p_more": 0.7984,
+     "p_fewer": 0.289
+    },
+    "seconds": {
+     "diff": 10.3434375,
+     "p_more": 0.0,
+     "p_fewer": 1.0,
+     "ci": [
+      10.3434375,
+      8.7546875,
+      11.9803125
+     ]
+    },
+    "tokens": {
+     "diff": 21918.76875,
+     "p_more": 0.0,
+     "p_fewer": 1.0
+    }
+   }
+  }
+ },
+ "text-coord": {
+  "label": "Text + coordinate",
+  "pairs": 320,
+  "reps": 5,
+  "variants": {
+   "nolog": {
+    "task_runs": 640,
+    "seconds": 33.0121875,
+    "seconds_median": 30.4,
+    "turns": 24.19375,
+    "tokens": 193636.653125,
+    "accuracy": 0.346875,
+    "reads": 0,
+    "intents": 0,
+    "post_refused": 0,
+    "write_refused": 0,
+    "piggybacked": 0,
+    "piggybacked_entries": 0,
+    "post_refused_total": 0,
+    "write_refused_total": {
+     "behind": 0,
+     "no_intent": 0,
+     "undeclared": 0
+    },
+    "conflicts": {
+     "dup_inserts": 0.0890625,
+     "gone": 0.16875,
+     "redundant": 0.153125,
+     "lost_updates": 0.0109375
+    },
+    "conflict_count": 728,
+    "drafts_used": 0,
+    "drafts_used_total": 0
+   },
    "wal-advisory": {
     "task_runs": 320,
-    "seconds": 33.4034375,
-    "seconds_median": 31.0,
-    "turns": 26.359375,
-    "tokens": 223638.1375,
-    "accuracy": 0.375,
-    "reads": 2.51875,
-    "intents": 3.05625,
+    "seconds": 32.63875,
+    "seconds_median": 29.7,
+    "turns": 27.540625,
+    "tokens": 232211.6375,
+    "accuracy": 0.378125,
+    "reads": 2.84375,
+    "intents": 2.915625,
     "post_refused": 0,
     "write_refused": 0,
     "piggybacked": 0,
@@ -144,112 +417,11 @@
     },
     "conflicts": {
      "dup_inserts": 0.090625,
-     "gone": 0.225,
-     "redundant": 0.35,
+     "gone": 0.265625,
+     "redundant": 0.315625,
      "lost_updates": 0.00625
     },
-    "conflict_count": 694,
-    "drafts_used": 0,
-    "drafts_used_total": 0
-   }
-  },
-  "steps": {
-   "wal->wal-changes-only": {
-    "seconds_diff": [
-     -10.3434375,
-     -11.9740625,
-     -8.74875
-    ],
-    "turns_diff": [
-     -0.6875,
-     -1.334375,
-     -0.00625
-    ],
-    "conflicts_diff": 69,
-    "conflicts_p_more": 0.0,
-    "conflicts_p_fewer": 1.0,
-    "duplicates_diff": 6,
-    "duplicates_p_more": 0.08955,
-    "duplicates_p_fewer": 0.97155,
-    "accuracy_diff": 0.015625,
-    "accuracy_p_up": 0.2867,
-    "accuracy_p_down": 0.7997
-   },
-   "wal->wal-post-anytime": {
-    "seconds_diff": [
-     1.6018750000000004,
-     -0.22156249999999952,
-     3.4384375000000005
-    ],
-    "turns_diff": [
-     2.140625,
-     1.40625,
-     2.884375
-    ],
-    "conflicts_diff": 37,
-    "conflicts_p_more": 0.0008,
-    "conflicts_p_fewer": 0.9996,
-    "duplicates_diff": -4,
-    "duplicates_p_more": 0.9238,
-    "duplicates_p_fewer": 0.19885,
-    "accuracy_diff": -0.034375,
-    "accuracy_p_up": 0.94245,
-    "accuracy_p_down": 0.0952
-   },
-   "wal->wal-advisory": {
-    "seconds_diff": [
-     -2.4709375,
-     -4.35875,
-     -0.6921874999999996
-    ],
-    "turns_diff": [
-     0.978125,
-     0.290625,
-     1.66875
-    ],
-    "conflicts_diff": 675,
-    "conflicts_p_more": 0.0,
-    "conflicts_p_fewer": 1.0,
-    "duplicates_diff": 25,
-    "duplicates_p_more": 0.0001,
-    "duplicates_p_fewer": 0.99995,
-    "accuracy_diff": -0.0125,
-    "accuracy_p_up": 0.7336,
-    "accuracy_p_down": 0.35205
-   }
-  }
- },
- "text-coord": {
-  "label": "Text + coordinate",
-  "pairs": 320,
-  "reps": 5,
-  "variants": {
-   "wal": {
-    "task_runs": 320,
-    "seconds": 35.69125,
-    "seconds_median": 33.95,
-    "turns": 26.815625,
-    "tokens": 231286.1375,
-    "accuracy": 0.375,
-    "reads": 3.9,
-    "intents": 2.078125,
-    "post_refused": 1.921875,
-    "write_refused": 0.20625000000000002,
-    "piggybacked": 0,
-    "piggybacked_entries": 0,
-    "post_refused_total": 615,
-    "write_refused_total": {
-     "behind": 13,
-     "no_intent": 49,
-     "undeclared": 4
-    },
-    "conflicts": {
-     "dup_inserts": 0.034375,
-     "gone": 0.003125,
-     "redundant": 0.003125,
-     "lost_updates": 0
-    },
-    "conflict_count": 15,
+    "conflict_count": 731,
     "drafts_used": 0,
     "drafts_used_total": 0
    },
@@ -311,15 +483,218 @@
     "drafts_used": 0,
     "drafts_used_total": 0
    },
-   "wal-advisory": {
+   "wal": {
     "task_runs": 320,
-    "seconds": 32.63875,
-    "seconds_median": 29.7,
-    "turns": 27.540625,
-    "tokens": 232211.6375,
-    "accuracy": 0.378125,
-    "reads": 2.84375,
-    "intents": 2.915625,
+    "seconds": 35.69125,
+    "seconds_median": 33.95,
+    "turns": 26.815625,
+    "tokens": 231286.1375,
+    "accuracy": 0.375,
+    "reads": 3.9,
+    "intents": 2.078125,
+    "post_refused": 1.921875,
+    "write_refused": 0.20625000000000002,
+    "piggybacked": 0,
+    "piggybacked_entries": 0,
+    "post_refused_total": 615,
+    "write_refused_total": {
+     "behind": 13,
+     "no_intent": 49,
+     "undeclared": 4
+    },
+    "conflicts": {
+     "dup_inserts": 0.034375,
+     "gone": 0.003125,
+     "redundant": 0.003125,
+     "lost_updates": 0
+    },
+    "conflict_count": 15,
+    "drafts_used": 0,
+    "drafts_used_total": 0
+   }
+  },
+  "steps": {
+   "nolog->wal-advisory": {
+    "units": 64,
+    "conflicts": {
+     "diff": 1.146875,
+     "p_more": 0.0,
+     "p_fewer": 1.0
+    },
+    "duplicates": {
+     "diff": 0.0015625000000000014,
+     "p_more": 0.4986,
+     "p_fewer": 0.58375
+    },
+    "correct": {
+     "diff": 0.031249999999999997,
+     "p_more": 0.0741,
+     "p_fewer": 0.94685
+    },
+    "seconds": {
+     "diff": -0.37343750000000053,
+     "p_more": 0.67505,
+     "p_fewer": 0.325,
+     "ci": [
+      -0.37343750000000053,
+      -2.0425000000000004,
+      1.2235937499999994
+     ]
+    },
+    "tokens": {
+     "diff": 38574.984375,
+     "p_more": 0.0,
+     "p_fewer": 1.0
+    }
+   },
+   "wal-advisory->wal-changes-only": {
+    "units": 320,
+    "conflicts": {
+     "diff": -2.1875,
+     "p_more": 1.0,
+     "p_fewer": 0.0
+    },
+    "duplicates": {
+     "diff": -0.06875,
+     "p_more": 1.0,
+     "p_fewer": 0.0
+    },
+    "correct": {
+     "diff": 0.0125,
+     "p_more": 0.3541,
+     "p_fewer": 0.7363
+    },
+    "seconds": {
+     "diff": -2.0215625,
+     "p_more": 0.98395,
+     "p_fewer": 0.01615,
+     "ci": [
+      -2.0215625,
+      -3.8968749999999996,
+      -0.1840625
+     ]
+    },
+    "tokens": {
+     "diff": -10598.015625,
+     "p_more": 0.99255,
+     "p_fewer": 0.00745
+    }
+   },
+   "wal-changes-only->wal-post-anytime": {
+    "units": 320,
+    "conflicts": {
+     "diff": -0.05,
+     "p_more": 0.98225,
+     "p_fewer": 0.03155
+    },
+    "duplicates": {
+     "diff": 0.003125,
+     "p_more": 0.5014,
+     "p_fewer": 0.69475
+    },
+    "correct": {
+     "diff": -0.034375,
+     "p_more": 0.9322,
+     "p_fewer": 0.10765
+    },
+    "seconds": {
+     "diff": 8.010625,
+     "p_more": 0.0,
+     "p_fewer": 1.0,
+     "ci": [
+      8.010625,
+      5.946875,
+      10.26625
+     ]
+    },
+    "tokens": {
+     "diff": 44881.45625,
+     "p_more": 0.0,
+     "p_fewer": 1.0
+    }
+   },
+   "wal-post-anytime->wal": {
+    "units": 320,
+    "conflicts": {
+     "diff": 0,
+     "p_more": 0.568,
+     "p_fewer": 0.56965
+    },
+    "duplicates": {
+     "diff": 0.009375,
+     "p_more": 0.29255,
+     "p_fewer": 0.8651
+    },
+    "correct": {
+     "diff": 0.01875,
+     "p_more": 0.2635,
+     "p_fewer": 0.8116
+    },
+    "seconds": {
+     "diff": -2.9365625,
+     "p_more": 0.9976,
+     "p_fewer": 0.0024,
+     "ci": [
+      -2.9365625,
+      -4.93,
+      -0.9503124999999998
+     ]
+    },
+    "tokens": {
+     "diff": -35208.940625,
+     "p_more": 1.0,
+     "p_fewer": 0.0
+    }
+   },
+   "wal-changes-only->wal": {
+    "units": 320,
+    "conflicts": {
+     "diff": -0.05,
+     "p_more": 0.9807,
+     "p_fewer": 0.03495
+    },
+    "duplicates": {
+     "diff": 0.0125,
+     "p_more": 0.22265,
+     "p_fewer": 0.8966
+    },
+    "correct": {
+     "diff": -0.015625,
+     "p_more": 0.77905,
+     "p_fewer": 0.30775
+    },
+    "seconds": {
+     "diff": 5.0740625,
+     "p_more": 0.0,
+     "p_fewer": 1.0,
+     "ci": [
+      5.0740625,
+      3.1996875,
+      6.9265625
+     ]
+    },
+    "tokens": {
+     "diff": 9672.515625,
+     "p_more": 0.0104,
+     "p_fewer": 0.9896
+    }
+   }
+  }
+ },
+ "all-coord": {
+  "label": "All channels + coordinate",
+  "pairs": 320,
+  "reps": 5,
+  "variants": {
+   "nolog": {
+    "task_runs": 640,
+    "seconds": 33.5684375,
+    "seconds_median": 30.85,
+    "turns": 28.83125,
+    "tokens": 247285.140625,
+    "accuracy": 0.3859375,
+    "reads": 0,
+    "intents": 0,
     "post_refused": 0,
     "write_refused": 0,
     "piggybacked": 0,
@@ -331,113 +706,41 @@
      "undeclared": 0
     },
     "conflicts": {
-     "dup_inserts": 0.090625,
-     "gone": 0.265625,
-     "redundant": 0.315625,
-     "lost_updates": 0.00625
+     "dup_inserts": 0.134375,
+     "gone": 0.3046875,
+     "redundant": 0.3015625,
+     "lost_updates": 0.0078125
     },
-    "conflict_count": 731,
+    "conflict_count": 1490,
     "drafts_used": 0,
     "drafts_used_total": 0
-   }
-  },
-  "steps": {
-   "wal->wal-changes-only": {
-    "seconds_diff": [
-     -5.0740625,
-     -6.925,
-     -3.1878125
-    ],
-    "turns_diff": [
-     0.36875,
-     -0.509375,
-     1.215625
-    ],
-    "conflicts_diff": 16,
-    "conflicts_p_more": 0.0351,
-    "conflicts_p_fewer": 0.9811,
-    "duplicates_diff": -4,
-    "duplicates_p_more": 0.89365,
-    "duplicates_p_fewer": 0.22895,
-    "accuracy_diff": 0.015625,
-    "accuracy_p_up": 0.3031,
-    "accuracy_p_down": 0.7817
    },
-   "wal->wal-post-anytime": {
-    "seconds_diff": [
-     2.9365625,
-     0.9540624999999998,
-     4.93
-    ],
-    "turns_diff": [
-     3.415625,
-     2.490625,
-     4.359375
-    ],
-    "conflicts_diff": 0,
-    "conflicts_p_more": 0.56345,
-    "conflicts_p_fewer": 0.57355,
-    "duplicates_diff": -3,
-    "duplicates_p_more": 0.8687,
-    "duplicates_p_fewer": 0.2924,
-    "accuracy_diff": -0.01875,
-    "accuracy_p_up": 0.8117,
-    "accuracy_p_down": 0.2618
-   },
-   "wal->wal-advisory": {
-    "seconds_diff": [
-     -3.0524999999999998,
-     -5.1690625,
-     -1.0696874999999997
-    ],
-    "turns_diff": [
-     0.725,
-     -0.128125,
-     1.58125
-    ],
-    "conflicts_diff": 716,
-    "conflicts_p_more": 0.0,
-    "conflicts_p_fewer": 1.0,
-    "duplicates_diff": 21,
-    "duplicates_p_more": 0.00055,
-    "duplicates_p_fewer": 0.9999,
-    "accuracy_diff": 0.003125,
-    "accuracy_p_up": 0.505,
-    "accuracy_p_down": 0.59705
-   }
-  }
- },
- "all-coord": {
-  "label": "All channels + coordinate",
-  "pairs": 320,
-  "reps": 5,
-  "variants": {
-   "wal": {
+   "wal-advisory": {
     "task_runs": 320,
-    "seconds": 40.1053125,
-    "seconds_median": 37.7,
-    "turns": 26.225,
-    "tokens": 239971.465625,
-    "accuracy": 0.384375,
-    "reads": 3.08125,
-    "intents": 2.153125,
-    "post_refused": 1.8,
-    "write_refused": 0.30937499999999996,
+    "seconds": 36.3253125,
+    "seconds_median": 33.3,
+    "turns": 27.7375,
+    "tokens": 248769.73125,
+    "accuracy": 0.378125,
+    "reads": 1.375,
+    "intents": 3.184375,
+    "post_refused": 0,
+    "write_refused": 0,
     "piggybacked": 0,
     "piggybacked_entries": 0,
-    "post_refused_total": 576,
+    "post_refused_total": 0,
     "write_refused_total": {
-     "behind": 26,
-     "no_intent": 66,
-     "undeclared": 7
+     "behind": 0,
+     "no_intent": 0,
+     "undeclared": 0
     },
     "conflicts": {
-     "dup_inserts": 0.0375,
-     "gone": 0.003125,
-     "redundant": 0.00625,
-     "lost_updates": 0
+     "dup_inserts": 0.103125,
+     "gone": 0.3125,
+     "redundant": 0.328125,
+     "lost_updates": 0.00625
     },
-    "conflict_count": 19,
+    "conflict_count": 823,
     "drafts_used": 0,
     "drafts_used_total": 0
    },
@@ -499,132 +802,369 @@
     "drafts_used": 0,
     "drafts_used_total": 0
    },
-   "wal-advisory": {
+   "wal": {
     "task_runs": 320,
-    "seconds": 36.3253125,
-    "seconds_median": 33.3,
-    "turns": 27.7375,
-    "tokens": 248769.73125,
-    "accuracy": 0.378125,
-    "reads": 1.375,
-    "intents": 3.184375,
-    "post_refused": 0,
-    "write_refused": 0,
+    "seconds": 40.1053125,
+    "seconds_median": 37.7,
+    "turns": 26.225,
+    "tokens": 239971.465625,
+    "accuracy": 0.384375,
+    "reads": 3.08125,
+    "intents": 2.153125,
+    "post_refused": 1.8,
+    "write_refused": 0.30937499999999996,
     "piggybacked": 0,
     "piggybacked_entries": 0,
-    "post_refused_total": 0,
+    "post_refused_total": 576,
     "write_refused_total": {
-     "behind": 0,
-     "no_intent": 0,
-     "undeclared": 0
+     "behind": 26,
+     "no_intent": 66,
+     "undeclared": 7
     },
     "conflicts": {
-     "dup_inserts": 0.103125,
-     "gone": 0.3125,
-     "redundant": 0.328125,
-     "lost_updates": 0.00625
+     "dup_inserts": 0.0375,
+     "gone": 0.003125,
+     "redundant": 0.00625,
+     "lost_updates": 0
     },
-    "conflict_count": 823,
+    "conflict_count": 19,
     "drafts_used": 0,
     "drafts_used_total": 0
    }
   },
   "steps": {
-   "wal->wal-changes-only": {
-    "seconds_diff": [
-     -6.150625,
-     -8.270625,
-     -3.9615625
-    ],
-    "turns_diff": [
-     1.921875,
-     0.86875,
-     2.99375
-    ],
-    "conflicts_diff": 14,
-    "conflicts_p_more": 0.085,
-    "conflicts_p_fewer": 0.9439,
-    "duplicates_diff": 0,
-    "duplicates_p_more": 0.59085,
-    "duplicates_p_fewer": 0.5831,
-    "accuracy_diff": 0.040625,
-    "accuracy_p_up": 0.0409,
-    "accuracy_p_down": 0.9794
+   "nolog->wal-advisory": {
+    "units": 64,
+    "conflicts": {
+     "diff": 0.24375000000000002,
+     "p_more": 0.09315,
+     "p_fewer": 0.90985
+    },
+    "duplicates": {
+     "diff": -0.03125,
+     "p_more": 0.9875,
+     "p_fewer": 0.02885
+    },
+    "correct": {
+     "diff": -0.0078124999999999965,
+     "p_more": 0.6705,
+     "p_fewer": 0.381
+    },
+    "seconds": {
+     "diff": 2.7568749999999995,
+     "p_more": 0.00315,
+     "p_fewer": 0.99685,
+     "ci": [
+      2.7568749999999995,
+      0.8329687499999995,
+      4.7281249999999995
+     ]
+    },
+    "tokens": {
+     "diff": 1484.5906250000007,
+     "p_more": 0.38655,
+     "p_fewer": 0.61345
+    }
    },
-   "wal->wal-post-anytime": {
-    "seconds_diff": [
-     3.62,
-     1.2234375,
-     6.1490625
-    ],
-    "turns_diff": [
-     3.478125,
-     2.534375,
-     4.459375
-    ],
-    "conflicts_diff": 8,
-    "conflicts_p_more": 0.22785,
-    "conflicts_p_fewer": 0.8298,
-    "duplicates_diff": -4,
-    "duplicates_p_more": 0.8551,
-    "duplicates_p_fewer": 0.26185,
-    "accuracy_diff": -0.046875,
-    "accuracy_p_up": 0.97225,
-    "accuracy_p_down": 0.0469
+   "wal-advisory->wal-changes-only": {
+    "units": 320,
+    "conflicts": {
+     "diff": -2.46875,
+     "p_more": 1.0,
+     "p_fewer": 0.0
+    },
+    "duplicates": {
+     "diff": -0.0625,
+     "p_more": 1.0,
+     "p_fewer": 0.0
+    },
+    "correct": {
+     "diff": 0.046875,
+     "p_more": 0.01655,
+     "p_fewer": 0.992
+    },
+    "seconds": {
+     "diff": -2.370625,
+     "p_more": 0.9841,
+     "p_fewer": 0.0159,
+     "ci": [
+      -2.370625,
+      -4.450937499999999,
+      -0.18218750000000003
+     ]
+    },
+    "tokens": {
+     "diff": -4495.059375,
+     "p_more": 0.81485,
+     "p_fewer": 0.18515
+    }
    },
-   "wal->wal-advisory": {
-    "seconds_diff": [
-     -3.7800000000000002,
-     -5.6671875,
-     -1.8815624999999998
-    ],
-    "turns_diff": [
-     1.5125,
-     0.646875,
-     2.39375
-    ],
-    "conflicts_diff": 804,
-    "conflicts_p_more": 0.0,
-    "conflicts_p_fewer": 1.0,
-    "duplicates_diff": 24,
-    "duplicates_p_more": 0.0002,
-    "duplicates_p_fewer": 1.0,
-    "accuracy_diff": -0.00625,
-    "accuracy_p_up": 0.65885,
-    "accuracy_p_down": 0.4456
+   "wal-changes-only->wal-post-anytime": {
+    "units": 320,
+    "conflicts": {
+     "diff": -0.01875,
+     "p_more": 0.73815,
+     "p_fewer": 0.32705
+    },
+    "duplicates": {
+     "diff": -0.0125,
+     "p_more": 0.91245,
+     "p_fewer": 0.21025
+    },
+    "correct": {
+     "diff": -0.0875,
+     "p_more": 0.9999,
+     "p_fewer": 0.0003
+    },
+    "seconds": {
+     "diff": 9.770625,
+     "p_more": 0.0,
+     "p_fewer": 1.0,
+     "ci": [
+      9.770625,
+      7.34,
+      12.30625
+     ]
+    },
+    "tokens": {
+     "diff": 33130.63125,
+     "p_more": 0.0,
+     "p_fewer": 1.0
+    }
+   },
+   "wal-post-anytime->wal": {
+    "units": 320,
+    "conflicts": {
+     "diff": -0.025,
+     "p_more": 0.8253,
+     "p_fewer": 0.2328
+    },
+    "duplicates": {
+     "diff": 0.009375,
+     "p_more": 0.31975,
+     "p_fewer": 0.8192
+    },
+    "correct": {
+     "diff": 0.046875,
+     "p_more": 0.0425,
+     "p_fewer": 0.97585
+    },
+    "seconds": {
+     "diff": -3.62,
+     "p_more": 0.9976,
+     "p_fewer": 0.0024,
+     "ci": [
+      -3.62,
+      -6.1484375,
+      -1.2178125
+     ]
+    },
+    "tokens": {
+     "diff": -37433.8375,
+     "p_more": 1.0,
+     "p_fewer": 0.0
+    }
+   },
+   "wal-changes-only->wal": {
+    "units": 320,
+    "conflicts": {
+     "diff": -0.04375,
+     "p_more": 0.94425,
+     "p_fewer": 0.0842
+    },
+    "duplicates": {
+     "diff": -0.003125,
+     "p_more": 0.68795,
+     "p_fewer": 0.4946
+    },
+    "correct": {
+     "diff": -0.040625,
+     "p_more": 0.97965,
+     "p_fewer": 0.04085
+    },
+    "seconds": {
+     "diff": 6.150625,
+     "p_more": 0.0,
+     "p_fewer": 1.0,
+     "ci": [
+      6.150625,
+      3.9640625000000003,
+      8.2765625
+     ]
+    },
+    "tokens": {
+     "diff": -4303.20625,
+     "p_more": 0.78615,
+     "p_fewer": 0.21385
+    }
    }
   }
  },
  "_pooled": {
-  "wal->wal-changes-only": {
-   "pairs": 960,
-   "accuracy_diff": 0.023958333333333335,
-   "accuracy_p_up": 0.0403,
-   "accuracy_p_down": 0.9717,
-   "conflicts_diff": 99,
-   "duplicates_diff": 2,
-   "duplicates_p_more": 0.4501,
-   "duplicates_p_fewer": 0.6613
+  "nolog->wal-advisory": {
+   "units": 192,
+   "conflicts": {
+    "diff": 0.2963541666666667,
+    "p_more": 0.0059,
+    "p_fewer": 0.99435
+   },
+   "duplicates": {
+    "diff": -0.029166666666666667,
+    "p_more": 0.9994,
+    "p_fewer": 0.00095
+   },
+   "correct": {
+    "diff": 0.021875000000000002,
+    "p_more": 0.0393,
+    "p_fewer": 0.96675
+   },
+   "seconds": {
+    "diff": 3.0758854166666665,
+    "p_more": 0.0,
+    "p_fewer": 1.0,
+    "ci": [
+     3.0758854166666665,
+     1.970625,
+     4.1831249999999995
+    ]
+   },
+   "tokens": {
+    "diff": 27383.0515625,
+    "p_more": 0.0,
+    "p_fewer": 1.0
+   }
   },
-  "wal->wal-post-anytime": {
-   "pairs": 960,
-   "accuracy_diff": -0.03333333333333333,
-   "accuracy_p_up": 0.99145,
-   "accuracy_p_down": 0.01165,
-   "conflicts_diff": 45,
-   "duplicates_diff": -11,
-   "duplicates_p_more": 0.95855,
-   "duplicates_p_fewer": 0.07365
+  "wal-advisory->wal-changes-only": {
+   "units": 960,
+   "conflicts": {
+    "diff": -2.183333333333333,
+    "p_more": 1.0,
+    "p_fewer": 0.0
+   },
+   "duplicates": {
+    "diff": -0.057291666666666664,
+    "p_more": 1.0,
+    "p_fewer": 0.0
+   },
+   "correct": {
+    "diff": 0.029166666666666667,
+    "p_more": 0.0169,
+    "p_fewer": 0.98825
+   },
+   "seconds": {
+    "diff": -4.088229166666666,
+    "p_more": 1.0,
+    "p_fewer": 0.0,
+    "ci": [
+     -4.088229166666666,
+     -5.191458333333333,
+     -3.0246875
+    ]
+   },
+   "tokens": {
+    "diff": -13433.727083333333,
+    "p_more": 1.0,
+    "p_fewer": 0.0
+   }
   },
-  "wal->wal-advisory": {
-   "pairs": 960,
-   "accuracy_diff": -0.005208333333333333,
-   "accuracy_p_up": 0.67045,
-   "accuracy_p_down": 0.38125,
-   "conflicts_diff": 2195,
-   "duplicates_diff": 70,
-   "duplicates_p_more": 0.0,
-   "duplicates_p_fewer": 1.0
+  "wal-changes-only->wal-post-anytime": {
+   "units": 960,
+   "conflicts": {
+    "diff": -0.05625,
+    "p_more": 0.994,
+    "p_fewer": 0.00795
+   },
+   "duplicates": {
+    "diff": -0.013541666666666667,
+    "p_more": 0.982,
+    "p_fewer": 0.0361
+   },
+   "correct": {
+    "diff": -0.057291666666666664,
+    "p_more": 1.0,
+    "p_fewer": 0.0
+   },
+   "seconds": {
+    "diff": 9.908854166666666,
+    "p_more": 0.0,
+    "p_fewer": 1.0,
+    "ci": [
+     9.908854166666666,
+     8.694166666666666,
+     11.099270833333334
+    ]
+   },
+   "tokens": {
+    "diff": 40860.09479166667,
+    "p_more": 0.0,
+    "p_fewer": 1.0
+   }
+  },
+  "wal-post-anytime->wal": {
+   "units": 960,
+   "conflicts": {
+    "diff": -0.046875,
+    "p_more": 0.99755,
+    "p_fewer": 0.0035
+   },
+   "duplicates": {
+    "diff": 0.010416666666666666,
+    "p_more": 0.0885,
+    "p_fewer": 0.95095
+   },
+   "correct": {
+    "diff": 0.03333333333333333,
+    "p_more": 0.0123,
+    "p_fewer": 0.99205
+   },
+   "seconds": {
+    "diff": -2.719479166666667,
+    "p_more": 1.0,
+    "p_fewer": 0.0,
+    "ci": [
+     -2.719479166666667,
+     -3.933125,
+     -1.4671875
+    ]
+   },
+   "tokens": {
+    "diff": -31764.06875,
+    "p_more": 1.0,
+    "p_fewer": 0.0
+   }
+  },
+  "wal-changes-only->wal": {
+   "units": 960,
+   "conflicts": {
+    "diff": -0.103125,
+    "p_more": 1.0,
+    "p_fewer": 0.0
+   },
+   "duplicates": {
+    "diff": -0.003125,
+    "p_more": 0.72725,
+    "p_fewer": 0.3827
+   },
+   "correct": {
+    "diff": -0.023958333333333335,
+    "p_more": 0.97195,
+    "p_fewer": 0.0397
+   },
+   "seconds": {
+    "diff": 7.189375,
+    "p_more": 0.0,
+    "p_fewer": 1.0,
+    "ci": [
+     7.189375,
+     6.1321875,
+     8.28125
+    ]
+   },
+   "tokens": {
+    "diff": 9096.026041666666,
+    "p_more": 0.0003,
+    "p_fewer": 0.9997
+   }
   }
  }
 }

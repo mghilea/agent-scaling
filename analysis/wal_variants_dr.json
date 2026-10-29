@@ -122,67 +122,103 @@
   },
   "steps": {
    "wal->wal-pb": {
-    "seconds_diff": [
-     -1.59625,
-     -3.0584375,
-     -0.15218750000000003
-    ],
-    "turns_diff": [
-     -0.4875,
-     -1.159375,
-     0.221875
-    ],
-    "conflicts_diff": -3,
-    "conflicts_p_more": 0.6559,
-    "conflicts_p_fewer": 0.4188,
-    "duplicates_diff": -1,
-    "duplicates_p_more": 0.699,
-    "duplicates_p_fewer": 0.4984,
-    "accuracy_diff": 0.00625,
-    "accuracy_p_up": 0.44015,
-    "accuracy_p_down": 0.6866
+    "units": 320,
+    "conflicts": {
+     "diff": -0.009375,
+     "p_more": 0.6462,
+     "p_fewer": 0.4282
+    },
+    "duplicates": {
+     "diff": -0.003125,
+     "p_more": 0.6977,
+     "p_fewer": 0.49505
+    },
+    "correct": {
+     "diff": 0.00625,
+     "p_more": 0.42515,
+     "p_fewer": 0.69135
+    },
+    "seconds": {
+     "diff": -1.59625,
+     "p_more": 0.9823,
+     "p_fewer": 0.0177,
+     "ci": [
+      -1.59625,
+      -3.0584375,
+      -0.15218750000000003
+     ]
+    },
+    "tokens": {
+     "diff": -6615,
+     "p_more": 0.96755,
+     "p_fewer": 0.03245
+    }
    },
    "wal-pb->wal-pb-dr": {
-    "seconds_diff": [
-     -2.1240625,
-     -3.5565625,
-     -0.6953124999999999
-    ],
-    "turns_diff": [
-     -0.703125,
-     -1.3375,
-     -0.053125
-    ],
-    "conflicts_diff": -1,
-    "conflicts_p_more": 0.5714,
-    "conflicts_p_fewer": 0.50295,
-    "duplicates_diff": 2,
-    "duplicates_p_more": 0.3914,
-    "duplicates_p_fewer": 0.78955,
-    "accuracy_diff": 0.003125,
-    "accuracy_p_up": 0.50325,
-    "accuracy_p_down": 0.6009
+    "units": 320,
+    "conflicts": {
+     "diff": -0.003125,
+     "p_more": 0.58015,
+     "p_fewer": 0.49645
+    },
+    "duplicates": {
+     "diff": 0.00625,
+     "p_more": 0.39615,
+     "p_fewer": 0.78875
+    },
+    "correct": {
+     "diff": 0.003125,
+     "p_more": 0.49745,
+     "p_fewer": 0.60935
+    },
+    "seconds": {
+     "diff": -2.1240625,
+     "p_more": 0.9985,
+     "p_fewer": 0.0015,
+     "ci": [
+      -2.1240625,
+      -3.5565625,
+      -0.6953124999999999
+     ]
+    },
+    "tokens": {
+     "diff": -8493.234375,
+     "p_more": 0.99415,
+     "p_fewer": 0.00585
+    }
    },
    "wal->wal-pb-dr": {
-    "seconds_diff": [
-     -3.7203125,
-     -5.124375000000001,
-     -2.33
-    ],
-    "turns_diff": [
-     -1.190625,
-     -1.859375,
-     -0.490625
-    ],
-    "conflicts_diff": -4,
-    "conflicts_p_more": 0.67925,
-    "conflicts_p_fewer": 0.39095,
-    "duplicates_diff": 1,
-    "duplicates_p_more": 0.498,
-    "duplicates_p_fewer": 0.7116,
-    "accuracy_diff": 0.009375,
-    "accuracy_p_up": 0.40545,
-    "accuracy_p_down": 0.68525
+    "units": 320,
+    "conflicts": {
+     "diff": -0.0125,
+     "p_more": 0.6725,
+     "p_fewer": 0.39305
+    },
+    "duplicates": {
+     "diff": 0.003125,
+     "p_more": 0.5018,
+     "p_fewer": 0.709
+    },
+    "correct": {
+     "diff": 0.009375,
+     "p_more": 0.39715,
+     "p_fewer": 0.69335
+    },
+    "seconds": {
+     "diff": -3.7203125,
+     "p_more": 1.0,
+     "p_fewer": 0.0,
+     "ci": [
+      -3.7203125,
+      -5.124375000000001,
+      -2.33
+     ]
+    },
+    "tokens": {
+     "diff": -15108.234375,
+     "p_more": 1.0,
+     "p_fewer": 0.0
+    }
    }
   }
  },
@@ -281,67 +317,103 @@
   },
   "steps": {
    "wal->wal-pb": {
-    "seconds_diff": [
-     -0.4790624999999999,
-     -2.1131249999999997,
-     1.1328125000000002
-    ],
-    "turns_diff": [
-     -0.76875,
-     -1.65625,
-     0.05
-    ],
-    "conflicts_diff": 11,
-    "conflicts_p_more": 0.14495,
-    "conflicts_p_fewer": 0.90065,
-    "duplicates_diff": -2,
-    "duplicates_p_more": 0.806,
-    "duplicates_p_fewer": 0.38655,
-    "accuracy_diff": 0.01875,
-    "accuracy_p_up": 0.24495,
-    "accuracy_p_down": 0.82975
+    "units": 320,
+    "conflicts": {
+     "diff": 0.034375,
+     "p_more": 0.14,
+     "p_fewer": 0.90205
+    },
+    "duplicates": {
+     "diff": -0.00625,
+     "p_more": 0.81005,
+     "p_fewer": 0.38675
+    },
+    "correct": {
+     "diff": 0.01875,
+     "p_more": 0.2442,
+     "p_fewer": 0.8322
+    },
+    "seconds": {
+     "diff": -0.4790624999999999,
+     "p_more": 0.7168,
+     "p_fewer": 0.28345,
+     "ci": [
+      -0.4790624999999999,
+      -2.1131249999999997,
+      1.1328125000000002
+     ]
+    },
+    "tokens": {
+     "diff": -6207.734375,
+     "p_more": 0.9259,
+     "p_fewer": 0.0741
+    }
    },
    "wal-pb->wal-pb-dr": {
-    "seconds_diff": [
-     0.010624999999999812,
-     -1.6431250000000002,
-     1.7790624999999998
-    ],
-    "turns_diff": [
-     0.128125,
-     -0.803125,
-     1.05
-    ],
-    "conflicts_diff": -1,
-    "conflicts_p_more": 0.5793,
-    "conflicts_p_fewer": 0.49905,
-    "duplicates_diff": 0,
-    "duplicates_p_more": 0.6004,
-    "duplicates_p_fewer": 0.60175,
-    "accuracy_diff": 0.003125,
-    "accuracy_p_up": 0.50075,
-    "accuracy_p_down": 0.60345
+    "units": 320,
+    "conflicts": {
+     "diff": -0.003125,
+     "p_more": 0.57975,
+     "p_fewer": 0.49605
+    },
+    "duplicates": {
+     "diff": -0.003125,
+     "p_more": 0.7254,
+     "p_fewer": 0.5014
+    },
+    "correct": {
+     "diff": 0.003125,
+     "p_more": 0.5039,
+     "p_fewer": 0.6079
+    },
+    "seconds": {
+     "diff": 0.010624999999999812,
+     "p_more": 0.4943,
+     "p_fewer": 0.50595,
+     "ci": [
+      0.010624999999999812,
+      -1.6431250000000002,
+      1.7790624999999998
+     ]
+    },
+    "tokens": {
+     "diff": 718.934375,
+     "p_more": 0.434,
+     "p_fewer": 0.566
+    }
    },
    "wal->wal-pb-dr": {
-    "seconds_diff": [
-     -0.4684375,
-     -2.2234375,
-     1.3312499999999998
-    ],
-    "turns_diff": [
-     -0.640625,
-     -1.528125,
-     0.25625
-    ],
-    "conflicts_diff": 10,
-    "conflicts_p_more": 0.16725,
-    "conflicts_p_fewer": 0.88215,
-    "duplicates_diff": -2,
-    "duplicates_p_more": 0.78135,
-    "duplicates_p_fewer": 0.3953,
-    "accuracy_diff": 0.021875,
-    "accuracy_p_up": 0.1887,
-    "accuracy_p_down": 0.8817
+    "units": 320,
+    "conflicts": {
+     "diff": 0.03125,
+     "p_more": 0.1705,
+     "p_fewer": 0.87895
+    },
+    "duplicates": {
+     "diff": -0.009375,
+     "p_more": 0.8849,
+     "p_fewer": 0.2735
+    },
+    "correct": {
+     "diff": 0.021875,
+     "p_more": 0.18555,
+     "p_fewer": 0.88305
+    },
+    "seconds": {
+     "diff": -0.4684375,
+     "p_more": 0.69295,
+     "p_fewer": 0.3072,
+     "ci": [
+      -0.4684375,
+      -2.2234375,
+      1.3312499999999998
+     ]
+    },
+    "tokens": {
+     "diff": -5488.8,
+     "p_more": 0.8901,
+     "p_fewer": 0.1099
+    }
    }
   }
  },
@@ -440,90 +512,205 @@
   },
   "steps": {
    "wal->wal-pb": {
-    "seconds_diff": [
-     -0.11749999999999988,
-     -1.7509375,
-     1.4628125
-    ],
-    "turns_diff": [
-     -0.290625,
-     -1.103125,
-     0.5875
-    ],
-    "conflicts_diff": 6,
-    "conflicts_p_more": 0.25825,
-    "conflicts_p_fewer": 0.81475,
-    "duplicates_diff": 2,
-    "duplicates_p_more": 0.39945,
-    "duplicates_p_fewer": 0.7736,
-    "accuracy_diff": -0.015625,
-    "accuracy_p_up": 0.7798,
-    "accuracy_p_down": 0.30085
+    "units": 320,
+    "conflicts": {
+     "diff": 0.01875,
+     "p_more": 0.26005,
+     "p_fewer": 0.8139
+    },
+    "duplicates": {
+     "diff": 0.00625,
+     "p_more": 0.39905,
+     "p_fewer": 0.7764
+    },
+    "correct": {
+     "diff": -0.015625,
+     "p_more": 0.7832,
+     "p_fewer": 0.2994
+    },
+    "seconds": {
+     "diff": -0.11749999999999988,
+     "p_more": 0.55965,
+     "p_fewer": 0.4405,
+     "ci": [
+      -0.11749999999999988,
+      -1.7509375,
+      1.4628125
+     ]
+    },
+    "tokens": {
+     "diff": -1500.915625,
+     "p_more": 0.63115,
+     "p_fewer": 0.36885
+    }
    },
    "wal-pb->wal-pb-dr": {
-    "seconds_diff": [
-     -0.5028125,
-     -2.3490625,
-     1.3384375
-    ],
-    "turns_diff": [
-     -0.471875,
-     -1.3125,
-     0.35625
-    ],
-    "conflicts_diff": 6,
-    "conflicts_p_more": 0.2647,
-    "conflicts_p_fewer": 0.81325,
-    "duplicates_diff": -2,
-    "duplicates_p_more": 0.80275,
-    "duplicates_p_fewer": 0.3926,
-    "accuracy_diff": 0.0125,
-    "accuracy_p_up": 0.33925,
-    "accuracy_p_down": 0.75905
+    "units": 320,
+    "conflicts": {
+     "diff": 0.01875,
+     "p_more": 0.26165,
+     "p_fewer": 0.81835
+    },
+    "duplicates": {
+     "diff": -0.00625,
+     "p_more": 0.8086,
+     "p_fewer": 0.384
+    },
+    "correct": {
+     "diff": 0.0125,
+     "p_more": 0.33685,
+     "p_fewer": 0.75445
+    },
+    "seconds": {
+     "diff": -0.5028125,
+     "p_more": 0.7104,
+     "p_fewer": 0.2897,
+     "ci": [
+      -0.5028125,
+      -2.3490625,
+      1.3384375
+     ]
+    },
+    "tokens": {
+     "diff": -4729.05625,
+     "p_more": 0.86035,
+     "p_fewer": 0.13965
+    }
    },
    "wal->wal-pb-dr": {
-    "seconds_diff": [
-     -0.6203124999999999,
-     -2.29125,
-     1.075
-    ],
-    "turns_diff": [
-     -0.7625,
-     -1.553125,
-     0.0125
-    ],
-    "conflicts_diff": 12,
-    "conflicts_p_more": 0.08555,
-    "conflicts_p_fewer": 0.94895,
-    "duplicates_diff": 0,
-    "duplicates_p_more": 0.61475,
-    "duplicates_p_fewer": 0.62645,
-    "accuracy_diff": -0.003125,
-    "accuracy_p_up": 0.61285,
-    "accuracy_p_down": 0.50425
+    "units": 320,
+    "conflicts": {
+     "diff": 0.0375,
+     "p_more": 0.0877,
+     "p_fewer": 0.9479
+    },
+    "duplicates": {
+     "diff": 0,
+     "p_more": 0.62125,
+     "p_fewer": 0.62525
+    },
+    "correct": {
+     "diff": -0.003125,
+     "p_more": 0.6181,
+     "p_fewer": 0.49975
+    },
+    "seconds": {
+     "diff": -0.6203124999999999,
+     "p_more": 0.76705,
+     "p_fewer": 0.23315,
+     "ci": [
+      -0.6203124999999999,
+      -2.29125,
+      1.075
+     ]
+    },
+    "tokens": {
+     "diff": -6229.971875,
+     "p_more": 0.9307,
+     "p_fewer": 0.0693
+    }
    }
   }
  },
  "_pooled": {
   "wal->wal-pb": {
-   "pairs": 960,
-   "accuracy_diff": 0.003125,
-   "accuracy_p_up": 0.43225,
-   "accuracy_p_down": 0.63055,
-   "conflicts_diff": 14,
-   "duplicates_diff": -1,
-   "duplicates_p_more": 0.6214,
-   "duplicates_p_fewer": 0.5004
+   "units": 960,
+   "conflicts": {
+    "diff": 0.014583333333333334,
+    "p_more": 0.2047,
+    "p_fewer": 0.8278
+   },
+   "duplicates": {
+    "diff": -0.0010416666666666667,
+    "p_more": 0.6198,
+    "p_fewer": 0.5001
+   },
+   "correct": {
+    "diff": 0.003125,
+    "p_more": 0.4327,
+    "p_fewer": 0.6309
+   },
+   "seconds": {
+    "diff": -0.7309374999999999,
+    "p_more": 0.9441,
+    "p_fewer": 0.05595,
+    "ci": [
+     -0.7309374999999999,
+     -1.6384374999999998,
+     0.18250000000000008
+    ]
+   },
+   "tokens": {
+    "diff": -4774.55,
+    "p_more": 0.97715,
+    "p_fewer": 0.02285
+   }
+  },
+  "wal-pb->wal-pb-dr": {
+   "units": 960,
+   "conflicts": {
+    "diff": 0.004166666666666667,
+    "p_more": 0.4301,
+    "p_fewer": 0.61895
+   },
+   "duplicates": {
+    "diff": -0.0010416666666666667,
+    "p_more": 0.62755,
+    "p_fewer": 0.5032
+   },
+   "correct": {
+    "diff": 0.00625,
+    "p_more": 0.3426,
+    "p_fewer": 0.7139
+   },
+   "seconds": {
+    "diff": -0.8720833333333334,
+    "p_more": 0.9593,
+    "p_fewer": 0.04075,
+    "ci": [
+     -0.8720833333333334,
+     -1.8135416666666668,
+     0.0908333333333332
+    ]
+   },
+   "tokens": {
+    "diff": -4167.785416666667,
+    "p_more": 0.96185,
+    "p_fewer": 0.03815
+   }
   },
   "wal->wal-pb-dr": {
-   "pairs": 960,
-   "accuracy_diff": 0.009375,
-   "accuracy_p_up": 0.2598,
-   "accuracy_p_down": 0.78995,
-   "conflicts_diff": 18,
-   "duplicates_diff": -1,
-   "duplicates_p_more": 0.63135,
-   "duplicates_p_fewer": 0.4925
+   "units": 960,
+   "conflicts": {
+    "diff": 0.01875,
+    "p_more": 0.15295,
+    "p_fewer": 0.8728
+   },
+   "duplicates": {
+    "diff": -0.0020833333333333333,
+    "p_more": 0.6969,
+    "p_fewer": 0.43205
+   },
+   "correct": {
+    "diff": 0.009375,
+    "p_more": 0.26125,
+    "p_fewer": 0.78765
+   },
+   "seconds": {
+    "diff": -1.6030208333333333,
+    "p_more": 0.99945,
+    "p_fewer": 0.00055,
+    "ci": [
+     -1.6030208333333333,
+     -2.54375,
+     -0.6404166666666666
+    ]
+   },
+   "tokens": {
+    "diff": -8942.335416666667,
+    "p_more": 1.0,
+    "p_fewer": 0.0
+   }
   }
  }
 }

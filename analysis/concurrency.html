@@ -147,18 +147,28 @@ a { color: var(--accent); }
 
   <section id="ablations" hidden>
     <div class="sectionhead">
-      <h2>Ablations: which part of the log does the work</h2>
+      <h2>Ablations: building the log one check at a time</h2>
       <p id="abintro"></p>
     </div>
     <div class="tablewrap"><table class="wide" id="abmodes"></table></div>
+    <p class="note" id="abmodesnote"></p>
+    <div class="sectionhead">
+      <h3>What each step changes</h3>
+      <p id="abladderintro"></p>
+    </div>
+    <div class="tablewrap"><table class="wide" id="abladder"></table></div>
     <figure class="chartbox" id="chart3box">
       <div class="legend" id="chart3legend"></div>
-      <svg id="chart3" role="img" aria-labelledby="chart3title"><title id="chart3title">Share of task-runs with a duplicate insert under each variant of the log, per setup</title></svg>
+      <svg id="chart3" role="img" aria-labelledby="chart3title"><title id="chart3title">Conflicts per task-run at each step of the ladder, per setup, on a log scale</title></svg>
       <div class="tip" id="tip3" hidden></div>
       <figcaption id="chart3cap"></figcaption>
     </figure>
-    <div class="tablewrap"><table class="wide" id="abtable"></table></div>
     <ul class="points" id="abpoints"></ul>
+    <details>
+      <summary>Every step, per setup</summary>
+      <div class="tablewrap"><table class="wide" id="abtable"></table></div>
+    </details>
+    <p class="note" id="abnote"></p>
   </section>
 
   <section id="how">
@@ -443,7 +453,7 @@ if (D.piggyback) {
 
 // ---- drafts and ablations: variants run side by side in the same jobs ----
 function chipC(cls, text) { return `<span class="chip ${cls}">${text}</span>`; }
-function secsChip(d) { const [m, l, h] = d.seconds_diff; return chipC(h < 0 ? "good" : l > 0 ? "bad" : "flat", `${m > 0 ? "+" : "−"}${Math.abs(m).toFixed(1)} s`); }
+function secsChip(d) { const [m, l, h] = d.seconds.ci; return chipC(h < 0 ? "good" : l > 0 ? "bad" : "flat", `${m > 0 ? "+" : "−"}${Math.abs(m).toFixed(1)} s`); }
 function hoverTips(svgId, tipId, boxId) {
   const svg = $(svgId), tip = $(tipId), box = $(boxId);
   const show = (e) => {
@@ -480,68 +490,113 @@ if (D.drafts) {
   const none = R2.none;
   $("drpoints").innerHTML = [
     `<b>Drafts do what they were built for.</b> Writes refused for having no intent fell from ${noIntent("wal-pb")} to ${noIntent("wal-pb-dr")} across the three setups, and ${used} drafts were recorded. The remaining no-intent refusals are agents that never posted at all, which stay refused by design.`,
-    `<b>They save time only for the no-channel team.</b> There, drafts cut another ${Math.abs(none.steps["wal-pb->wal-pb-dr"].seconds_diff[0]).toFixed(1)} s per task, and with piggybacking ${Math.abs(none.steps["wal->wal-pb-dr"].seconds_diff[0]).toFixed(1)} s (${Math.round(100 * Math.abs(none.steps["wal->wal-pb-dr"].seconds_diff[0]) / none.variants.wal.seconds)}%) compared with the log alone. For the teams that can message, neither change moved latency beyond noise.`,
-    `<b>Piggybacking's speed-up replicated only for the no-channel team.</b> In this second batch it saved ${Math.abs(none.steps["wal->wal-pb"].seconds_diff[0]).toFixed(1)} s there but not in the messaging teams, which saved about 1.6 s in the first batch. Its effect on teams that already message is uncertain.`,
-    `<b>Conflicts and accuracy did not change</b>${accAll ? ` (accuracy ${accAll.accuracy_diff >= 0 ? "+" : "−"}${Math.abs(100 * accAll.accuracy_diff).toFixed(1)} points pooled, p = ${Math.min(accAll.accuracy_p_up, accAll.accuracy_p_down).toFixed(2)})` : ""}: both changes alter when agents learn about entries, not what the log enforces.`,
+    `<b>They save time only for the no-channel team.</b> There, drafts cut another ${Math.abs(none.steps["wal-pb->wal-pb-dr"].seconds.diff).toFixed(1)} s per task, and with piggybacking ${Math.abs(none.steps["wal->wal-pb-dr"].seconds.diff).toFixed(1)} s (${Math.round(100 * Math.abs(none.steps["wal->wal-pb-dr"].seconds.diff) / none.variants.wal.seconds)}%) compared with the log alone. For the teams that can message, neither change moved latency beyond noise.`,
+    `<b>Piggybacking's speed-up replicated only for the no-channel team.</b> In this second batch it saved ${Math.abs(none.steps["wal->wal-pb"].seconds.diff).toFixed(1)} s there but not in the messaging teams, which saved about 1.6 s in the first batch. Its effect on teams that already message is uncertain.`,
+    `<b>Conflicts and accuracy did not change</b>${accAll ? ` (accuracy ${accAll.correct.diff >= 0 ? "+" : "−"}${Math.abs(100 * accAll.correct.diff).toFixed(1)} points pooled, two-sided p = ${Math.min(1, 2 * Math.min(accAll.correct.p_more, accAll.correct.p_fewer)).toFixed(2)})` : ""}: both changes alter when agents learn about entries, not what the log enforces.`,
   ].map((x) => `<li>${x}</li>`).join("");
 }
 if (D.ablations) {
-  const A = D.ablations, keys = SETUPS.filter((s) => A[s]), V = ["wal", "wal-changes-only", "wal-post-anytime", "wal-advisory"];
-  const name = Object.fromEntries(A._variants);
+  const A = D.ablations, keys = SETUPS.filter((s) => A[s]);
+  const L = A._variants.map(([v]) => v);  // the steps in order: no log, then one check added at a time
+  const short = ["No log", "Log, nothing enforced", "+ Catch up before writing", "+ Declare before writing", "+ Catch up before posting"];
+  const stepName = (i) => `${i}. ${A._variants[i][1]}`;
+  const two = (d) => Math.min(1, 2 * Math.min(d.p_more, d.p_fewer));  // two-sided
+  const pv = (p) => p < 0.001 ? "p < 0.001" : `p = ${p.toFixed(p < 0.01 || (p > 0.04 && p < 0.06) ? 3 : 2)}`;
+  const sg = (x) => (x > 0 ? "+" : x < 0 ? "−" : "±");
+  const M = { conflicts: (q) => q.conflict_count / q.task_runs, dups: (q) => q.conflicts.dup_inserts, posts: (q) => q.post_refused,
+              writes: (q) => q.write_refused, seconds: (q) => q.seconds, tokens: (q) => q.tokens, accuracy: (q) => q.accuracy,
+              intents: (q) => q.intents, reads: (q) => q.reads };
+  // a step's value pooled over the setups: their mean (every setup has the same number of task-runs at a step)
+  const pooled = (v) => Object.fromEntries(Object.entries(M).map(([n, f]) => [n, keys.reduce((a, s) => a + f(A[s].variants[v]), 0) / keys.length]));
+  const one = (s) => (v) => Object.fromEntries(Object.entries(M).map(([n, f]) => [n, f(A[s].variants[v])]));
   $("ablations").hidden = false;
-  $("abintro").textContent = `The full log has three ingredients: intents posted before acting, a rule that a post needs every entry read, and refusals that enforce both before a write. Each ablation removes one. ` +
-    `Each job ran the full log and the three ablations side by side on one GPU (${A[keys[0]].reps} runs of the 64 tasks per setup), so every ablation is compared task by task with the full log under the same load.`;
-  $("abmodes").innerHTML = `<thead><tr><th>Variant</th><th>What is removed</th><th>What stays</th></tr></thead><tbody>` + [
-    ["Full log", "Nothing", "Intents; posting needs every entry read; writes refused unless caught up and declared"],
-    ["Changes only", "Intents (no wal_append, protocol without them)", "The log of completed changes; writes refused until the agent has read every entry"],
-    ["Posting while behind", "The read-before-posting rule", "Intents; writes still refused unless caught up and declared"],
-    ["Nothing enforced", "Every check and refusal", "The log, both tools and the protocol text, which says it is up to the agents"],
-  ].map((r) => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join("") + "</tbody>";
-  // chart: share of task-runs with a duplicate insert, per variant (rows) and setup (series), with no log as reference
+  $("abintro").textContent = `Each step keeps everything from the step before and adds one check, so the change from one row to the next is what that check does. ` +
+    `Step 0 is the shared workspace with no log at all; step 4 is the full log used everywhere else on this page.`;
+  const E = `<span class="pill ok">Enforced</span>`, NEW = `<span class="pill ok">Enforced · added here</span>`, ASK = `<span class="pill na">Asked, not checked</span>`, NO = `<span class="delta">–</span>`;
+  const p0 = pooled(L[1]);
+  const matrix = [
+    [NO, NO, NO, NO, NO],
+    ["Yes", `Optional: ${p0.intents.toFixed(1)} per task-run`, ASK, ASK, ASK],
+    ["Yes", "None (no tool)*", NEW, NO, NO],
+    ["Yes", "Required", E, NEW, ASK],
+    ["Yes", "Required", E, E, NEW],
+  ];
+  $("abmodes").innerHTML = `<thead><tr><th>Step</th><th>Log of every change</th><th style="min-width:130px">Intents</th><th>A write is refused until the agent has read every entry</th>` +
+    `<th>A write is refused unless the agent's latest intent declares it</th><th>A post is refused until the agent has read every entry</th></tr></thead><tbody>` +
+    matrix.map((r, i) => `<tr><td><b>${esc(stepName(i))}</b></td>${r.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("") + "</tbody>";
+  $("abmodesnote").textContent = `The harness adds each completed change to the log itself; agents only read it and post intents. "Asked, not checked": the instructions tell agents to do it, but nothing refuses them if they don't. ` +
+    `* Step 2 is the one step that is not purely additive: in these runs it also took away the intent tool, so step 1 → 2 both adds the catch-up check and removes the optional intents. Step 3 brings intents back, now required. ` +
+    `Separating the two would need one more run: the catch-up check with optional intents.`;
+  $("abladderintro").textContent = `All three agent-driven setups pooled: ${3 * A[keys[0]].pairs} task-runs per step (step 0: ${keys.reduce((a, s) => a + A[s].variants[L[0]].task_runs, 0).toLocaleString()}). ` +
+    `Under each value is the change from the step before, colored when it is statistically significant: green better, red worse.`;
+  const chipD = (d, fmt, goodWhenUp) => {
+    const p = two(d), sig = p < 0.05;
+    return chipC(sig ? ((d.diff > 0) === goodWhenUp ? "good" : "bad") : "flat", `${fmt(d.diff)}, ${sig ? pv(p) : "n.s."}`);
+  };
+  const secChip = (d) => { const [m, l, h] = d.seconds.ci; return chipC(h < 0 ? "good" : l > 0 ? "bad" : "flat", `${sg(m)}${Math.abs(m).toFixed(1)} s${h < 0 || l > 0 ? "" : ", n.s."}`); };
+  const ptsF = (x) => `${sg(x)}${Math.abs(100 * x).toFixed(1)} pts`;
+  const ladder = (stats, steps) => L.map((v, i) => {
+    const q = stats(v), d = i ? steps[`${L[i - 1]}->${v}`] : null, prev = i ? stats(L[i - 1]) : null;
+    const under = (html) => d ? "<br>" + html : "";
+    return `<tr><td><b>${esc(stepName(i))}</b></td>` +
+      `<td class="n">${q.conflicts.toFixed(2)}${under(d && chipD(d.conflicts, (x) => `${sg(x)}${Math.abs(x).toFixed(2)}`, false))}</td>` +
+      `<td class="n">${pct(q.dups, 1)}${under(d && chipD(d.duplicates, ptsF, false))}</td>` +
+      `<td class="n">${q.posts + q.writes ? `${(q.posts + q.writes).toFixed(1)}<br><span class="delta">posts ${q.posts.toFixed(1)}, writes ${q.writes.toFixed(1)}</span>` : "–"}</td>` +
+      `<td class="n">${q.seconds.toFixed(1)}${under(d && secChip(d))}</td>` +
+      `<td class="n">${k(q.tokens)}${under(d && chipC("flat", `${sg(d.tokens.diff)}${Math.abs(Math.round(100 * d.tokens.diff / prev.tokens))}%`))}</td>` +
+      `<td class="n">${pct(q.accuracy)}${under(d && chipD(d.correct, ptsF, true))}</td></tr>`;
+  }).join("");
+  const head = (first) => `<thead><tr><th>${first}</th><th class="n">Conflicts<br>per task-run</th><th class="n">Task-runs with a<br>duplicate insert</th><th class="n">Refusals<br>per task-run</th>` +
+    `<th class="n">Seconds<br>per task</th><th class="n">Tokens<br>per task</th><th class="n">Accuracy</th></tr></thead>`;
+  $("abladder").innerHTML = head("Step, all setups pooled") + "<tbody>" + ladder(pooled, A._pooled) + "</tbody>";
+  $("abtable").innerHTML = head("Step") + "<tbody>" + keys.map((s) => `<tr class="group"><td colspan="7">${A[s].label} (${A[s].pairs} task-runs per step; step 0: ${A[s].variants[L[0]].task_runs})</td></tr>` + ladder(one(s), A[s].steps)).join("") + "</tbody>";
+  // chart: every conflict per task-run at each step, one dot per setup; log scale, since step 2 cuts conflicts tenfold
   (function () {
     const series = keys.map((s, i) => ({ s, color: `var(--s${i + 1})`, label: A[s].label }));
     $("chart3legend").innerHTML = series.map((x) => `<span><i style="background:${x.color};border-radius:50%"></i>${x.label}</span>`).join("");
-    const noLog = (s) => (C[s].task_runs_with.duplicate || 0) / C[s].task_runs;
-    const rowsC = [["No log (10-run baselines)", (s) => noLog(s)], ...["wal-advisory", "wal-changes-only", "wal-post-anytime", "wal"].map((v) => [name[v], (s) => A[s].variants[v].conflicts.dup_inserts])];
-    const svg = $("chart3"), W = 720, rowH = 38, top = 8, left = 230, right = 30, H = top + rowsC.length * rowH + 28;
-    const max = Math.ceil(Math.max(...rowsC.flatMap(([, f]) => keys.map(f))) * 50) / 50;
-    const x = (v) => left + (W - left - right) * v / max;
+    const vals = L.flatMap((v) => keys.map((s2) => M.conflicts(A[s2].variants[v])));
+    const ticks = [0.01, 0.03, 0.1, 0.3, 1, 3].filter((t, i, all) => t >= Math.min(...vals) / 3 && (i === 0 || all[i - 1] < Math.max(...vals)));
+    const lo = Math.log10(ticks[0]), hi = Math.log10(ticks[ticks.length - 1]);
+    const svg = $("chart3"), W = 760, rowH = 38, top = 8, left = 236, right = 120, H = top + L.length * rowH + 28;
+    const x = (v) => left + (W - left - right) * (Math.log10(v) - lo) / (hi - lo);
     svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
     let s = "";
-    for (let v = 0; v <= max + 1e-9; v += 0.04) s += `<line class="gridline" x1="${x(v)}" x2="${x(v)}" y1="${top}" y2="${H - 24}"/><text class="lbl" x="${x(v)}" y="${H - 8}" text-anchor="middle">${pct(v)}</text>`;
-    rowsC.forEach(([label, f], i) => {
+    for (const t of ticks) s += `<line class="gridline" x1="${x(t)}" x2="${x(t)}" y1="${top}" y2="${H - 24}"/><text class="lbl" x="${x(t)}" y="${H - 8}" text-anchor="middle">${t}</text>`;
+    L.forEach((v, i) => {
       const y = top + i * rowH + rowH / 2;
-      s += `<text class="cat" x="${left - 12}" y="${y + 4}" text-anchor="end">${esc(label)}</text>`;
+      s += `<text class="cat" x="${left - 14}" y="${y + 4}" text-anchor="end">${esc(`${i} · ${short[i]}`)}</text>`;
       series.forEach((ser, j) => {
-        const v = f(ser.s);
-        s += `<circle cx="${x(v)}" cy="${y + (j - 1) * 4}" r="5.5" fill="${ser.color}" stroke="var(--surface)" stroke-width="2" tabindex="0" data-tip="${esc(`${label}, ${ser.label}: ${pct(v, 1)} of task-runs with a duplicate insert`)}"/>`;
+        const val = M.conflicts(A[ser.s].variants[v]);
+        s += `<circle cx="${x(val)}" cy="${y + (j - 1) * 5}" r="5.5" fill="${ser.color}" stroke="var(--surface)" stroke-width="2" tabindex="0" data-tip="${esc(`Step ${stepName(i)}, ${ser.label}: ${val.toFixed(2)} conflicts per task-run`)}"/>`;
       });
+      s += `<text class="val" x="${W - right + 14}" y="${y + 4}">${pooled(v).conflicts.toFixed(2)} pooled</text>`;
     });
     svg.insertAdjacentHTML("beforeend", s);
     hoverTips("chart3", "tip3", "chart3box");
-    $("chart3cap").textContent = `Share of task-runs with a duplicate insert, the conflict that changes the final state. Each variant has 320 task-runs per setup; the no-log row comes from the 10-run baselines, run on other days. The table below has every value.`;
+    $("chart3cap").textContent = `Every conflict (duplicate inserts, writes to deleted records, redundant writes, lost updates) per task-run, one dot per setup; on the right, the three setups pooled. ` +
+      `The axis is logarithmic: each gridline is roughly three times the one before, so step 2's drop is about tenfold. Duplicate inserts alone are in the table above.`;
   })();
-  let h = `<thead><tr><th>Variant</th><th class="n">Conflicts</th><th class="n">Task-runs with a duplicate insert</th><th class="n">Rejected writes</th><th class="n">Seconds per task</th><th class="n">Tokens per task</th><th class="n">Accuracy</th></tr></thead><tbody>`;
-  for (const s of keys) {
-    h += `<tr class="group"><td colspan="7">${A[s].label} (${A[s].pairs} task-runs per variant)</td></tr>`;
-    for (const v of V) {
-      const q = A[s].variants[v], st = A[s].steps[`wal->${v}`];
-      const cChip = st ? (st.conflicts_p_more < 0.05 ? chipC("bad", "more, p " + (st.conflicts_p_more < 0.001 ? "< 0.001" : st.conflicts_p_more.toFixed(3))) : chipC("flat", "n.s.")) : "";
-      const dChip = st ? (st.duplicates_p_more < 0.05 ? chipC("bad", "more") : st.duplicates_p_fewer < 0.05 ? chipC("good", "fewer") : chipC("flat", "n.s.")) : "";
-      const aChip = st ? (st.accuracy_p_up < 0.05 ? chipC("good", `+${(100 * st.accuracy_diff).toFixed(1)} pts`) : st.accuracy_p_down < 0.05 ? chipC("bad", `−${Math.abs(100 * st.accuracy_diff).toFixed(1)} pts`) : chipC("flat", "n.s.")) : "";
-      h += `<tr><td>${name[v]}</td><td class="n">${q.conflict_count}${st ? "<br>" + cChip : ""}</td><td class="n">${pct(q.conflicts.dup_inserts, 1)}${st ? "<br>" + dChip : ""}</td>` +
-        `<td class="n">${sumW(q.write_refused_total)}</td><td class="n">${q.seconds.toFixed(1)}${st ? "<br>" + secsChip(st) : ""}</td><td class="n">${k(q.tokens)}</td><td class="n">${pct(q.accuracy)}${st ? "<br>" + aChip : ""}</td></tr>`;
-    }
-  }
-  $("abtable").innerHTML = h + "</tbody>";
-  const P = A._pooled, adv = P["wal->wal-advisory"], co = P["wal->wal-changes-only"], pa = P["wal->wal-post-anytime"];
-  const reads = (v) => keys.map((s) => A[s].variants[v].reads.toFixed(1)).join(", ");
-  const secs = (v) => keys.map((s) => Math.abs(A[s].steps[`wal->${v}`].seconds_diff[0]).toFixed(1)).join(", ");
+  const P = A._pooled, q = L.map(pooled), d = L.slice(1).map((v, i) => P[`${L[i]}->${v}`]), net = P["wal-changes-only->wal"];
+  const c = (x) => x.toFixed(2), dp = (x) => pct(x, 1), ns = (dd) => two(dd) < 0.05 ? pv(two(dd)) : `n.s., ${pv(two(dd))}`;
+  const accTxt = (dd) => two(dd.correct) < 0.05 ? `accuracy ${dd.correct.diff > 0 ? "rises" : "drops"} ${Math.abs(100 * dd.correct.diff).toFixed(1)} points (${pv(two(dd.correct))})`
+    : `accuracy doesn't change significantly (${ptsF(dd.correct.diff)}, ${pv(two(dd.correct))})`;
+  const rose = keys.filter((s) => M.conflicts(A[s].variants[L[1]]) > M.conflicts(A[s].variants[L[0]])).map((s) => A[s].label.toLowerCase());
+  const tokPct = (i) => Math.abs(Math.round(100 * d[i - 1].tokens.diff / q[i - 1].tokens));
   $("abpoints").innerHTML = [
-    `<b>Enforcement is what works.</b> With the same log, tools and instructions but nothing checked, conflicts go back to roughly the level of having no log at all: ${keys.map((s) => A[s].variants["wal-advisory"].conflict_count).join(", ")} conflicts against ${keys.map((s) => A[s].variants.wal.conflict_count).join(", ")} with the full log, and ${adv.duplicates_diff} more duplicate inserts (p < 0.001). Unprompted by refusals, agents read the log less (${reads("wal-advisory")} reads per task-run, against ${reads("wal")}).`,
-    `<b>Intents add little against harmful conflicts.</b> Without intents, duplicate inserts did not change (${co.duplicates_diff >= 0 ? "+" : ""}${co.duplicates_diff} pooled, n.s.). What rose were harmless collisions, mostly in the no-channel team. And the team was faster (${secs("wal-changes-only")} s per task) with slightly higher accuracy (+${(100 * co.accuracy_diff).toFixed(1)} points pooled, p = ${co.accuracy_p_up.toFixed(2)}). On WorkBench, enforced visibility of completed changes does most of the work; posting plans mainly prevents wasted writes, at a cost in time.`,
-    `<b>The read-before-posting rule pays for itself.</b> Without it, agents plan without having caught up, so their writes are refused instead: about ${Math.round(keys.reduce((a, s) => a + sumW(A[s].variants["wal-post-anytime"].write_refused_total), 0) / keys.length)} refused writes per setup against ${Math.round(keys.reduce((a, s) => a + sumW(A[s].variants.wal.write_refused_total), 0) / keys.length)}. That costs extra calls and tokens, adds ${secs("wal-post-anytime")} s per task, and lowers accuracy by ${Math.abs(100 * pa.accuracy_diff).toFixed(1)} points (pooled, p = ${pa.accuracy_p_down.toFixed(2)}). Catching up before planning is cheaper than catching up after.`,
+    `<b>Step 1: the log on its own, with nothing enforced, cuts duplicates a little but not conflicts.</b> Agents use it of their own accord (${q[1].intents.toFixed(1)} intents posted and ${q[1].reads.toFixed(1)} reads per task-run), and duplicate inserts fall from ${dp(q[0].dups)} to ${dp(q[1].dups)} of task-runs (${ns(d[0].duplicates)}). ` +
+      `Conflicts overall don't fall: ${c(q[0].conflicts)} → ${c(q[1].conflicts)} per task-run${rose.length ? `, up in the ${rose.join(" and ")} team${rose.length > 1 ? "s" : ""}` : ""}. Nothing stops an agent from writing on a stale view.`,
+    `<b>Step 2: refusing a write until the agent has read every entry does almost all the work.</b> Conflicts fall from ${c(q[1].conflicts)} to ${c(q[2].conflicts)} per task-run (−${Math.round(100 * (1 - q[2].conflicts / q[1].conflicts))}%, ${ns(d[1].conflicts)}), ` +
+      `duplicate inserts from ${dp(q[1].dups)} to ${dp(q[2].dups)} of task-runs (${ns(d[1].duplicates)}), the team is ${Math.abs(d[1].seconds.diff).toFixed(1)} s faster per task, and ${accTxt(d[1])}. This one check, with no intents at all, turns the log from advice into protection.`,
+    `<b>Step 3: requiring a declared intent before each write trims a little more, at a high price.</b> Conflicts go from ${c(q[2].conflicts)} to ${c(q[3].conflicts)} per task-run (${ns(d[2].conflicts)}) and duplicate inserts from ${dp(q[2].dups)} to ${dp(q[3].dups)} (${ns(d[2].duplicates)}). ` +
+      `But each task takes ${d[2].seconds.diff.toFixed(1)} s longer and ${tokPct(3)}% more tokens, and ${accTxt(d[2])}. Agents now post intents without having caught up, so ${q[3].writes.toFixed(1)} writes per task-run are refused for unread entries, and they re-plan and post again.`,
+    `<b>Step 4: refusing a post until the agent has read every entry recovers part of that cost.</b> The refusal now comes before the agent has committed to a plan: refused writes fall from ${q[3].writes.toFixed(1)} to ${q[4].writes.toFixed(1)} per task-run, while ${q[4].posts.toFixed(1)} posts per task-run are refused instead. ` +
+      `The team is ${Math.abs(d[3].seconds.diff).toFixed(1)} s faster per task and uses ${tokPct(4)}% fewer tokens, ${accTxt(d[3])}, and conflicts fall to ${c(q[4].conflicts)} per task-run (${ns(d[3].conflicts)}). Duplicate inserts: ${dp(q[3].dups)} → ${dp(q[4].dups)} (${ns(d[3].duplicates)}).`,
+    `<b>Net, what intents and their two checks (steps 3 and 4) add on top of step 2:</b> fewer harmless conflicts (${c(q[2].conflicts)} → ${c(q[4].conflicts)} per task-run, ${ns(net.conflicts)}), no fewer duplicate inserts (${dp(q[2].dups)} → ${dp(q[4].dups)}, ${ns(net.duplicates)}), ` +
+      `and ${net.seconds.diff.toFixed(1)} s more per task; ${accTxt(net)}. On WorkBench, the check that matters is step 2's: an agent can't change anything until it has seen every change its teammates made.`,
   ].map((x) => `<li>${x}</li>`).join("");
+  $("abnote").textContent = `Steps 1–4 ran side by side in the same jobs, ${A[keys[0]].reps} runs of the 64 tasks per setup on one GPU each, so every step is compared with the one before task-run by task-run under the same load. ` +
+    `Step 0 is the 10-run no-log baseline from other jobs (also four runs per GPU), compared task by task: each task's mean over its runs. Its seconds are only roughly comparable. ` +
+    `p-values are two-sided sign-flip tests on the paired differences; seconds are marked when the 95% bootstrap interval excludes zero. Script: analysis/wal_variants.py --tag ab.`;
 }
 
 // ---- logs ----
