@@ -297,6 +297,12 @@ $("cards").innerHTML = cards.map(([a, b, c]) => `<div class="card"><span class="
     return chip(r >= up ? "warn" : r <= down ? "good" : "flat", t);
   };
   let h = `<thead><tr><th>Setup</th><th class="n">Accuracy</th><th class="n">Conflicts<br>(640 task-runs)</th><th class="n">Tokens per task</th><th class="n">Seconds per task</th></tr></thead><tbody>`;
+  if (D.single) {  // the reference: one agent has nobody to coordinate with, so it has no log and no conflicts
+    const S = D.single;
+    h += `<tr class="group"><td colspan="5">Reference: one agent, nobody to coordinate with (no log)</td></tr>` +
+      `<tr><td>Single agent</td><td class="n"><b>${pct(S.accuracy)}</b><br><span class="delta">runs ${pct(S.range[0])}–${pct(S.range[1])}</span></td>` +
+      `<td class="n">–<br><span class="delta">one agent</span></td><td class="n"><b>${k(S.tokens)}</b></td><td class="n"><b>${S.seconds.toFixed(0)}</b></td></tr>`;
+  }
   for (const [title, rows] of groups) {
     h += `<tr class="group"><td colspan="5">${title}</td></tr>`;
     for (const [name, conf, accKey, costKey, priv] of rows) {

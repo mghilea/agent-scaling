@@ -258,6 +258,17 @@ def accuracy():
     return {"rows": rows, "single": systems["single"]["acc"]["all"], "decentralized": systems["decentralized"]["acc"]["all"]}
 
 
+def single():
+    """The single agent on the same tasks: the reference row (one agent, nothing to coordinate, no log)."""
+    dirs = runs("*-sas-workbench-gpt-oss-20b-rep??")
+    rows = [json.loads(line) for d in dirs for line in open(Path(d, "results.jsonl"))]
+    per_run = [st.mean(bool(json.loads(line)["correct"]) for line in open(Path(d, "results.jsonl"))) for d in dirs]
+    return {"runs": len(dirs), "task_runs": len(rows), "accuracy": st.mean(bool(r["correct"]) for r in rows),
+            "range": [min(per_run), max(per_run)],
+            "tokens": st.mean(r["prompt_tokens"] + r["completion_tokens"] for r in rows),
+            "seconds": st.mean(r["seconds"] for r in rows), "turns": st.mean(r["turns"] for r in rows)}
+
+
 def vote():
     """Decentralized: what the majority vote kept, with and without the log, and what keeping every change would score."""
     out = {}
@@ -301,7 +312,8 @@ def examples():
 
 def main():
     data = {"tasks": len(TASKS), "conflicts": conflict_table(), "remaining": remaining(), "cost": cost_and_usage(),
-            "behaviour": log_behaviour(), "accuracy": accuracy(), "vote": vote(), "examples": examples()}
+            "behaviour": log_behaviour(), "accuracy": accuracy(), "vote": vote(), "examples": examples(),
+            "single": single()}
     (ROOT / "analysis" / "concurrency.json").write_text(json.dumps(data, indent=1, default=str))
     print("written analysis/concurrency.json")
 
