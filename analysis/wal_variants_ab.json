@@ -1,0 +1,630 @@
+{
+ "_variants": [
+  [
+   "wal",
+   "Full log"
+  ],
+  [
+   "wal-changes-only",
+   "Changes only (no intents)"
+  ],
+  [
+   "wal-post-anytime",
+   "Posting while behind allowed"
+  ],
+  [
+   "wal-advisory",
+   "Nothing enforced"
+  ]
+ ],
+ "_steps": [
+  [
+   "wal",
+   "wal-changes-only"
+  ],
+  [
+   "wal",
+   "wal-post-anytime"
+  ],
+  [
+   "wal",
+   "wal-advisory"
+  ]
+ ],
+ "none": {
+  "label": "No channels",
+  "pairs": 320,
+  "reps": 5,
+  "variants": {
+   "wal": {
+    "task_runs": 320,
+    "seconds": 35.874375,
+    "seconds_median": 33.55,
+    "turns": 25.38125,
+    "tokens": 220348.8,
+    "accuracy": 0.3875,
+    "reads": 3.953125,
+    "intents": 2.2875,
+    "post_refused": 1.909375,
+    "write_refused": 0.2625,
+    "piggybacked": 0,
+    "piggybacked_entries": 0,
+    "post_refused_total": 611,
+    "write_refused_total": {
+     "behind": 25,
+     "no_intent": 56,
+     "undeclared": 3
+    },
+    "conflicts": {
+     "dup_inserts": 0.03125,
+     "gone": 0.009375,
+     "redundant": 0.009375,
+     "lost_updates": 0
+    },
+    "conflict_count": 19,
+    "drafts_used": 0,
+    "drafts_used_total": 0
+   },
+   "wal-changes-only": {
+    "task_runs": 320,
+    "seconds": 25.5309375,
+    "seconds_median": 22.5,
+    "turns": 24.69375,
+    "tokens": 198430.03125,
+    "accuracy": 0.403125,
+    "reads": 4.540625,
+    "intents": 0,
+    "post_refused": 0,
+    "write_refused": 1.85625,
+    "piggybacked": 0,
+    "piggybacked_entries": 0,
+    "post_refused_total": 0,
+    "write_refused_total": {
+     "behind": 594,
+     "no_intent": 0,
+     "undeclared": 0
+    },
+    "conflicts": {
+     "dup_inserts": 0.05,
+     "gone": 0.034375,
+     "redundant": 0.09375,
+     "lost_updates": 0
+    },
+    "conflict_count": 88,
+    "drafts_used": 0,
+    "drafts_used_total": 0
+   },
+   "wal-post-anytime": {
+    "task_runs": 320,
+    "seconds": 37.47625,
+    "seconds_median": 35.75,
+    "turns": 27.521875,
+    "tokens": 242998.228125,
+    "accuracy": 0.353125,
+    "reads": 4.853125,
+    "intents": 3.89375,
+    "post_refused": 0,
+    "write_refused": 2.625,
+    "piggybacked": 0,
+    "piggybacked_entries": 0,
+    "post_refused_total": 0,
+    "write_refused_total": {
+     "behind": 825,
+     "no_intent": 12,
+     "undeclared": 3
+    },
+    "conflicts": {
+     "dup_inserts": 0.01875,
+     "gone": 0.028125,
+     "redundant": 0.05625,
+     "lost_updates": 0
+    },
+    "conflict_count": 56,
+    "drafts_used": 0,
+    "drafts_used_total": 0
+   },
+   "wal-advisory": {
+    "task_runs": 320,
+    "seconds": 33.4034375,
+    "seconds_median": 31.0,
+    "turns": 26.359375,
+    "tokens": 223638.1375,
+    "accuracy": 0.375,
+    "reads": 2.51875,
+    "intents": 3.05625,
+    "post_refused": 0,
+    "write_refused": 0,
+    "piggybacked": 0,
+    "piggybacked_entries": 0,
+    "post_refused_total": 0,
+    "write_refused_total": {
+     "behind": 0,
+     "no_intent": 0,
+     "undeclared": 0
+    },
+    "conflicts": {
+     "dup_inserts": 0.090625,
+     "gone": 0.225,
+     "redundant": 0.35,
+     "lost_updates": 0.00625
+    },
+    "conflict_count": 694,
+    "drafts_used": 0,
+    "drafts_used_total": 0
+   }
+  },
+  "steps": {
+   "wal->wal-changes-only": {
+    "seconds_diff": [
+     -10.3434375,
+     -11.9740625,
+     -8.74875
+    ],
+    "turns_diff": [
+     -0.6875,
+     -1.334375,
+     -0.00625
+    ],
+    "conflicts_diff": 69,
+    "conflicts_p_more": 0.0,
+    "conflicts_p_fewer": 1.0,
+    "duplicates_diff": 6,
+    "duplicates_p_more": 0.08955,
+    "duplicates_p_fewer": 0.97155,
+    "accuracy_diff": 0.015625,
+    "accuracy_p_up": 0.2867,
+    "accuracy_p_down": 0.7997
+   },
+   "wal->wal-post-anytime": {
+    "seconds_diff": [
+     1.6018750000000004,
+     -0.22156249999999952,
+     3.4384375000000005
+    ],
+    "turns_diff": [
+     2.140625,
+     1.40625,
+     2.884375
+    ],
+    "conflicts_diff": 37,
+    "conflicts_p_more": 0.0008,
+    "conflicts_p_fewer": 0.9996,
+    "duplicates_diff": -4,
+    "duplicates_p_more": 0.9238,
+    "duplicates_p_fewer": 0.19885,
+    "accuracy_diff": -0.034375,
+    "accuracy_p_up": 0.94245,
+    "accuracy_p_down": 0.0952
+   },
+   "wal->wal-advisory": {
+    "seconds_diff": [
+     -2.4709375,
+     -4.35875,
+     -0.6921874999999996
+    ],
+    "turns_diff": [
+     0.978125,
+     0.290625,
+     1.66875
+    ],
+    "conflicts_diff": 675,
+    "conflicts_p_more": 0.0,
+    "conflicts_p_fewer": 1.0,
+    "duplicates_diff": 25,
+    "duplicates_p_more": 0.0001,
+    "duplicates_p_fewer": 0.99995,
+    "accuracy_diff": -0.0125,
+    "accuracy_p_up": 0.7336,
+    "accuracy_p_down": 0.35205
+   }
+  }
+ },
+ "text-coord": {
+  "label": "Text + coordinate",
+  "pairs": 320,
+  "reps": 5,
+  "variants": {
+   "wal": {
+    "task_runs": 320,
+    "seconds": 35.69125,
+    "seconds_median": 33.95,
+    "turns": 26.815625,
+    "tokens": 231286.1375,
+    "accuracy": 0.375,
+    "reads": 3.9,
+    "intents": 2.078125,
+    "post_refused": 1.921875,
+    "write_refused": 0.20625000000000002,
+    "piggybacked": 0,
+    "piggybacked_entries": 0,
+    "post_refused_total": 615,
+    "write_refused_total": {
+     "behind": 13,
+     "no_intent": 49,
+     "undeclared": 4
+    },
+    "conflicts": {
+     "dup_inserts": 0.034375,
+     "gone": 0.003125,
+     "redundant": 0.003125,
+     "lost_updates": 0
+    },
+    "conflict_count": 15,
+    "drafts_used": 0,
+    "drafts_used_total": 0
+   },
+   "wal-changes-only": {
+    "task_runs": 320,
+    "seconds": 30.6171875,
+    "seconds_median": 27.85,
+    "turns": 27.184375,
+    "tokens": 221613.621875,
+    "accuracy": 0.390625,
+    "reads": 4.5,
+    "intents": 0,
+    "post_refused": 0,
+    "write_refused": 1.603125,
+    "piggybacked": 0,
+    "piggybacked_entries": 0,
+    "post_refused_total": 0,
+    "write_refused_total": {
+     "behind": 513,
+     "no_intent": 0,
+     "undeclared": 0
+    },
+    "conflicts": {
+     "dup_inserts": 0.021875,
+     "gone": 0.025,
+     "redundant": 0.028125,
+     "lost_updates": 0
+    },
+    "conflict_count": 31,
+    "drafts_used": 0,
+    "drafts_used_total": 0
+   },
+   "wal-post-anytime": {
+    "task_runs": 320,
+    "seconds": 38.6278125,
+    "seconds_median": 36.5,
+    "turns": 30.23125,
+    "tokens": 266495.078125,
+    "accuracy": 0.35625,
+    "reads": 4.90625,
+    "intents": 3.753125,
+    "post_refused": 0,
+    "write_refused": 2.50625,
+    "piggybacked": 0,
+    "piggybacked_entries": 0,
+    "post_refused_total": 0,
+    "write_refused_total": {
+     "behind": 787,
+     "no_intent": 11,
+     "undeclared": 4
+    },
+    "conflicts": {
+     "dup_inserts": 0.025,
+     "gone": 0.009375,
+     "redundant": 0.009375,
+     "lost_updates": 0
+    },
+    "conflict_count": 15,
+    "drafts_used": 0,
+    "drafts_used_total": 0
+   },
+   "wal-advisory": {
+    "task_runs": 320,
+    "seconds": 32.63875,
+    "seconds_median": 29.7,
+    "turns": 27.540625,
+    "tokens": 232211.6375,
+    "accuracy": 0.378125,
+    "reads": 2.84375,
+    "intents": 2.915625,
+    "post_refused": 0,
+    "write_refused": 0,
+    "piggybacked": 0,
+    "piggybacked_entries": 0,
+    "post_refused_total": 0,
+    "write_refused_total": {
+     "behind": 0,
+     "no_intent": 0,
+     "undeclared": 0
+    },
+    "conflicts": {
+     "dup_inserts": 0.090625,
+     "gone": 0.265625,
+     "redundant": 0.315625,
+     "lost_updates": 0.00625
+    },
+    "conflict_count": 731,
+    "drafts_used": 0,
+    "drafts_used_total": 0
+   }
+  },
+  "steps": {
+   "wal->wal-changes-only": {
+    "seconds_diff": [
+     -5.0740625,
+     -6.925,
+     -3.1878125
+    ],
+    "turns_diff": [
+     0.36875,
+     -0.509375,
+     1.215625
+    ],
+    "conflicts_diff": 16,
+    "conflicts_p_more": 0.0351,
+    "conflicts_p_fewer": 0.9811,
+    "duplicates_diff": -4,
+    "duplicates_p_more": 0.89365,
+    "duplicates_p_fewer": 0.22895,
+    "accuracy_diff": 0.015625,
+    "accuracy_p_up": 0.3031,
+    "accuracy_p_down": 0.7817
+   },
+   "wal->wal-post-anytime": {
+    "seconds_diff": [
+     2.9365625,
+     0.9540624999999998,
+     4.93
+    ],
+    "turns_diff": [
+     3.415625,
+     2.490625,
+     4.359375
+    ],
+    "conflicts_diff": 0,
+    "conflicts_p_more": 0.56345,
+    "conflicts_p_fewer": 0.57355,
+    "duplicates_diff": -3,
+    "duplicates_p_more": 0.8687,
+    "duplicates_p_fewer": 0.2924,
+    "accuracy_diff": -0.01875,
+    "accuracy_p_up": 0.8117,
+    "accuracy_p_down": 0.2618
+   },
+   "wal->wal-advisory": {
+    "seconds_diff": [
+     -3.0524999999999998,
+     -5.1690625,
+     -1.0696874999999997
+    ],
+    "turns_diff": [
+     0.725,
+     -0.128125,
+     1.58125
+    ],
+    "conflicts_diff": 716,
+    "conflicts_p_more": 0.0,
+    "conflicts_p_fewer": 1.0,
+    "duplicates_diff": 21,
+    "duplicates_p_more": 0.00055,
+    "duplicates_p_fewer": 0.9999,
+    "accuracy_diff": 0.003125,
+    "accuracy_p_up": 0.505,
+    "accuracy_p_down": 0.59705
+   }
+  }
+ },
+ "all-coord": {
+  "label": "All channels + coordinate",
+  "pairs": 320,
+  "reps": 5,
+  "variants": {
+   "wal": {
+    "task_runs": 320,
+    "seconds": 40.1053125,
+    "seconds_median": 37.7,
+    "turns": 26.225,
+    "tokens": 239971.465625,
+    "accuracy": 0.384375,
+    "reads": 3.08125,
+    "intents": 2.153125,
+    "post_refused": 1.8,
+    "write_refused": 0.30937499999999996,
+    "piggybacked": 0,
+    "piggybacked_entries": 0,
+    "post_refused_total": 576,
+    "write_refused_total": {
+     "behind": 26,
+     "no_intent": 66,
+     "undeclared": 7
+    },
+    "conflicts": {
+     "dup_inserts": 0.0375,
+     "gone": 0.003125,
+     "redundant": 0.00625,
+     "lost_updates": 0
+    },
+    "conflict_count": 19,
+    "drafts_used": 0,
+    "drafts_used_total": 0
+   },
+   "wal-changes-only": {
+    "task_runs": 320,
+    "seconds": 33.9546875,
+    "seconds_median": 30.85,
+    "turns": 28.146875,
+    "tokens": 244274.671875,
+    "accuracy": 0.425,
+    "reads": 3.7,
+    "intents": 0,
+    "post_refused": 0,
+    "write_refused": 1.775,
+    "piggybacked": 0,
+    "piggybacked_entries": 0,
+    "post_refused_total": 0,
+    "write_refused_total": {
+     "behind": 568,
+     "no_intent": 0,
+     "undeclared": 0
+    },
+    "conflicts": {
+     "dup_inserts": 0.040625,
+     "gone": 0.0125,
+     "redundant": 0.01875,
+     "lost_updates": 0.00625
+    },
+    "conflict_count": 33,
+    "drafts_used": 0,
+    "drafts_used_total": 0
+   },
+   "wal-post-anytime": {
+    "task_runs": 320,
+    "seconds": 43.7253125,
+    "seconds_median": 40.349999999999994,
+    "turns": 29.703125,
+    "tokens": 277405.303125,
+    "accuracy": 0.3375,
+    "reads": 3.909375,
+    "intents": 3.8125,
+    "post_refused": 0,
+    "write_refused": 2.484375,
+    "piggybacked": 0,
+    "piggybacked_entries": 0,
+    "post_refused_total": 0,
+    "write_refused_total": {
+     "behind": 764,
+     "no_intent": 20,
+     "undeclared": 11
+    },
+    "conflicts": {
+     "dup_inserts": 0.028125,
+     "gone": 0.015625,
+     "redundant": 0.0125,
+     "lost_updates": 0
+    },
+    "conflict_count": 27,
+    "drafts_used": 0,
+    "drafts_used_total": 0
+   },
+   "wal-advisory": {
+    "task_runs": 320,
+    "seconds": 36.3253125,
+    "seconds_median": 33.3,
+    "turns": 27.7375,
+    "tokens": 248769.73125,
+    "accuracy": 0.378125,
+    "reads": 1.375,
+    "intents": 3.184375,
+    "post_refused": 0,
+    "write_refused": 0,
+    "piggybacked": 0,
+    "piggybacked_entries": 0,
+    "post_refused_total": 0,
+    "write_refused_total": {
+     "behind": 0,
+     "no_intent": 0,
+     "undeclared": 0
+    },
+    "conflicts": {
+     "dup_inserts": 0.103125,
+     "gone": 0.3125,
+     "redundant": 0.328125,
+     "lost_updates": 0.00625
+    },
+    "conflict_count": 823,
+    "drafts_used": 0,
+    "drafts_used_total": 0
+   }
+  },
+  "steps": {
+   "wal->wal-changes-only": {
+    "seconds_diff": [
+     -6.150625,
+     -8.270625,
+     -3.9615625
+    ],
+    "turns_diff": [
+     1.921875,
+     0.86875,
+     2.99375
+    ],
+    "conflicts_diff": 14,
+    "conflicts_p_more": 0.085,
+    "conflicts_p_fewer": 0.9439,
+    "duplicates_diff": 0,
+    "duplicates_p_more": 0.59085,
+    "duplicates_p_fewer": 0.5831,
+    "accuracy_diff": 0.040625,
+    "accuracy_p_up": 0.0409,
+    "accuracy_p_down": 0.9794
+   },
+   "wal->wal-post-anytime": {
+    "seconds_diff": [
+     3.62,
+     1.2234375,
+     6.1490625
+    ],
+    "turns_diff": [
+     3.478125,
+     2.534375,
+     4.459375
+    ],
+    "conflicts_diff": 8,
+    "conflicts_p_more": 0.22785,
+    "conflicts_p_fewer": 0.8298,
+    "duplicates_diff": -4,
+    "duplicates_p_more": 0.8551,
+    "duplicates_p_fewer": 0.26185,
+    "accuracy_diff": -0.046875,
+    "accuracy_p_up": 0.97225,
+    "accuracy_p_down": 0.0469
+   },
+   "wal->wal-advisory": {
+    "seconds_diff": [
+     -3.7800000000000002,
+     -5.6671875,
+     -1.8815624999999998
+    ],
+    "turns_diff": [
+     1.5125,
+     0.646875,
+     2.39375
+    ],
+    "conflicts_diff": 804,
+    "conflicts_p_more": 0.0,
+    "conflicts_p_fewer": 1.0,
+    "duplicates_diff": 24,
+    "duplicates_p_more": 0.0002,
+    "duplicates_p_fewer": 1.0,
+    "accuracy_diff": -0.00625,
+    "accuracy_p_up": 0.65885,
+    "accuracy_p_down": 0.4456
+   }
+  }
+ },
+ "_pooled": {
+  "wal->wal-changes-only": {
+   "pairs": 960,
+   "accuracy_diff": 0.023958333333333335,
+   "accuracy_p_up": 0.0403,
+   "accuracy_p_down": 0.9717,
+   "conflicts_diff": 99,
+   "duplicates_diff": 2,
+   "duplicates_p_more": 0.4501,
+   "duplicates_p_fewer": 0.6613
+  },
+  "wal->wal-post-anytime": {
+   "pairs": 960,
+   "accuracy_diff": -0.03333333333333333,
+   "accuracy_p_up": 0.99145,
+   "accuracy_p_down": 0.01165,
+   "conflicts_diff": 45,
+   "duplicates_diff": -11,
+   "duplicates_p_more": 0.95855,
+   "duplicates_p_fewer": 0.07365
+  },
+  "wal->wal-advisory": {
+   "pairs": 960,
+   "accuracy_diff": -0.005208333333333333,
+   "accuracy_p_up": 0.67045,
+   "accuracy_p_down": 0.38125,
+   "conflicts_diff": 2195,
+   "duplicates_diff": 70,
+   "duplicates_p_more": 0.0,
+   "duplicates_p_fewer": 1.0
+  }
+ }
+}
