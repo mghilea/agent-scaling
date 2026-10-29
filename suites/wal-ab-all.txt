@@ -1,0 +1,7 @@
+# Ablations of the write-ahead log, side by side on one GPU with the full log: changes only (no intents), posting
+# allowed while behind (no read-before-posting rule), and nothing enforced. Submit with --tag abNN.
+# Analysis: analysis/wal_variants.py --tag ab
+--benchmark workbench --min-changes 3 --topology agent-driven --comm all --coordinate --wal
+--benchmark workbench --min-changes 3 --topology agent-driven --comm all --coordinate --wal --wal-mode changes-only
+--benchmark workbench --min-changes 3 --topology agent-driven --comm all --coordinate --wal --wal-mode post-anytime
+--benchmark workbench --min-changes 3 --topology agent-driven --comm all --coordinate --wal --wal-mode advisory

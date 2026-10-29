@@ -2,6 +2,8 @@
 
     python analysis/wal_variants.py --tag dr   # the log alone, + piggybacking, + piggybacking + drafts
                                                 # (suites/wal-dr-*.txt); writes analysis/wal_variants_dr.json
+    python analysis/wal_variants.py --tag ab   # ablations: the full log vs changes only, posting while behind,
+                                                # nothing enforced (suites/wal-ab-*.txt)
 
 Every task-run is paired with the same task in the same job under each other variant (same GPU load), as in
 analysis/piggyback.py, whose loading, summaries and tests this reuses. For each agent-driven setup: latency,
@@ -17,8 +19,14 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "analysis"))
 from piggyback import SETUPS, ci, load, side, sign_flip  # noqa: E402
 
-VARIANTS = [("wal", "Log"), ("wal-pb", "Log + piggybacking"), ("wal-pb-dr", "Log + piggybacking + drafts")]
-STEPS = [("wal", "wal-pb"), ("wal-pb", "wal-pb-dr"), ("wal", "wal-pb-dr")]
+# Per run tag: the variants (run-name part after the setup, and a label) and the pairs of variants to compare.
+TAGS = {
+    "dr": ([("wal", "Log"), ("wal-pb", "Log + piggybacking"), ("wal-pb-dr", "Log + piggybacking + drafts")],
+           [("wal", "wal-pb"), ("wal-pb", "wal-pb-dr"), ("wal", "wal-pb-dr")]),
+    "ab": ([("wal", "Full log"), ("wal-changes-only", "Changes only (no intents)"),
+            ("wal-post-anytime", "Posting while behind allowed"), ("wal-advisory", "Nothing enforced")],
+           [("wal", "wal-changes-only"), ("wal", "wal-post-anytime"), ("wal", "wal-advisory")]),
+}
 
 
 def conflict_total(c):
@@ -27,7 +35,8 @@ def conflict_total(c):
 
 def main():
     tag = sys.argv[sys.argv.index("--tag") + 1] if "--tag" in sys.argv else "dr"
-    out = {}
+    VARIANTS, STEPS = TAGS[tag]
+    out = {"_variants": VARIANTS, "_steps": STEPS}
     for setup, label in SETUPS.items():
         runs = {v: load(f"*-agent-driven-{setup}-{v}-workbench-*-{tag}[0-9][0-9]") for v, _ in VARIANTS}
         keys = sorted(set.intersection(*(set(r) for r in runs.values())))

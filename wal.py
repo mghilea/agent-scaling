@@ -44,6 +44,18 @@ TEXT_PRIVATE = """Each agent on the team works in its own private copy of the wo
 3. Then make the change.
 Your workspace refuses a change if the WAL has entries you haven't read, or if your latest intent doesn't declare that change; it then tells you why and shows you any entries you missed. Every change you make is added to the WAL automatically. Searches and lookups don't need the WAL."""
 
+# Ablations (--wal-mode): the protocol text for the log without intents, and for the log with nothing enforced.
+TEXT_CHANGES_ONLY = """The team keeps a write-ahead log (WAL): an append-only list, shared by all of you, of every change any of you has made. Before you change anything in the workspace:
+1. Read the WAL (wal_read) to see your teammates' changes.
+2. Then make the change.
+The workspace refuses a change if the WAL has entries you haven't read; it then shows you the entries you missed. Every change you make is added to the WAL automatically. Searches and lookups don't need the WAL."""
+TEXT_ADVISORY = """The team keeps a write-ahead log (WAL): an append-only list, shared by all of you, of what each agent intends to change and what it has changed. Before you change anything in the workspace:
+1. Read the WAL (wal_read) to see your teammates' intents and changes.
+2. Append your intent (wal_append): your plan, and each resource you will change and how, for example: create calendar "meeting with Lena on 2023-12-01 at 10:00", update crm "customer 00000076".
+3. Then make the change.
+Nothing checks that you do this: it is up to you. Every change you make is added to the WAL automatically. Searches and lookups don't need the WAL."""
+MODES = ["full", "changes-only", "post-anytime", "advisory"]
+
 # Each WorkBench write tool as the (resource, access) an intent must declare to use it.
 WRITES = {
     "email_send_email": ("email", "create"), "email_forward_email": ("email", "create"),
@@ -111,7 +123,13 @@ class Log:
     gate() and add() expect the caller to hold the lock; the tools take it themselves.
     """
 
-    def __init__(self, t0=None, lock=None, event=None, private=False, drafts=False):
+    def __init__(self, t0=None, lock=None, event=None, private=False, drafts=False, mode="full"):
+        """mode (ablations): full; changes-only (no intents: only changes are logged, and a change needs every
+        entry read); post-anytime (an intent is appended even while the agent has unread entries); advisory
+        (nothing is checked or refused: the log and the instructions only)."""
+        if mode not in MODES:
+            raise ValueError(f"unknown WAL mode {mode!r}")
+        self.mode = mode
         self.entries, self.seen, self.intent = [], {}, {}
         # drafts: an intent whose post was refused for unread entries is kept, and recorded when the agent makes
         # a change it covers without re-posting (it has seen the entries it missed by then)
@@ -133,12 +151,15 @@ class Log:
                             for r in e["resources"]) or "none declared"
             return f"#{e['id']} {e['agent']} INTENT{note}: {e['plan']} | resources: {res}"
         where = " in its own copy" if self.private else ""
-        return f"#{e['id']} {e['agent']} CHANGE{where} (intent #{e['intent']}): {e['call']} -> {e['result']}"
+        why = f" (intent #{e['intent']})" if e.get("intent") is not None else ""
+        return f"#{e['id']} {e['agent']} CHANGE{where}{why}: {e['call']} -> {e['result']}"
 
     def add(self, me, kind, **data):
         e = {"id": len(self.entries) + 1, "t": round(time.time() - self.t0, 2), "agent": me, "kind": kind, **data}
+        caught_up = self.seen.get(me, 0) >= len(self.entries)
         self.entries.append(e)
-        self.seen[me] = e["id"]  # only an agent that had seen every entry can add one
+        if caught_up:  # always, unless an ablation lets an agent add entries while it has unread ones
+            self.seen[me] = e["id"]
         return e
 
     def catch_up(self, me):
@@ -149,6 +170,15 @@ class Log:
 
     def gate(self, me, tool):
         """None if this change may go ahead, else (reason, what the agent is told)."""
+        if self.mode == "advisory":
+            return None
+        if self.mode == "changes-only":  # no intents: only the check that every entry has been read
+            unseen, n = self.catch_up(me)
+            if n:
+                return "behind", (f"[WAL] Refused: the WAL has {n} entr{'y' if n == 1 else 'ies'} you hadn't read:\n"
+                                  f"{unseen}\nYou have now seen them. If they don't affect your plan, make the change "
+                                  "again.")
+            return None
         if self.drafts and me in self.draft:
             return self._gate_with_draft(me, tool)
         intent = self.intent.get(me)
@@ -249,6 +279,12 @@ class Log:
             if error:
                 return error
             with self.lock:
+                if self.mode in ("post-anytime", "advisory"):  # appended even while behind; unread entries stay unread
+                    e = self.add(me, "intent", plan=str(plan).strip(), resources=declared)
+                    self.intent[me] = e["id"]
+                    self.event(me, "wal_append", id=e["id"], plan=e["plan"], resources=declared,
+                               behind=self.seen.get(me, 0) < len(self.entries))
+                    return f"Appended as intent #{e['id']}. You can now make the changes it declares."
                 unseen, n = self.catch_up(me)
                 if n:
                     self.event(me, "wal_append_refused", unseen=n)
@@ -262,7 +298,7 @@ class Log:
             self.event(me, "wal_append", id=e["id"], plan=e["plan"], resources=declared)
             return f"Appended as intent #{e['id']}. You can now make the changes it declares."
 
-        return {
+        tools = {
             "wal_read": (wal_read, _schema(
                 "wal_read", "Read the team's write-ahead log: every intent and change since you last read it.",
                 {"all": {"type": "boolean", "description": "Show the whole log, not only the entries you haven't seen"}},
@@ -281,6 +317,9 @@ class Log:
                                    "required": ["resource", "access", "target"]}}},
                 ["plan", "resources"])),
         }
+        if self.mode == "changes-only":  # no intents to post
+            del tools["wal_append"]
+        return tools
 
     def counts(self, events):
         """The log's numbers for a run's results, from the events it recorded."""
