@@ -115,6 +115,10 @@ a { color: var(--accent); }
 #tasktable td:first-child code { white-space: nowrap; overflow-wrap: normal; font-size: 12px; }
 #tasktable td.recs { font-size: 12.5px; width: 38%; }
 #tasktable .pill { margin: 0 2px 4px 0; white-space: normal; border-radius: 6px; }
+#duptable { min-width: 900px; }
+#duptable td:nth-child(3) { width: 34%; font-size: 13px; }
+#duptable td.recs { font-size: 12.5px; }
+
 .pill.stop { background: var(--surface); color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--pass); }
 @media (max-width: 520px) { .card .v { font-size: 22px; } }
 </style>
@@ -294,6 +298,11 @@ a { color: var(--accent); }
     <div class="controls" id="taskcontrols"></div>
     <div class="tablewrap"><table class="wide" id="tasktable"></table></div>
     <p class="note" id="tasknote"></p>
+    <div class="sectionhead" id="duphead">
+      <h3>Failed task-runs with a teammate's duplicate insert: what else was wrong</h3>
+      <p id="dupintro"></p>
+    </div>
+    <div class="tablewrap" id="dupwrap"><table class="wide" id="duptable"></table></div>
   </section>
 
   <section id="private">
@@ -702,8 +711,36 @@ if (D.errors) {
         `<td class="recs">${recs || (a.solved === a.runs ? "" : `<span class="delta">–</span>`)}</td></tr>`;
     }
     $("tasktable").innerHTML = h + "</tbody>";
+    renderDups(key);
     $("tasksintro").textContent = `${ids.length} tasks. ${E[key].label}: ${pct(E[key].accuracy)} of task-runs solved. ` +
       `Counts are failed runs (of ${T[ids[0]] ? T[ids[0]].runs : 10}) in which each cause appeared; one failed run can have several. Red: conflict-related. Gray: what the team got wrong. Green outline: how agents stopped.`;
+  }
+  // every failed task-run that had a teammate's duplicate insert and still fails without it: the rest, exactly
+  function renderDups(key) {
+    const runs = key === "single" ? [] : (E[key].duplicate_runs || []);
+    $("duphead").hidden = $("dupwrap").hidden = key === "single";
+    if (key === "single") return;
+    runs.sort((a, b) => a.task.localeCompare(b.task, undefined, { numeric: true }) || a.run.localeCompare(b.run));
+    const n = runs.length, has = (f) => runs.filter(f).length;
+    const keptWrong = has((r) => r.items.some((i) => i.status !== "required"));
+    const missed = has((r) => r.omitted.length), extra = has((r) => r.extra.length), wrong = has((r) => r.wrong.length);
+    const onlyItem = has((r) => !r.omitted.length && !r.extra.length && !r.wrong.length);
+    $("dupintro").innerHTML = `${E[key].label}: ${n} failed task-runs had a teammate's duplicate insert and still fail once the second copy is removed. ` +
+      `In ${keptWrong} of them the duplicated item itself is wrong (not asked for, or wrong values), so even one copy fails the task${onlyItem ? `; in ${onlyItem} that is the only other error` : ""}. ` +
+      `Besides the duplicated item, ${missed} miss required changes, ${extra} change things not asked for, and ${wrong} ${wrong === 1 ? "has" : "have"} wrong values on a required record.`;
+    const STATUS = { required: `<span class="pill na">required</span>`, "wrong values": `<span class="pill harm">wrong values</span>`, "not asked for": `<span class="pill harm">not asked for</span>` };
+    let h = `<thead><tr><th>Task</th><th>Run</th><th>Duplicated by two agents</th><th>Everything else that was wrong</th></tr></thead><tbody>`;
+    for (const r of runs) {
+      const items = r.items.map((i) => `${esc(i.item)}${recDesc(i.item)} <span class="delta">${i.agents} agents, ${i.seconds_apart} s apart</span><br>${STATUS[i.status]}` +
+        `${i.differs.length ? ` <span class="delta">differs in ${esc(i.differs.join(", "))}</span>` : ""}`).join("<br>");
+      const rest = [
+        r.omitted.length ? `<b>Missed:</b> ${r.omitted.map(([lab, why]) => `${esc(lab)}${recDesc(lab)}, ${WHY[why]}`).join("; ")}` : "",
+        r.extra.length ? `<b>Changed, not asked for:</b> ${r.extra.map((lab) => `${esc(lab)}${recDesc(lab)}`).join("; ")}` : "",
+        r.wrong.length ? `<b>Wrong values:</b> ${r.wrong.map(esc).join("; ")}` : "",
+      ].filter(Boolean).join("<br>") || `<span class="delta">nothing else: only the duplicated item is wrong</span>`;
+      h += `<tr><td><code>${r.task}</code></td><td>${r.run}</td><td>${items}</td><td class="recs">${rest}</td></tr>`;
+    }
+    $("duptable").innerHTML = h + (n ? "" : `<tr><td colspan="4"><span class="delta">none</span></td></tr>`) + "</tbody>";
   }
   ctl.addEventListener("click", (e) => {
     const b = e.target.closest("button"); if (!b || b.disabled) return;

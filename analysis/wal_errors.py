@@ -105,6 +105,93 @@ def describe(label, st):
     return f"{x.customer_name}: {x.status}, {x.product_interest}, {who(x.assigned_to_email)}, last contact {x.last_contact_date}"
 
 
+def args_of(action):
+    return dict(re.findall(r'(\w+)="((?:[^"\\]|\\.)*)"', action))
+
+
+def tool_of(action):
+    return action.split(".func(")[0]
+
+
+def changes(actions):
+    """The write actions that changed the databases, replayed in order on fresh databases."""
+    wb._state._local.tool_state = wb._state._pristine_state().copy()
+    st = wb._state.get_state()
+    out = []
+    for a in actions:
+        if not wb.is_write(a):
+            continue
+        before = {f: getattr(st, f).copy() for f in wb._MUTABLE}
+        try:
+            _parse_and_dispatch(a)
+        except Exception:  # noqa: BLE001 - a call that raised changed nothing
+            continue
+        if any(not getattr(st, f).equals(before[f]) for f in wb._MUTABLE):
+            out.append(a)
+    wb._state._local.tool_state = None
+    return out
+
+
+def without_teammate_duplicates(actions, keys):
+    """The actions with the later copy of every insert whose key two agents created removed."""
+    seen, kept = set(), []
+    for a in actions:
+        k = insert_key(tool_of(a).replace(".", "_"), args_of(a))
+        if k in keys and k in seen:
+            continue
+        seen.add(k)
+        kept.append(a)
+    return kept
+
+
+def classify(made, expected):
+    """(primary category, details) for a failed task-run's changes against the correct ones."""
+    M, G = Counter(a.lower() for a in made), Counter(a.lower() for a in expected)
+    missing, extra = list((G - M).elements()), list((M - G).elements())
+    wrong, args_diff = [], Counter()
+    for g in list(missing):
+        e = next((e for e in extra if target(e) == target(g) and tool_of(e) == tool_of(g)), None)
+        if e is not None:
+            missing.remove(g)
+            extra.remove(e)
+            wrong.append((g, e))
+            ga, ea = args_of(g), args_of(e)
+            for k in sorted(set(ga) | set(ea)):
+                if ga.get(k) != ea.get(k):
+                    args_diff[f"{tool_of(g).split('.')[-1]}: {k}"] += 1
+    repeats = [e for e in extra if M[e] > 1 and G[e] >= 1]  # a required change made again (same text)
+    extra = [e for e in extra if e not in repeats]
+    if not made:
+        cat = "Nothing changed"
+    elif missing and not extra and not wrong:
+        cat = "Some required changes missing"
+    elif wrong and not missing and not extra:
+        cat = "Right records, wrong values"
+    elif extra and not missing and not wrong:
+        cat = "Extra changes to other records"
+    elif missing and extra and not wrong:
+        cat = "Wrong records: missed some, changed others"
+    elif missing or extra or wrong:
+        cat = "Mixed"
+    else:
+        cat = "Other"
+    return cat, {"omitted": missing, "extra": extra, "wrong": wrong, "repeats": repeats, "args_diff": args_diff}
+
+
+def tool_texts(trace):
+    """Per agent, the text of its WorkBench tool results (not the log, messages or shared state)."""
+    convs = trace["conversations"] if isinstance(trace, dict) else {"agent": trace}
+    return {ag: " ".join(str(m.get("content", "")) for m in conv if m.get("role") == "tool" and m.get("name") in DOTTED)
+            for ag, conv in convs.items()}
+
+
+def raw_endings(trace):
+    """Agents whose last reply is a tool call written out as text (the model meant to act and the call was lost)."""
+    if not isinstance(trace, dict):
+        return 0
+    return sum(1 for e in trace["events"] if e["kind"] == "idle" and RAW_CALL.search(str(e.get("reply", ""))))
+
+
 def lost_calls(trace):
     """Agents whose last reply is a tool call written out as text, or empty: the call never ran."""
     convs = trace["conversations"].values() if isinstance(trace, dict) else [trace]
@@ -147,12 +234,13 @@ def task_run(d, r, trace):
     if out["correct"]:
         return out
     if isinstance(trace, dict):  # agent-driven: inserts created by two agents
-        by_key = defaultdict(set)
+        by_key, times = defaultdict(set), defaultdict(list)
         for e in trace["events"]:
             if e["kind"] == "tool" and e["changes"]:
                 k = insert_key(e["tool"], e["args"])
                 if k:
                     by_key[k].add(e["agent"])
+                    times[k].append(float(e["t"]))
         dup_keys = {k for k, ags in by_key.items() if len(ags) > 1}
         if dup_keys:
             out["had_duplicate"] = True
@@ -162,6 +250,25 @@ def task_run(d, r, trace):
                 return out
             made = changes(kept)
     cat, det = classify(made, r["expected"])
+    if out.get("had_duplicate"):  # still wrong without the duplicates: what else was wrong, exactly
+        expected = {a.lower() for a in r["expected"]}
+        wrong_made = {e: g for g, e in det["wrong"]}
+        items, dup_records = [], set()
+        for k in sorted(dup_keys):
+            a = next((x for x in kept if insert_key(tool_of(x).replace(".", "_"), args_of(x)) == k), None)
+            if a is None:
+                continue
+            low = a.lower()
+            status = ("required" if low in expected else "wrong values" if low in wrong_made
+                      else "not asked for" if low in det["extra"] else "required")
+            t = sorted(times[k])
+            items.append({"item": record(a), "agents": len(by_key[k]), "seconds_apart": round(t[1] - t[0], 1),
+                          "status": status,
+                          "differs": sorted(x for x in set(args_of(low)) | set(args_of(wrong_made.get(low, low)))
+                                            if args_of(low).get(x) != args_of(wrong_made.get(low, low)).get(x))})
+            dup_records.add(low)
+        out["dup_detail"] = {"run": Path(d).name.rsplit("-", 1)[-1], "items": items}
+        out["dup_exclude"] = dup_records
     out["category"] = cat
     out["omitted"], out["extra"], out["wrong"], out["repeats"] = (len(det["omitted"]), len(det["extra"]),
                                                                   len(det["wrong"]), len(det["repeats"]))
@@ -169,6 +276,11 @@ def task_run(d, r, trace):
     out["extra_list"] = [record(e) for e in det["extra"]]
     out["wrong_list"] = [f"{record(g)}: {k}" for g, e in det["wrong"]
                          for k in sorted(set(args_of(g)) | set(args_of(e))) if args_of(g).get(k) != args_of(e).get(k)]
+    skip = out.pop("dup_exclude", set())
+    if "dup_detail" in out:  # the errors besides the duplicated item itself
+        out["dup_detail"]["extra"] = [record(e) for e in det["extra"] if e not in skip]
+        out["dup_detail"]["wrong"] = [f"{record(g)}: {k}" for g, e in det["wrong"] if e not in skip
+                                      for k in sorted(set(args_of(g)) | set(args_of(e))) if args_of(g).get(k) != args_of(e).get(k)]
     out["omitted_list"] = []
     # why each omitted change to an existing record was omitted
     texts = tool_texts(trace)
@@ -190,6 +302,8 @@ def task_run(d, r, trace):
         why[reason] += 1
         out["omitted_list"].append([record(g), REASON[reason]])
     out["omitted_why"] = dict(why)
+    if "dup_detail" in out:
+        out["dup_detail"]["omitted"] = out["omitted_list"]
     tool = main_tool(r["expected"])
     out["cap"] = TASKS[r["id"]]["cap"] and sum(tool_of(a) == tool for a in made) == 5
     return out
@@ -314,7 +428,11 @@ def main():
         for t, rows in pt.items():
             agg = task_summary(rows)
             out[key].setdefault("tasks", {})[t] = agg
+            out[key].setdefault("duplicate_runs", []).extend(
+                {"task": t, **r["dup_detail"]} for r in rows if r.get("dup_detail"))
             labels |= {x[0] for k in ("omitted", "extra", "wrong") for x in agg[k]}
+        for run in out[key].get("duplicate_runs", []):
+            labels |= {i["item"] for i in run["items"]} | {x[0] for x in run["omitted"]} | set(run["extra"])
     out["_records"] = {lab: describe(lab.split(":")[0], st) for lab in sorted(labels)}
     info = {t["id"]: t for t in wb.load_tasks()}
     out["_task_info"] = {t: {"question": info[t]["question"], "changes": TASKS[t]["changes"], "cap": TASKS[t]["cap"]}
