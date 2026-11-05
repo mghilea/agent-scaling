@@ -164,6 +164,17 @@ def _show_args(arguments: str) -> str:
 MALFORMED_CALL = re.compile(r"<\|(start|channel|call|message)\|>|\bto=functions\.")
 
 
+def repair_name(name, tools):
+    """A tool name with format tokens or stray characters stuck to it ('x?commentary', 'x</commentary', 'x...',
+    'xjson'), as the tool's own name if that is what it is; otherwise unchanged."""
+    m = re.match(r"\w+", name)
+    if m:
+        for candidate in (m.group(0), re.sub(r"(json|commentary)$", "", m.group(0))):
+            if candidate in tools:
+                return candidate
+    return name
+
+
 def new_stats():
     return {"turns": 0, "tool_calls": 0, "tool_errors": 0, "prompt_tokens": 0, "completion_tokens": 0}
 
@@ -176,7 +187,8 @@ class Agent:
     """
 
     def __init__(self, client, model, tools=TOOLS, system_prompt=SYSTEM_PROMPT, max_turns=12,
-                 reasoning_effort="medium", verbose=True, show_reasoning=False, name="", retry_malformed=False):
+                 reasoning_effort="medium", verbose=True, show_reasoning=False, name="", retry_malformed=False,
+                 repair_calls=False):
         self.client = client
         self.model = model
         self.tools = tools
@@ -186,9 +198,12 @@ class Agent:
         self.verbose = verbose
         self.show_reasoning = show_reasoning
         self.name = name  # shown in logs when several agents run at once
-        # Retry tool calls written out as text instead of taking them as the answer. Off for WorkBench, so its
-        # runs stay comparable with the ones made before this existed.
+        # Retry tool calls written out as text instead of taking them as the answer. Off for WorkBench unless
+        # --repair-calls, so its runs stay comparable with the ones made before this existed.
         self.retry_malformed = retry_malformed
+        # --repair-calls (WorkBench): also retry an empty reply, which is almost always a call the parser dropped
+        # (its reasoning ends "Let's do wal_append."), and strip stray characters from tool names.
+        self.repair_calls = repair_calls
         self.messages = [{"role": "system", "content": system_prompt}]
         self.stats = new_stats()
         self._stats_lock = threading.Lock()  # an orchestrator's calls can run in parallel threads
@@ -220,6 +235,13 @@ class Agent:
                 with self._stats_lock:
                     self.stats["tool_errors"] += 1
                 continue
+            if not msg.tool_calls and self.repair_calls and not (msg.content or "").strip():
+                self.messages.append(entry)
+                self.messages.append({"role": "user", "content": "Your last reply was empty and no tool ran. If you "
+                                      "meant to call a tool, call it again; if you are done, say so."})
+                with self._stats_lock:
+                    self.stats["tool_errors"] += 1
+                continue
             if not msg.tool_calls:
                 self.messages.append(entry)
                 self.log(_block("answer", msg.content, GREEN))
@@ -231,6 +253,8 @@ class Agent:
                 # vLLM's gpt-oss parser sometimes leaves format tokens on the name, like
                 # "email_search_emails<|channel|>commentary". Keep just the tool name.
                 tc.function.name = tc.function.name.split("<|")[0].strip()
+                if self.repair_calls and tc.function.name not in self.tools:
+                    tc.function.name = repair_name(tc.function.name, self.tools)
             entry["tool_calls"] = [tc.model_dump(exclude_none=True) for tc in msg.tool_calls]
             self.messages.append(entry)
             for tc in msg.tool_calls:
@@ -372,6 +396,10 @@ def main():
                     help="multi-agent, workbench: a write-ahead log agents must read and post their intent to "
                          "before each change (wal.py). Agent-driven teams share one workspace; the paper's topologies "
                          "keep a private copy per worker, and the log shows each what the others are doing")
+    ap.add_argument("--repair-calls", action="store_true",
+                    help="retry a tool call the model wrote out as text or that came back empty, and strip stray "
+                         "characters from tool names, instead of taking them as the agent's answer (browsecomp always "
+                         "retries calls written out as text)")
     ap.add_argument("--agents", type=int, default=3, help="multi-agent: number of worker agents (paper: 3)")
     ap.add_argument("--rounds", type=int,
                     help="multi-agent: max rounds (default as in the paper: 5 centralized/hybrid, 3 decentralized)")
@@ -426,14 +454,16 @@ def main():
     topo_name += "-wal" if args.wal and not driven else ""
     topo_name += f"-split{args.split}" if args.split else ""
     topo_name += "-propose" if driven and bc and args.team_answer == "propose" else ""
-    kind = "ask" if args.ask else ("sas" if not multi else topo_name) + ("-workbench" if wb else "-browsecomp" if bc else "")
+    kind = "ask" if args.ask else ("sas" if not multi else topo_name) + ("-rc" if args.repair_calls else "") + \
+        ("-workbench" if wb else "-browsecomp" if bc else "")
     run_dir = ROOT / "runs" / f"{datetime.now():%Y%m%d-%H%M%S}-{kind}-{args.model}{'-' + args.tag if args.tag else ''}"
     (run_dir / "traces").mkdir(parents=True)
     (run_dir / "config.json").write_text(json.dumps({"git_commit": git_commit(), **vars(args)}, indent=2))
 
     def make_agent(**kwargs):
         return Agent(client, args.model, max_turns=args.max_turns, reasoning_effort=args.reasoning_effort,
-                     verbose=not args.quiet, show_reasoning=args.show_reasoning, retry_malformed=bool(bc), **kwargs)
+                     verbose=not args.quiet, show_reasoning=args.show_reasoning,
+                     retry_malformed=bool(bc) or args.repair_calls, repair_calls=args.repair_calls, **kwargs)
 
     def log_message(label, text):  # messages between agents, in multi-agent runs
         if not args.quiet:

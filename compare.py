@@ -24,6 +24,7 @@ def load(run_dir):
         name = f"driven/{config.get('comm', 'all')}{'+coord' if config.get('coordinate') else ''}{'+wal' if config.get('wal') else ''}{'+pb' if config.get('wal_piggyback') else ''}{'+dr' if config.get('wal_drafts') else ''}{':' + config['wal_mode'] if config.get('wal_mode', 'full') != 'full' else ''}"
     elif config.get("wal"):
         name += "+wal"
+    name += "+rc" if config.get("repair_calls") else ""
     return name, {r["id"]: r for r in rows}
 
 

@@ -4,6 +4,8 @@
                                                 # (suites/wal-dr-*.txt); writes analysis/wal_variants_dr.json
     python analysis/wal_variants.py --tag ab   # ablations as a ladder: no log, then the log's checks added one at
                                                 # a time up to the full log (suites/wal-ab-*.txt)
+    python analysis/wal_variants.py --tag rc   # no log and log, each without and with --repair-calls
+                                                # (suites/rc-*.txt)
 
 Every task-run is paired with the same task in the same job under each other variant (same GPU load), as in
 analysis/piggyback.py, whose loading and summaries this reuses. For each agent-driven setup: latency, model calls,
@@ -35,6 +37,9 @@ TAGS = {
            [("nolog", "wal-advisory"), ("wal-advisory", "wal-changes-only"), ("wal-changes-only", "wal-post-anytime"),
             ("wal-post-anytime", "wal"), ("wal-changes-only", "wal")],
            ("nolog", "No log", "*-agent-driven-{setup}-workbench-gpt-oss-20b-rep??")),
+    # garbled tool calls: each team without and with the log, each without and with --repair-calls
+    "rc": ([("nolog", "No log"), ("rc", "No log + repaired calls"), ("wal", "Log"), ("wal-rc", "Log + repaired calls")],
+           [("nolog", "rc"), ("wal", "wal-rc"), ("nolog", "wal"), ("rc", "wal-rc")], None),
 }
 
 
@@ -94,7 +99,8 @@ def main():
     out = {"_variants": ([REF[:2]] if REF else []) + VARIANTS, "_steps": STEPS}
     pooled_pairs = defaultdict(list)
     for setup, label in SETUPS.items():
-        runs = {v: load(f"*-agent-driven-{setup}-{v}-workbench-*-{tag}[0-9][0-9]") for v, _ in VARIANTS}
+        part = lambda v: "" if v == "nolog" else "-" + v  # noqa: E731 - the run name has nothing for no log
+        runs = {v: load(f"*-agent-driven-{setup}{part(v)}-workbench-*-{tag}[0-9][0-9]") for v, _ in VARIANTS}
         keys = sorted(set.intersection(*(set(r) for r in runs.values())))
         if not keys:
             continue

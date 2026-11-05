@@ -1,0 +1,6 @@
+# Garbled tool calls (--repair-calls): the team without and with the write-ahead log, each without and with the fix,
+# side by side on one GPU. Submit with --tag rcNN. Analysis: analysis/wal_variants.py --tag rc
+--benchmark workbench --min-changes 3 --topology agent-driven --comm text --coordinate
+--benchmark workbench --min-changes 3 --topology agent-driven --comm text --coordinate --repair-calls
+--benchmark workbench --min-changes 3 --topology agent-driven --comm text --coordinate --wal
+--benchmark workbench --min-changes 3 --topology agent-driven --comm text --coordinate --wal --repair-calls
