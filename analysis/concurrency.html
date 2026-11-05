@@ -102,6 +102,20 @@ details summary { cursor: pointer; color: var(--accent); font-weight: 500; }
 details[open] summary { margin-bottom: 10px; }
 a { color: var(--accent); }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-size: 14px; }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.seg button { font: 500 13.5px var(--sans); color: var(--ink-2); background: none; border: 0; padding: 6px 12px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--surface); }
+.seg button:disabled { color: var(--muted); cursor: default; opacity: .6; }
+.controls label { color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
+.controls select { font: 13.5px var(--sans); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; }
+#tasktable { min-width: 960px; }
+#tasktable td:first-child { width: 26%; }
+#tasktable td:first-child code { white-space: nowrap; overflow-wrap: normal; font-size: 12px; }
+#tasktable td.recs { font-size: 12.5px; width: 38%; }
+#tasktable .pill { margin: 0 2px 4px 0; white-space: normal; border-radius: 6px; }
+.pill.stop { background: var(--surface); color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--pass); }
 @media (max-width: 520px) { .card .v { font-size: 22px; } }
 </style>
 
@@ -264,6 +278,22 @@ a { color: var(--accent); }
     </div>
     <div class="tablewrap"><table class="wide" id="acctable"></table></div>
     <p class="note">p is an exact permutation test over the 10 + 10 runs: the share of relabellings of the runs (with log / without) in which the difference is at least as large in the same direction.</p>
+  </section>
+
+  <section id="failures" hidden>
+    <div class="sectionhead">
+      <h2>Why task-runs fail, task by task</h2>
+      <p id="failintro"></p>
+    </div>
+    <div class="tablewrap"><table class="wide" id="failsummary"></table></div>
+    <ul class="points" id="failpoints"></ul>
+    <div class="sectionhead">
+      <h3>Every task</h3>
+      <p id="tasksintro"></p>
+    </div>
+    <div class="controls" id="taskcontrols"></div>
+    <div class="tablewrap"><table class="wide" id="tasktable"></table></div>
+    <p class="note" id="tasknote"></p>
   </section>
 
   <section id="private">
@@ -595,6 +625,99 @@ if (D.ablations) {
   $("abnote").textContent = `Steps 1–4 ran side by side in the same jobs, ${A[keys[0]].reps} runs of the 64 tasks per setup on one GPU each, so every step is compared with the one before task-run by task-run under the same load. ` +
     `Step 0 is the 10-run no-log baseline from other jobs (also four runs per GPU), compared task by task: each task's mean over its runs. Its seconds are only roughly comparable. ` +
     `p-values are two-sided sign-flip tests on the paired differences; seconds are marked when the 95% bootstrap interval excludes zero. Script: analysis/wal_variants.py --tag ab.`;
+}
+
+// ---- why task-runs fail, task by task (analysis/wal_errors.py) ----
+if (D.errors) {
+  const E = D.errors, F = E._factors, fl = Object.fromEntries(F.map(([key, label]) => [key, label]));
+  const group = Object.fromEntries(F.map(([key, , g]) => [key, g]));
+  const SHORT = { dup_caused: "duplicate insert, only error", dup_other: "duplicate insert + other errors", lost_update: "lost update",
+    never_found: "required record never found", found_not_changed: "required record seen, not changed",
+    claimed: "claimed, never done", not_created: "required new item not created", extra: "changed records not asked for",
+    wrong_values: "wrong values", nothing: "nothing changed", deferred: "left it to a teammate", lost_call: "garbled or empty last call" };
+  const TEAMS = SETUPS.filter((s) => E[s] && E[s + "+wal"]);
+  const sumF = (key, f) => Object.values(E[key].tasks).reduce((a, t) => a + (t.factors[f] || 0), 0);
+  $("failures").hidden = false;
+  $("failintro").textContent = `WorkBench scores only the final state of the databases. For every task-run that failed, the changes it made were replayed on fresh databases and compared with the correct ones, ` +
+    `so each failure can be traced to what went wrong: a teammate's duplicate insert, a required record that was never found or never changed, a record changed that the task didn't ask for, and so on. ` +
+    `Several can apply to one failed task-run. 10 runs of the 64 tasks per setup.`;
+  // summary: failed task-runs in which each factor appeared, per team, without → with the log
+  {
+    let h = `<thead><tr><th>Failed task-runs in which this contributed (of 640)</th>${TEAMS.map((s) => `<th class="n">${E[s].label}<br><span class="delta">no log → log</span></th>`).join("")}` +
+      `${E.single ? `<th class="n">Single agent</th>` : ""}</tr></thead><tbody>`;
+    const row = (label, f, cls = "") => `<tr${cls}><td>${label}</td>${TEAMS.map((s) => `<td class="n">${f(s)} → <b>${f(s + "+wal")}</b></td>`).join("")}${E.single ? `<td class="n">${f("single")}</td>` : ""}</tr>`;
+    h += row("Accuracy", (k) => pct(E[k].accuracy)) + row("Failed task-runs", (k) => E[k].failed);
+    for (const [g, title] of [["conflict", "Conflict-related"], ["failure", "What the team got wrong"], ["behaviour", "How agents stopped"]]) {
+      h += `<tr class="group"><td colspan="${TEAMS.length + 2}">${title}</td></tr>`;
+      for (const [f, label, gg] of F) if (gg === g) h += row(label, (k) => sumF(k, f));
+    }
+    $("failsummary").innerHTML = h + "</tbody>";
+    const caused = TEAMS.map((s) => sumF(s, "dup_caused")), failed = TEAMS.map((s) => E[s].failed);
+    const nf = (k) => sumF(k, "never_found"), ex = (k) => sumF(k, "extra");
+    $("failpoints").innerHTML = [
+      `<b>Conflicts almost never decide the outcome.</b> Without the log, a teammate's duplicate insert was the only thing wrong in ${caused.join(", ")} of ${failed.join(", ")} failed task-runs. ` +
+        `The other conflicts (writes to deleted records, redundant writes) change nothing, so they can't fail a task. Where a duplicate occurred, the run almost always had other errors too.`,
+      `<b>Most failures are the wrong set of records.</b> For the teams, the two biggest causes are changes to records the task didn't ask for (${TEAMS.map((s) => ex(s)).join(", ")} failed task-runs without the log), usually a misread criterion such as "leads" (every customer, not just those with status Lead), "future" or "last 6 days", ` +
+        `and required records that no search ever showed (${TEAMS.map((s) => nf(s)).join(", ")}): WorkBench searches return at most 5 results, and agents rarely search again. ` +
+        `${E.single ? `For the single agent, records never found come first (${nf("single")} of ${E.single.failed} failed task-runs). ` : ""}Wrong values on the right record are rare.`,
+      `<b>The log trades one error for another.</b> Changes to records not asked for fall (${TEAMS.map((s) => `${ex(s)} → ${ex(s + "+wal")}`).join(", ")}), but required records that an agent named in an intent or message and never changed rise (${TEAMS.map((s) => `${sumF(s, "claimed")} → ${sumF(s + "+wal", "claimed")}`).join(", ")}), ` +
+        `and so do agents ending on a garbled or empty call (${TEAMS.map((s) => `${sumF(s, "lost_call")} → ${sumF(s + "+wal", "lost_call")}`).join(", ")}). Without the log, three agents working the same task catch some of each other's misses; with it, each record is handled once.`,
+    ].map((x) => `<li>${x}</li>`).join("");
+  }
+  // the per-task table, for one team (with or without the log) or the single agent
+  const state = { team: TEAMS[0], wal: false, sort: "solved", onlyConflict: false };
+  const ctl = $("taskcontrols");
+  const teamBtns = [...TEAMS.map((s) => [s, E[s].label]), ...(E.single ? [["single", "Single agent"]] : [])];
+  ctl.innerHTML = `<div class="seg" role="group" aria-label="Team">${teamBtns.map(([k, l]) => `<button type="button" data-team="${k}">${esc(l)}</button>`).join("")}</div>` +
+    `<div class="seg" role="group" aria-label="Write-ahead log"><button type="button" data-wal="0">Without the log</button><button type="button" data-wal="1">With the log</button></div>` +
+    `<label>Sort <select id="tasksort"><option value="solved">Fewest solved first</option><option value="id">Task</option><option value="conflict">Most conflict-related failures</option><option value="change">Biggest change with the log</option></select></label>` +
+    `<label><input type="checkbox" id="taskonly"> Only tasks with a conflict-related failure</label>`;
+  const recDesc = (lab) => { const d = E._records[lab]; return d ? ` <span class="delta">(${esc(d)})</span>` : ""; };
+  const WHY = { never_found: "never shown by a search", found_not_changed: "shown, not changed", claimed: "claimed, not changed", not_created: "not created" };
+  function render() {
+    const key = state.team === "single" ? "single" : state.team + (state.wal ? "+wal" : "");
+    ctl.querySelectorAll("[data-team]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.team === state.team)));
+    ctl.querySelectorAll("[data-wal]").forEach((b) => { b.setAttribute("aria-pressed", String(b.dataset.wal === (state.wal ? "1" : "0"))); b.disabled = state.team === "single"; });
+    const T = E[key].tasks, other = state.team === "single" ? null : E[state.team + (state.wal ? "" : "+wal")].tasks;
+    const base = state.team === "single" ? null : E[state.team].tasks, log = state.team === "single" ? null : E[state.team + "+wal"].tasks;
+    const confFail = (t) => ["dup_caused", "dup_other", "lost_update"].reduce((a, f) => a + (T[t].factors[f] || 0), 0);
+    let ids = Object.keys(E._task_info).filter((t) => T[t] && (!state.onlyConflict || confFail(t) > 0));
+    const by = { solved: (t) => T[t].solved, id: null, conflict: (t) => -confFail(t), change: (t) => base ? -Math.abs(log[t].solved - base[t].solved) : 0 };
+    ids.sort((a, b) => (by[state.sort] ? by[state.sort](a) - by[state.sort](b) : 0) || a.localeCompare(b, undefined, { numeric: true }));
+    const chips = (t, g) => Object.entries(T[t].factors).filter(([f]) => group[f] === g || (g === "failure" && group[f] === "behaviour"))
+      .sort((a, b) => b[1] - a[1]).map(([f, n]) => `<span class="pill ${group[f] === "conflict" ? "harm" : group[f] === "behaviour" ? "stop" : "na"}" title="${esc(fl[f])}">${SHORT[f]} ×${n}</span>`).join(" ");
+    let h = `<thead><tr><th>Task</th><th class="n">Solved</th><th>Conflict-related<br><span class="delta">in failed runs</span></th><th>Other causes<br><span class="delta">failed runs in which each appeared</span></th><th>Which records</th></tr></thead><tbody>`;
+    for (const t of ids) {
+      const a = T[t], info = E._task_info[t];
+      const solved = base ? `<span class="delta">no log</span> ${base[t].solved}/${base[t].runs}<br><span class="delta">log</span> ${log[t].solved}/${log[t].runs}` : `${a.solved}/${a.runs}`;
+      const conf = state.team === "single" ? `<span class="delta">one agent</span>` :
+        (chips(t, "conflict") || `<span class="delta">none</span>`) + `<br><span class="delta">any conflict in ${a.conflict_runs} of ${a.runs} runs</span>`;
+      const recs = [
+        a.omitted.length ? `<b>Missed:</b> ${a.omitted.map(([lab, n, why]) => `${esc(lab)}${recDesc(lab)} ×${n}, ${WHY[why]}`).join("; ")}` : "",
+        a.extra.length ? `<b>Changed, not asked for:</b> ${a.extra.map(([lab, n]) => `${esc(lab)}${recDesc(lab)} ×${n}`).join("; ")}` : "",
+        a.wrong.length ? `<b>Wrong values:</b> ${a.wrong.map(([lab, n]) => `${esc(lab)} ×${n}`).join("; ")}` : "",
+      ].filter(Boolean).join("<br>");
+      h += `<tr><td><code>${t}</code><br><span class="delta">${info.changes} changes${info.cap ? ", more than one search page" : ""}</span><br>${esc(info.question)}</td>` +
+        `<td class="n">${solved}</td><td>${conf}</td><td>${chips(t, "failure") || (a.solved === a.runs ? `<span class="delta">always solved</span>` : "")}</td>` +
+        `<td class="recs">${recs || (a.solved === a.runs ? "" : `<span class="delta">–</span>`)}</td></tr>`;
+    }
+    $("tasktable").innerHTML = h + "</tbody>";
+    $("tasksintro").textContent = `${ids.length} tasks. ${E[key].label}: ${pct(E[key].accuracy)} of task-runs solved. ` +
+      `Counts are failed runs (of ${T[ids[0]] ? T[ids[0]].runs : 10}) in which each cause appeared; one failed run can have several. Red: conflict-related. Gray: what the team got wrong. Green outline: how agents stopped.`;
+  }
+  ctl.addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b || b.disabled) return;
+    if (b.dataset.team) state.team = b.dataset.team;
+    if (b.dataset.wal) state.wal = b.dataset.wal === "1";
+    render();
+  });
+  $("tasksort").addEventListener("change", (e) => { state.sort = e.target.value; render(); });
+  $("taskonly").addEventListener("change", (e) => { state.onlyConflict = e.target.checked; render(); });
+  render();
+  $("tasknote").textContent = `How causes are found: a missing change and an extra change to the same record are one change with wrong values; other missing changes are records that no agent's search results ever showed, ` +
+    `that were shown but not changed, or that an agent named in an intent or message and never changed; new items (emails, events, replies) are "not created". "Duplicate insert, only error": the run passes once the teammate's copy is removed. ` +
+    `"Left it to a teammate": an agent changed nothing and its last reply points at a teammate. "Garbled or empty last call": an agent's last reply was a tool call written out as text, or empty, so the call never ran (fixed by --repair-calls, not used in these runs). ` +
+    `Records are described as they are before the task; WorkBench's "today" is 2023-11-30. Script: analysis/wal_errors.py.`;
 }
 
 // ---- logs ----

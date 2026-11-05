@@ -14,6 +14,8 @@ if (HERE / "piggyback.json").exists():  # from piggyback.py: the log with and wi
 for key, name in (("drafts", "wal_variants_dr.json"), ("ablations", "wal_variants_ab.json")):
     if (HERE / name).exists():  # from wal_variants.py --tag dr / ab: variants of the log run side by side
         data[key] = json.load(open(HERE / name))
+if (HERE / "wal_errors.json").exists():  # from wal_errors.py: what failed task-runs got wrong, per setup and task
+    data["errors"] = json.load(open(HERE / "wal_errors.json"))
 if (HERE / "wal_timing.json").exists():  # from wal_timing.py: how long the log's locked operations take
     data["timing"] = json.load(open(HERE / "wal_timing.json"))
 html = (HERE / "concurrency.html").read_text().replace("/*DATA*/null", json.dumps(data, ensure_ascii=False).replace("</", "<\\/"))

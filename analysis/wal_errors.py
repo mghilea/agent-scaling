@@ -24,6 +24,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "analysis"))
 from concurrency import insert_key  # noqa: E402
+from conflicts import conflicts  # noqa: E402
 from hard_common import DOTTED, main_tool, target  # noqa: E402
 from wal_compare import TASKS  # noqa: E402
 
@@ -42,93 +43,78 @@ ID_KEYS = ("email_id", "event_id", "task_id", "customer_id")
 RAW_CALL = re.compile(r"<\|call\|>|to=functions\.|<\|channel\|>")
 # a final reply that mentions a teammate: from an agent that changed nothing, it left the work to them
 TEAMMATE = re.compile(r"\bagent[ _]?\d\b|teammate|another agent|other agents?\b|the team\b", re.I)
+# What contributed to a failed task-run (several can apply), for the per-task table: conflict-related first.
+FACTORS = [("dup_caused", "A teammate's duplicate insert, the only error", "conflict"),
+           ("dup_other", "A teammate's duplicate insert, with other errors", "conflict"),
+           ("lost_update", "A lost update (two agents set one field differently)", "conflict"),
+           ("never_found", "A required record that no search showed", "failure"),
+           ("found_not_changed", "A required record shown but not changed", "failure"),
+           ("claimed", "A required record named in an intent or message, never changed", "failure"),
+           ("not_created", "A required new item (email, event, reply...) not created", "failure"),
+           ("extra", "Changes to records the task didn't ask for", "failure"),
+           ("wrong_values", "Wrong values on a required record", "failure"),
+           ("nothing", "Nothing changed at all", "failure"),
+           ("deferred", "An agent changed nothing and left the work to a teammate", "behaviour"),
+           ("lost_call", "An agent ended on a garbled or empty tool call", "behaviour")]
+REASON = {"record never shown by any search": "never_found", "shown, but never changed": "found_not_changed",
+          "shown, and named in an intent or message, but never changed": "claimed",
+          "a new item (email, event, customer, task) never created": "not_created"}
+KIND = {"email_id": "email", "event_id": "event", "task_id": "task", "customer_id": "customer"}
 
 
-def args_of(action):
-    return dict(re.findall(r'(\w+)="((?:[^"\\]|\\.)*)"', action))
+def record(action):
+    """A short name for what an action changes: 'event 00000205', 'new email to x: \"subject\"', ..."""
+    a, tool = args_of(action), tool_of(action).split(".")[-1]
+    if tool in ("reply_email", "forward_email"):
+        return f"{tool.split('_')[0]} of email {a.get('email_id')}" + (f" to {a['recipient']}" if a.get("recipient") else "")
+    for k, kind in KIND.items():
+        if k in a:
+            return f"{kind} {a[k]}"
+    if tool == "send_email":
+        return f"new email to {a.get('recipient', '?')}: \u201c{a.get('subject', '')}\u201d"
+    if tool == "create_event":
+        return f"new event \u201c{a.get('event_name', '')}\u201d at {a.get('event_start', '?')}"
+    if tool == "add_customer":
+        return f"new customer {a.get('customer_name', '?')}"
+    if tool == "create_task":
+        return f"new task \u201c{a.get('task_name', '')}\u201d"
+    if tool == "create_plot":
+        return f"plot of {a.get('value_to_plot', '?')} ({a.get('plot_type', '?')})"
+    return tool
 
 
-def tool_of(action):
-    return action.split(".func(")[0]
+def describe(label, st):
+    """What an existing record is, from WorkBench's starting databases (empty for new items)."""
+    kind, _, rid = label.partition(" ")
+    frame = {"event": "calendar_events", "email": "emails", "task": "project_tasks", "customer": "crm_data"}.get(kind)
+    if not frame:
+        return ""
+    df = getattr(st, frame)
+    row = df[df[kind + "_id"] == rid]
+    if row.empty:
+        return ""
+    x = row.iloc[0]
+    who = lambda e: str(e).split("@")[0]  # noqa: E731 - every address is @atlas.com or a customer's
+    if kind == "event":
+        return f"\u201c{x.event_name}\u201d with {who(x.participant_email)}, {x.event_start[:16]}"
+    if kind == "email":
+        way = "from" if x["inbox/outbox"] == "inbox" else "to"
+        return f"{way} {who(x['sender/recipient'])}: \u201c{x.subject}\u201d, {x.sent_datetime[:10]}"
+    if kind == "task":
+        return f"\u201c{x.task_name}\u201d ({x.board}): {x.list_name}, {who(x.assigned_to_email)}, due {x.due_date}"
+    return f"{x.customer_name}: {x.status}, {x.product_interest}, {who(x.assigned_to_email)}, last contact {x.last_contact_date}"
 
 
-def changes(actions):
-    """The write actions that changed the databases, replayed in order on fresh databases."""
-    wb._state._local.tool_state = wb._state._pristine_state().copy()
-    st = wb._state.get_state()
-    out = []
-    for a in actions:
-        if not wb.is_write(a):
-            continue
-        before = {f: getattr(st, f).copy() for f in wb._MUTABLE}
-        try:
-            _parse_and_dispatch(a)
-        except Exception:  # noqa: BLE001 - a call that raised changed nothing
-            continue
-        if any(not getattr(st, f).equals(before[f]) for f in wb._MUTABLE):
-            out.append(a)
-    wb._state._local.tool_state = None
-    return out
-
-
-def without_teammate_duplicates(actions, keys):
-    """The actions with the later copy of every insert whose key two agents created removed."""
-    seen, kept = set(), []
-    for a in actions:
-        k = insert_key(tool_of(a).replace(".", "_"), args_of(a))
-        if k in keys and k in seen:
-            continue
-        seen.add(k)
-        kept.append(a)
-    return kept
-
-
-def classify(made, expected):
-    """(primary category, details) for a failed task-run's changes against the correct ones."""
-    M, G = Counter(a.lower() for a in made), Counter(a.lower() for a in expected)
-    missing, extra = list((G - M).elements()), list((M - G).elements())
-    wrong, args_diff = [], Counter()
-    for g in list(missing):
-        e = next((e for e in extra if target(e) == target(g) and tool_of(e) == tool_of(g)), None)
-        if e is not None:
-            missing.remove(g)
-            extra.remove(e)
-            wrong.append((g, e))
-            ga, ea = args_of(g), args_of(e)
-            for k in sorted(set(ga) | set(ea)):
-                if ga.get(k) != ea.get(k):
-                    args_diff[f"{tool_of(g).split('.')[-1]}: {k}"] += 1
-    repeats = [e for e in extra if M[e] > 1 and G[e] >= 1]  # a required change made again (same text)
-    extra = [e for e in extra if e not in repeats]
-    if not made:
-        cat = "Nothing changed"
-    elif missing and not extra and not wrong:
-        cat = "Some required changes missing"
-    elif wrong and not missing and not extra:
-        cat = "Right records, wrong values"
-    elif extra and not missing and not wrong:
-        cat = "Extra changes to other records"
-    elif missing and extra and not wrong:
-        cat = "Wrong records: missed some, changed others"
-    elif missing or extra or wrong:
-        cat = "Mixed"
-    else:
-        cat = "Other"
-    return cat, {"omitted": missing, "extra": extra, "wrong": wrong, "repeats": repeats, "args_diff": args_diff}
-
-
-def tool_texts(trace):
-    """Per agent, the text of its WorkBench tool results (not the log, messages or shared state)."""
-    convs = trace["conversations"] if isinstance(trace, dict) else {"agent": trace}
-    return {ag: " ".join(str(m.get("content", "")) for m in conv if m.get("role") == "tool" and m.get("name") in DOTTED)
-            for ag, conv in convs.items()}
-
-
-def raw_endings(trace):
-    """Agents whose last reply is a tool call written out as text (the model meant to act and the call was lost)."""
-    if not isinstance(trace, dict):
-        return 0
-    return sum(1 for e in trace["events"] if e["kind"] == "idle" and RAW_CALL.search(str(e.get("reply", ""))))
+def lost_calls(trace):
+    """Agents whose last reply is a tool call written out as text, or empty: the call never ran."""
+    convs = trace["conversations"].values() if isinstance(trace, dict) else [trace]
+    n = 0
+    for conv in convs:
+        last = [m for m in conv if m.get("role") == "assistant"]
+        if last and not last[-1].get("tool_calls"):
+            text = str(last[-1].get("content") or "")
+            n += bool(RAW_CALL.search(text) or not text.strip() or text == "None")
+    return n
 
 
 def claims(trace):
@@ -154,7 +140,8 @@ def deferrers(trace):
 def task_run(d, r, trace):
     made = changes(r["answer"])
     out = {"task": r["id"], "correct": bool(r["correct"]), "n_made": len(made), "n_expected": len(r["expected"]),
-           "raw_endings": raw_endings(trace), "deferrers": deferrers(trace),
+           "raw_endings": raw_endings(trace), "deferrers": deferrers(trace), "lost_calls": lost_calls(trace),
+           "conflicts": conflicts(trace) if isinstance(trace, dict) else None,
            "unknown_tool": sum(1 for conv in (trace["conversations"].values() if isinstance(trace, dict) else [trace])
                                for m in conv if m.get("role") == "tool" and "unknown tool" in str(m.get("content", "")))}
     if out["correct"]:
@@ -179,6 +166,10 @@ def task_run(d, r, trace):
     out["omitted"], out["extra"], out["wrong"], out["repeats"] = (len(det["omitted"]), len(det["extra"]),
                                                                   len(det["wrong"]), len(det["repeats"]))
     out["args_diff"] = dict(det["args_diff"])
+    out["extra_list"] = [record(e) for e in det["extra"]]
+    out["wrong_list"] = [f"{record(g)}: {k}" for g, e in det["wrong"]
+                         for k in sorted(set(args_of(g)) | set(args_of(e))) if args_of(g).get(k) != args_of(e).get(k)]
+    out["omitted_list"] = []
     # why each omitted change to an existing record was omitted
     texts = tool_texts(trace)
     claimed = claims(trace)
@@ -187,14 +178,17 @@ def task_run(d, r, trace):
         ids = [v for k, v in args_of(g).items() if k in ID_KEYS]
         if not ids or tool_of(g).endswith(("reply_email", "forward_email")):
             why["a new item (email, event, customer, task) never created"] += 1
+            out["omitted_list"].append([record(g), "not_created"])
             continue
         rid = ids[0]
         if not any(rid in t for t in texts.values()):
-            why["record never shown by any search"] += 1
+            reason = "record never shown by any search"
         elif rid in claimed:
-            why["shown, and named in an intent or message, but never changed"] += 1
+            reason = "shown, and named in an intent or message, but never changed"
         else:
-            why["shown, but never changed"] += 1
+            reason = "shown, but never changed"
+        why[reason] += 1
+        out["omitted_list"].append([record(g), REASON[reason]])
     out["omitted_why"] = dict(why)
     tool = main_tool(r["expected"])
     out["cap"] = TASKS[r["id"]]["cap"] and sum(tool_of(a) == tool for a in made) == 5
@@ -238,16 +232,61 @@ def summary(rows):
                                  "more": sum(r["n_made"] > r["n_expected"] for r in failed)}}
 
 
+def factors(r):
+    """What contributed to a failed task-run (keys of FACTORS)."""
+    c = r.get("conflicts") or {}
+    f = {reason for _, reason in r.get("omitted_list", [])}
+    if r.get("category") == CATEGORIES[0]:
+        f.add("dup_caused")
+    elif r.get("had_duplicate"):
+        f.add("dup_other")
+    if c.get("lost_updates"):
+        f.add("lost_update")
+    if r.get("extra_list"):
+        f.add("extra")
+    if r.get("wrong_list"):
+        f.add("wrong_values")
+    if r.get("category") == "Nothing changed":
+        f.add("nothing")
+    if r["deferrers"]:
+        f.add("deferred")
+    if r["lost_calls"]:
+        f.add("lost_call")
+    return f
+
+
+def task_summary(rows):
+    """One task under one condition: how often solved, what contributed to its failures, which records."""
+    failed = [r for r in rows if not r["correct"]]
+    f, omitted, reason, extra, wrong = Counter(), Counter(), defaultdict(Counter), Counter(), Counter()
+    for r in failed:
+        f.update(factors(r))
+        for lab, why in r.get("omitted_list", []):
+            omitted[lab] += 1
+            reason[lab][why] += 1
+        extra.update(set(r.get("extra_list", [])))
+        wrong.update(set(r.get("wrong_list", [])))
+    conf = [r["conflicts"] for r in rows if r.get("conflicts")]
+    total = lambda c: c["dup_inserts"] + c["gone"] + c["redundant"] + c["lost_updates"]  # noqa: E731
+    return {"runs": len(rows), "solved": len(rows) - len(failed), "factors": dict(f),
+            "conflict_runs": sum(total(c) > 0 for c in conf), "conflicts": sum(total(c) for c in conf),
+            "harmless_runs": sum(c["gone"] + c["redundant"] > 0 for c in conf),
+            "omitted": [[lab, n, reason[lab].most_common(1)[0][0]] for lab, n in omitted.most_common(3)],
+            "extra": [[lab, n] for lab, n in extra.most_common(3)], "wrong": [[lab, n] for lab, n in wrong.most_common(2)]}
+
+
 def main():
-    out, per_task = {"_categories": CATEGORIES, "_conditions": [(k, label) for k, label, _ in CONDITIONS]}, {}
+    out, per_task, by_task = {"_categories": CATEGORIES, "_conditions": [(k, label) for k, label, _ in CONDITIONS]}, {}, {}
     for key, label, pattern in CONDITIONS:
         rows = load(pattern)
         if not rows:
             continue
         out[key] = {"label": label, **summary(rows)}
         per_task[key] = defaultdict(list)
+        by_task[key] = defaultdict(list)
         for r in rows:
             per_task[key][r["task"]].append(r["correct"])
+            by_task[key][r["task"]].append(r)
         s = out[key]
         print(f"\n{label}: {s['task_runs']} task-runs, accuracy {s['accuracy']:.0%}, {s['failed']} failed")
         for c, v in s["categories"].items():
@@ -268,6 +307,18 @@ def main():
                      "solved_rarely": [t for t in TASKS if t not in never and max(rates[k].get(t, 0) for k in driven) <= 0.3]}
     print(f"\n{len(never)} of {len(TASKS)} tasks are never solved by any of these setups; {len(always)} are solved in 90%+ "
           f"of runs by all; {len(out['_tasks']['solved_rarely'])} more are solved in at most 30% of runs by every team")
+    out["_factors"] = FACTORS
+    st = wb._state._pristine_state()
+    labels = set()
+    for key, pt in by_task.items():
+        for t, rows in pt.items():
+            agg = task_summary(rows)
+            out[key].setdefault("tasks", {})[t] = agg
+            labels |= {x[0] for k in ("omitted", "extra", "wrong") for x in agg[k]}
+    out["_records"] = {lab: describe(lab.split(":")[0], st) for lab in sorted(labels)}
+    info = {t["id"]: t for t in wb.load_tasks()}
+    out["_task_info"] = {t: {"question": info[t]["question"], "changes": TASKS[t]["changes"], "cap": TASKS[t]["cap"]}
+                         for t in TASKS}
     (ROOT / "analysis" / "wal_errors.json").write_text(json.dumps(out, indent=1))
 
 
