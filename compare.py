@@ -25,6 +25,8 @@ def load(run_dir):
     elif config.get("wal"):
         name += "+wal"
     name += "+rc" if config.get("repair_calls") else ""
+    name += "+np" if config.get("no_pause") else ""
+    name += f"+tb{config['turn_budget']}" if config.get("turn_budget") else ""
     return name, {r["id"]: r for r in rows}
 
 

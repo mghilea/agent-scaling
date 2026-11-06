@@ -396,6 +396,8 @@ class Team:
             "actions": [] if text else answer, **({"answer": answer, "sessions": [w.sandbox for w in self.workers]}
                                                  if text else {}),
             "stop": "final", **stats,
+            # times a worker's round (or an orchestrator call) stopped at --max-turns
+            "out_of_calls": sum((a.agent if isinstance(a, Worker) else a).limit_hits for a in agents),
             "agents": len(self.workers), "rounds": self.rounds, "agent_messages": len(self.messages),
             **({"comm": self.wal_log.counts(self.wal_log.events)} if self.wal_log else {}),
             "trace": {"topology": self.topology, **self.trace, "worker_errors": errors,

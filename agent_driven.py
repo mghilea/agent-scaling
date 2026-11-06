@@ -63,8 +63,8 @@ import workbench as wb
 CHANNELS = {"all": ["message", "a2a", "shared"], "text": ["message"], "a2a": ["a2a"],
             "shared": ["shared"], "none": []}
 A2A_STATES = ["working", "input-required", "completed", "failed", "rejected", "canceled"]
-TURN_BUDGET = 30        # model calls per agent for the whole task
-TURNS_PER_WAKE = 12     # model calls per activation before the agent must pause
+TURN_BUDGET = 30        # model calls per agent for the whole task (--turn-budget)
+TURNS_PER_WAKE = 12     # model calls per activation before the agent must pause, unless --no-pause
 TIME_LIMIT = 900        # seconds per task
 # BrowseComp-Plus: each agent gets the single agent's 30 calls, usable in one go (research takes many searches).
 TURN_BUDGET_BC = TURNS_PER_WAKE_BC = 30
@@ -139,13 +139,17 @@ def _as_object(data):
 
 class Team:
     def __init__(self, task, make_agent, n_agents, comm, log, seed, coordinate=False, browsecomp=False, split=0,
-                 answer_rule="vote", wal=False, wal_piggyback=False, wal_drafts=False, wal_mode="full"):
+                 answer_rule="vote", wal=False, wal_piggyback=False, wal_drafts=False, wal_mode="full",
+                 turn_budget=None, no_pause=False):
         if wal and browsecomp:
             raise ValueError("the write-ahead log is for WorkBench's shared workspace; BrowseComp has none")
         self.task, self.log, self.channels = task, log, CHANNELS[comm]
         self.use_wal, self.wal_piggyback, self.wal_drafts = wal, wal and wal_piggyback, wal and wal_drafts
         self.wal_mode = wal_mode if wal else None
         self.split = split
+        # --turn-budget: calls per agent instead of the default; --no-pause: one activation may use all of them.
+        # A paused agent only resumes when a teammate contacts it, so without channels it never does.
+        self.turn_budget, self.no_pause = turn_budget, no_pause
         self.propose = browsecomp and answer_rule == "propose"
         self.answer_rule = answer_rule if browsecomp else None
         self.proposals, self.final, self.announced, self.team_nudged = {}, None, None, False
@@ -231,8 +235,8 @@ class Team:
 
     def budget(self):
         if not self.bc:
-            return TURN_BUDGET
-        return TURN_BUDGET_BC + (DECIDE_CALLS if self.announced is not None else 0)
+            return self.turn_budget or TURN_BUDGET
+        return (self.turn_budget or TURN_BUDGET_BC) + (DECIDE_CALLS if self.announced is not None else 0)
 
     @staticmethod
     def _proposal_text(me, p):
@@ -482,10 +486,15 @@ class Team:
             while not self.over() and not self.expired():
                 left = self.budget() - agent.stats["turns"]
                 if left > 0:
-                    agent.max_turns = min(TURNS_PER_WAKE_BC if self.bc else TURNS_PER_WAKE, left)
+                    per_wake = (self.turn_budget or TURNS_PER_WAKE_BC) if self.bc else TURNS_PER_WAKE
+                    agent.max_turns = left if self.no_pause else min(per_wake, left)
                     self.wakes[me] += 1
                     self.event(me, "active", wake=self.wakes[me])
                     r = agent.send(message)
+                    if r["stop"] == "max_turns":  # out of calls for good, or paused until a teammate writes
+                        out = agent.stats["turns"] >= self.budget()
+                        self.event(me, "out_of_calls" if out else "paused", turns=agent.stats["turns"],
+                                   budget=self.budget())
                     if (r["final"] or "").strip():
                         self.final_replies[me] = r["final"]
                     if self.propose and not self.over() and me not in self.proposals:
@@ -620,12 +629,15 @@ class Team:
             "stop": "final" if not self.expired() else "time_limit",
             **{k: stats[k] for k in ("turns", "tool_calls", "tool_errors", "prompt_tokens", "completion_tokens")},
             "agents": len(self.ids), "rounds": max(self.wakes.values(), default=0),
+            "out_of_calls": len({e["agent"] for e in self.events if e["kind"] == "out_of_calls"}),
+            "paused": kinds["paused"],
             "agent_messages": deliveries, "comm": comm,
             "duplicate_changes": sum(c - 1 for c in dup.values() if c > 1),
             "trace": {"topology": "agent-driven", "comm": self.comm, "coordinate": self.coordinate, "wal": self.use_wal,
                       **({"wal_piggyback": True} if self.wal_piggyback else {}),
                       **({"wal_drafts": True} if self.wal_drafts else {}),
                       **({"wal_mode": self.wal_mode} if self.wal_mode not in (None, "full") else {}),
+                      "turn_budget": self.budget(), "no_pause": self.no_pause,
                       "task": self.task, "events": self.events,
                       "changes": [{"agent": a, "change": wb.show(c)} for a, c in self.changes],
                       "shared_state": self.state, "shared_state_history": self.state_history,
@@ -636,6 +648,6 @@ class Team:
 
 def run(task, make_agent, n_agents=3, comm="all", log=lambda label, text: None, seed=0, coordinate=False,
         browsecomp=False, split=0, answer_rule="vote", wal=False, wal_piggyback=False, wal_drafts=False,
-        wal_mode="full"):
+        wal_mode="full", turn_budget=None, no_pause=False):
     return Team(task, make_agent, n_agents, comm, log, seed, coordinate, browsecomp, split, answer_rule, wal,
-                wal_piggyback, wal_drafts, wal_mode).run()
+                wal_piggyback, wal_drafts, wal_mode, turn_budget, no_pause).run()

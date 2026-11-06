@@ -206,6 +206,7 @@ class Agent:
         self.repair_calls = repair_calls
         self.messages = [{"role": "system", "content": system_prompt}]
         self.stats = new_stats()
+        self.limit_hits = 0  # times a send() stopped at max_turns
         self._stats_lock = threading.Lock()  # an orchestrator's calls can run in parallel threads
         # Optional: a function returning text that arrived while the agent was working (messages from
         # teammates), or None. It is checked after each round of tool calls and added as a user message.
@@ -219,6 +220,7 @@ class Agent:
         """Start a fresh conversation on task."""
         self.messages = [{"role": "system", "content": self.system_prompt}]
         self.stats = new_stats()
+        self.limit_hits = 0  # times a send() stopped at max_turns
         return self.send(task)
 
     def send(self, text: str) -> dict:
@@ -272,6 +274,7 @@ class Agent:
                 self.log(_block("arrived", arrived, DIM, limit=800))
                 self.messages.append({"role": "user", "content": arrived})
 
+        self.limit_hits += 1
         self.log(_c(YELLOW, f"  {self.name or 'agent'} stopped: hit --max-turns ({self.max_turns}) "
                             "without a final answer"))
         return {"final": "", "stop": "max_turns", "messages": self.messages, **self.stats}
@@ -400,6 +403,11 @@ def main():
                     help="retry a tool call the model wrote out as text or that came back empty, and strip stray "
                          "characters from tool names, instead of taking them as the agent's answer (browsecomp always "
                          "retries calls written out as text)")
+    ap.add_argument("--turn-budget", type=int,
+                    help="agent-driven: model calls per agent for the whole task (default 30, as before)")
+    ap.add_argument("--no-pause", action="store_true",
+                    help="agent-driven: one activation may use the agent's whole budget, instead of pausing "
+                         "after 12 calls until a teammate contacts it")
     ap.add_argument("--agents", type=int, default=3, help="multi-agent: number of worker agents (paper: 3)")
     ap.add_argument("--rounds", type=int,
                     help="multi-agent: max rounds (default as in the paper: 5 centralized/hybrid, 3 decentralized)")
@@ -434,6 +442,8 @@ def main():
         sys.exit("--wal needs --benchmark workbench and a multi-agent topology")
     if (args.wal_piggyback or args.wal_drafts or args.wal_mode != "full") and not (args.wal and args.topology == "agent-driven"):
         sys.exit("--wal-piggyback, --wal-drafts and --wal-mode need --wal and --topology agent-driven")
+    if (args.turn_budget or args.no_pause) and args.topology != "agent-driven":
+        sys.exit("--turn-budget and --no-pause are for --topology agent-driven (other setups: --max-turns)")
     if args.wal_mode != "full" and (args.wal_piggyback or args.wal_drafts):
         sys.exit("--wal-mode ablations run on the plain log, without --wal-piggyback or --wal-drafts")
     if args.split and not (bc and multi and args.split == args.agents):
@@ -454,6 +464,8 @@ def main():
     topo_name += "-wal" if args.wal and not driven else ""
     topo_name += f"-split{args.split}" if args.split else ""
     topo_name += "-propose" if driven and bc and args.team_answer == "propose" else ""
+    topo_name += "-np" if args.no_pause else ""
+    topo_name += f"-tb{args.turn_budget}" if args.turn_budget else ""
     kind = "ask" if args.ask else ("sas" if not multi else topo_name) + ("-rc" if args.repair_calls else "") + \
         ("-workbench" if wb else "-browsecomp" if bc else "")
     run_dir = ROOT / "runs" / f"{datetime.now():%Y%m%d-%H%M%S}-{kind}-{args.model}{'-' + args.tag if args.tag else ''}"
@@ -469,6 +481,9 @@ def main():
         if not args.quiet:
             print(_block(label, text, DIM, limit=600), flush=True)
 
+    budget_name = (f"--turn-budget {args.turn_budget or (agent_driven.TURN_BUDGET_BC if bc else agent_driven.TURN_BUDGET)}"
+                   if driven
+                   else f"--max-turns {args.max_turns}" if not args.ask else "")
     rows = []
     for t in tasks:
         print(_c(BOLD, f"\n=== {t['id']} ===") + f"\n{t['question']}", flush=True)
@@ -479,7 +494,8 @@ def main():
                 r = agent_driven.run(t["question"], make_agent, args.agents, args.comm, log_message, seed=t["id"],
                                      coordinate=args.coordinate, browsecomp=bool(bc), split=args.split,
                                      answer_rule=args.team_answer, wal=args.wal, wal_piggyback=args.wal_piggyback,
-                                     wal_drafts=args.wal_drafts, wal_mode=args.wal_mode)
+                                     wal_drafts=args.wal_drafts, wal_mode=args.wal_mode,
+                                     turn_budget=args.turn_budget, no_pause=args.no_pause)
                 actions = r["actions"]
             elif multi:
                 r = mas.run(args.topology, t["question"], make_agent, args.agents, args.rounds, log_message,
@@ -526,6 +542,10 @@ def main():
                "prompt_tokens": r["prompt_tokens"],
                "completion_tokens": r["completion_tokens"], "agent_messages": r.get("agent_messages", 0),
                **{k: r[k] for k in ("agents", "rounds", "comm", "duplicate_changes") if k in r},
+               # agents that reached their call limit (agent-driven: the whole budget; paper topologies: --max-turns
+               # in a round; single agent: --max-turns), and agent-driven pauses at 12 calls
+               "out_of_calls": r.get("out_of_calls", int(r["stop"] == "max_turns")),
+               **({"paused": r["paused"]} if "paused" in r else {}),
                "seconds": round(time.time() - start, 1)}
         rows.append(row)
         # Multi-agent runs trace every agent, not one conversation.
@@ -545,6 +565,9 @@ def main():
         print(f"{mark}  {shown}  {extra}turns={row['turns']} "
               f"tools={row['tool_calls']} tool_errors={row['tool_errors']} tokens={row['prompt_tokens'] + row['completion_tokens']} "
               f"{row['seconds']}s  stop={row['stop']}", flush=True)
+        if row["out_of_calls"]:
+            print(_c(YELLOW, f"  {row['out_of_calls']} agent(s) reached their call limit"
+                             + (f" ({budget_name})" if budget_name else "")), flush=True)
 
     n = len(rows)
     scored = [r for r in rows if r["correct"] is not None]
@@ -555,6 +578,8 @@ def main():
         "mean_turns": round(sum(r["turns"] for r in rows) / n, 2),
         "mean_tool_calls": round(sum(r["tool_calls"] for r in rows) / n, 2),
         "total_tool_errors": sum(r["tool_errors"] for r in rows),
+        "tasks_out_of_calls": sum(r["out_of_calls"] > 0 for r in rows),
+        "agents_out_of_calls": sum(r["out_of_calls"] for r in rows),
         "total_tokens": sum(r["prompt_tokens"] + r["completion_tokens"] for r in rows),
         "mean_agent_messages": round(sum(r["agent_messages"] for r in rows) / n, 2),
         # The paper's message density: messages between agents per model call (turn).
