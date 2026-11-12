@@ -149,13 +149,15 @@ a { color: var(--accent); }
   <section id="conflicts">
     <div class="sectionhead">
       <h2>Conflicts between agents</h2>
-      <p>A conflict is a write to a record, or of a new item, that a teammate had already written. It either went through a second time (a duplicate) or failed because the work was already done (a collision, such as "already downloaded").</p>
+      <p>A conflict is a write to a record, or of a new item, that a teammate had already written. It comes in two kinds. A <b>duplicate</b> went through a second time, so the world changed twice; AppWorld's tests check that nothing extra changed, so a duplicate can fail the task. A <b>collision</b> failed because the work was already done (such as "already downloaded"), so nothing changed.</p>
     </div>
     <figure class="chartbox" id="c1box">
       <svg id="c1" role="img" aria-labelledby="c1t"><title id="c1t">Share of task-runs with at least one conflict, by level</title></svg>
       <div class="tip" id="c1tip" hidden></div>
       <figcaption>Share of task-runs with at least one conflict between agents.</figcaption>
     </figure>
+    <div class="tablewrap"><table class="wide" id="kindtable"></table></div>
+    <p class="note">Solved: the share of those task-runs that passed all of AppWorld's tests. A lower share for task-runs with a duplicate than for those with no conflict marks duplicates as harmful; a share close to it marks collisions as harmless. This compares task-runs, so harder tasks with more writes also weigh on it.</p>
     <div class="tablewrap"><table class="wide" id="conftable"></table></div>
   </section>
 
@@ -253,6 +255,13 @@ if (S.L0 && S[topLvl]) {
   $("cards").innerHTML = cards.map(([a, b, c]) => `<div class="card"><span class="k">${a}</span><span class="v">${b}</span><p>${c}</p></div>`).join("");
 }
 
+// ---- conflicts by kind ----
+{
+  const cell = (share, acc, n) => `<td class="n">${pct(share, 1)} <span class="delta">(${Math.round(share * n)})</span><br><span class="delta">${acc == null ? "–" : "solved " + pct(acc)}</span></td>`;
+  $("kindtable").innerHTML = `<thead><tr><th>Level</th><th class="n">Task-runs with a duplicate<br>(harmful: changed twice)</th><th class="n">With collisions only<br>(harmless: nothing changed)</th><th class="n">With no conflict</th><th class="n">All task-runs</th></tr></thead><tbody>` +
+    levels.map((l) => { const x = S[l]; return `<tr><td><span class="lvl">${l}</span> ${NAME[l]}</td>${cell(x.dup_share, x.acc_dup, x.task_runs)}${cell(x.coll_only_share, x.acc_coll_only, x.task_runs)}${cell(x.no_conflict_share, x.acc_no_conflict, x.task_runs)}<td class="n">100%<br><span class="delta">solved ${pct(x.accuracy)}</span></td></tr>`; }).join("") + "</tbody>";
+}
+
 // ---- key findings (computed, so they follow the data) ----
 {
   const out = [], f1 = (x) => Math.abs(100 * x).toFixed(1);
@@ -260,7 +269,7 @@ if (S.L0 && S[topLvl]) {
   if (S.L1 && S.L2 && S.L3 && a23) out.push(`<b>Catch-up is what removes conflicts.</b> Requiring intents alone takes task-runs with a conflict from ${pct(S.L1.any_conflict, 1)} (L1) to ${pct(S.L2.any_conflict, 1)} (L2); adding catch-up takes them to ${pct(S.L3.any_conflict, 1)} (L3, ${pv(a23.any_conflict.p)}).`);
   if (a12 && a23) out.push(`<b>Requiring intents costs accuracy.</b> ${sg(a12.correct.diff)}${f1(a12.correct.diff)} points from L1 to L2 (${pv(a12.correct.p)}), and catch-up doesn't win it back (${sg(a23.correct.diff)}${f1(a23.correct.diff)} points, ${a23.correct.p < 0.05 ? pv(a23.correct.p) : "not significant"}).`);
   if (a03) out.push(`<b>Enforcement costs time and tokens.</b> From no log to L3: ${sg(a03.seconds[0])}${Math.abs(a03.seconds[0]).toFixed(0)} s per task (${sg(a03.seconds[0])}${(100 * Math.abs(a03.seconds[0]) / S.L0.seconds).toFixed(0)}%) and ${sg(a03.tokens.diff)}${k(Math.abs(a03.tokens.diff))} tokens.`);
-  if (S.L0 && S.L0.acc_conflict != null) out.push(`<b>Fewer conflicts didn't buy accuracy, because the conflicts were mostly harmless.</b> At L0, ${S.L0.collisions.toFixed(1)} of the ${S.L0.conflicts.toFixed(1)} conflicts per task-run were repeats that simply failed (such as "already done"), and task-runs with a conflict were solved about as often as those without (${pct(S.L0.acc_conflict)} vs ${pct(S.L0.acc_no_conflict)}).`);
+  if (S.L0 && S.L0.acc_no_conflict != null) out.push(`<b>Fewer conflicts didn't buy accuracy, because most conflicts were harmless.</b> At L0, ${pct(S.L0.coll_only_share)} of task-runs had only collisions (a repeat that failed, nothing changed); they were solved ${S.L0.acc_coll_only == null ? "–" : pct(S.L0.acc_coll_only)} of the time, against ${pct(S.L0.acc_no_conflict)} with no conflict. Harmful duplicates (the world changed twice) were rarer: ${pct(S.L0.dup_share)} of task-runs, solved ${S.L0.acc_dup == null ? "–" : pct(S.L0.acc_dup)}. Even if every duplicate had been avoided and those task-runs solved as often as conflict-free ones, L0's accuracy would rise by at most about ${Math.max(0, 100 * S.L0.dup_share * (S.L0.acc_no_conflict - (S.L0.acc_dup ?? S.L0.acc_no_conflict))).toFixed(1)} points.`);
   const v3 = D.vs_L0 && D.vs_L0.L3;
   if (v3 && v3.lost) out.push(`<b>What enforcement adds is work left undone.</b> On the ${v3.lost} task-runs that L0 solved and L3 failed (same task, same run; ${v3.won} went the other way), the L3 team made ${v3.writes_lost.toFixed(0)} writes against ${v3.writes_L0_lost.toFixed(0)} for L0.`);
   const v2 = D.vs_L0 && D.vs_L0.L2;

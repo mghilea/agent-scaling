@@ -77,6 +77,11 @@ def m(r, key):
     return r.get(key, 0) or 0
 
 
+KINDS = {"dup": lambda r: m(r, "duplicate_writes") > 0,
+         "coll_only": lambda r: m(r, "duplicate_writes") == 0 and m(r, "collisions") > 0,
+         "no_conflict": lambda r: m(r, "conflicts") == 0}
+
+
 def summary(rows):
     n = len(rows)
     mean = lambda k: st.mean(m(r, k) for r in rows) if rows else 0  # noqa: E731
@@ -101,6 +106,10 @@ def summary(rows):
            "ended_open": st.mean(int(r["_ended_open"]) for r in rows) if rows else 0,
            "acc_ended_open": st.mean(int(bool(r["correct"])) for r in rows if r["_ended_open"]) if any(r["_ended_open"] for r in rows) else None,
            "acc_not_ended_open": st.mean(int(bool(r["correct"])) for r in rows if not r["_ended_open"]) if rows else None,
+           # conflicts by kind: a duplicate went through (the world changed twice); a collision failed (nothing changed)
+           **{f"{name}_share": st.mean(int(sel(r)) for r in rows) if rows else 0 for name, sel in KINDS.items()},
+           **{f"acc_{name}": (st.mean(int(bool(r["correct"])) for r in rows if sel(r)) if any(sel(r) for r in rows) else None)
+              for name, sel in KINDS.items()},
            "acc_conflict": st.mean(int(bool(r["correct"])) for r in rows if m(r, "any_conflict")) if any(m(r, "any_conflict") for r in rows) else None,
            "acc_no_conflict": st.mean(int(bool(r["correct"])) for r in rows if not m(r, "any_conflict")) if rows else None,
            "completion_deferred": mean("completion_deferred"), "finish_wait": mean("finish_wait"),
