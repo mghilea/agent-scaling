@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1140 580" role="img" aria-label="Agents send code cells to a main thread that runs them one at a time in the shared AppWorld world. Reads go straight to the apps; writes pass through the log service's gate, which checks the level's rules, runs allowed writes and appends each entry to a log file. Agents read and post to the log with two tools.">
+<style>svg { background: #fbfcfd; }
+/* SVG text and shapes */
+.t-title { font: 600 16px "IBM Plex Sans Condensed", "IBM Plex Sans", "Arial Narrow", Arial, sans-serif; fill: #16202e; }
+.t-body { font: 13px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; fill: #3e4a5c; }
+.t-small { font: 12px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; fill: #5d6879; }
+.t-mono { font: 500 13px "IBM Plex Mono", ui-monospace, Menlo, Consolas, "Courier New", monospace; fill: #16202e; }
+.t-lbl { font: 12px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; fill: #3e4a5c; }
+.t-lmono { font: 12px "IBM Plex Mono", ui-monospace, Menlo, Consolas, "Courier New", monospace; fill: #3e4a5c; }
+.t-cap { font: 600 10.5px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; letter-spacing: .07em; fill: #5d6879; }
+.t-acc { fill: #2a78d6; }
+.t-ref { fill: #b3261e; }
+.box { fill: #fbfcfd; stroke: #c9d1dc; stroke-width: 1.2; }
+.box-key { fill: #fbfcfd; stroke: #2a78d6; stroke-width: 2; }
+.gate { fill: #e2edfb; stroke: #2a78d6; stroke-width: 1.5; }
+.card { fill: #e7ebf1; stroke: none; }
+.refbar { fill: #fbe2df; stroke: none; }
+.edge { stroke: #3e4a5c; stroke-width: 1.5; fill: none; }
+.edge-ref { stroke: #b3261e; stroke-width: 1.5; stroke-dasharray: 5 4; fill: none; }
+.dot-on { fill: #2a78d6; }
+.dot-part { fill: #fbfcfd; stroke: #2a78d6; stroke-width: 1.8; }
+.dot-off { fill: #c9d1dc; }
+</style>
+          <defs>
+            <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3e4a5c"/></marker>
+            <marker id="a1r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b3261e"/></marker>
+          </defs>
+
+          <!-- agents -->
+          <rect class="box" x="20" y="60" width="220" height="480" rx="10"/>
+          <text class="t-title" x="38" y="90">Agents 1–3</text>
+          <text class="t-small" x="38" y="110">one thread each, same task</text>
+          <rect class="card" x="36" y="128" width="188" height="56" rx="7"/>
+          <text class="t-mono" x="50" y="151">agent_1</text><text class="t-small" x="50" y="170">model + Python shell</text>
+          <rect class="card" x="36" y="196" width="188" height="56" rx="7"/>
+          <text class="t-mono" x="50" y="219">agent_2</text><text class="t-small" x="50" y="238">model + Python shell</text>
+          <rect class="card" x="36" y="264" width="188" height="56" rx="7"/>
+          <text class="t-mono" x="50" y="287">agent_3</text><text class="t-small" x="50" y="306">model + Python shell</text>
+          <text class="t-cap" x="38" y="356">TOOLS</text>
+          <text class="t-lmono" x="38" y="378">execute_python</text>
+          <text class="t-lmono" x="38" y="398">wal_read</text>
+          <text class="t-lmono" x="38" y="418">wal_intend</text>
+          <text class="t-cap" x="38" y="462">BETWEEN AGENTS</text>
+          <text class="t-small" x="38" y="482">no messages: only the log</text>
+          <text class="t-small" x="38" y="500">and the world's state</text>
+
+          <!-- log service -->
+          <rect class="box-key" x="390" y="30" width="420" height="270" rx="10"/>
+          <text class="t-title" x="408" y="58">Log service</text>
+          <text class="t-small" x="408" y="78">one per team · every check, write and entry under one lock</text>
+          <text class="t-cap" x="408" y="106">STATE</text>
+          <text class="t-body" x="408" y="128">entries, append-only: intent · change · release</text>
+          <text class="t-body" x="408" y="149">each agent's read position (what it has seen)</text>
+          <text class="t-body" x="408" y="170">each agent's current intent and its open claims</text>
+          <text class="t-body" x="408" y="191">records changed and items created, and by whom</text>
+          <rect class="gate" x="406" y="210" width="388" height="76" rx="8"/>
+          <text class="t-title t-acc" x="422" y="235">Gate: commit()</text>
+          <text class="t-body" x="422" y="256">checks the level's rules, writes a pending line,</text>
+          <text class="t-body" x="422" y="275">runs the write, appends the change entry</text>
+
+          <!-- main thread -->
+          <rect class="box" x="390" y="380" width="420" height="160" rx="10"/>
+          <text class="t-title" x="408" y="408">Main thread</text>
+          <text class="t-small" x="408" y="428">holds the one shared AppWorld world</text>
+          <text class="t-body" x="408" y="458">queue: code cells from all agents, in arrival order;</text>
+          <text class="t-body" x="408" y="479">each runs in its agent's own shell, one at a time</text>
+          <text class="t-body" x="408" y="508">its <tspan class="t-lmono">apis.&lt;app&gt;.&lt;api&gt;(…)</tspan> calls go out from here</text>
+
+          <!-- log file -->
+          <rect class="box" x="920" y="40" width="200" height="118" rx="10"/>
+          <text class="t-mono" x="938" y="68">wal/&lt;task&gt;.jsonl</text>
+          <text class="t-body" x="938" y="92">one JSON line per entry,</text>
+          <text class="t-body" x="938" y="112">forced to disk (fsync);</text>
+          <text class="t-body" x="938" y="132">a pending line goes first</text>
+          <text class="t-body" x="938" y="150">for every write</text>
+
+          <!-- apps -->
+          <rect class="box" x="920" y="220" width="200" height="250" rx="10"/>
+          <text class="t-title" x="938" y="248">AppWorld apps</text>
+          <text class="t-small" x="938" y="268">the same data for all three</text>
+          <text class="t-body" x="938" y="298">spotify, venmo, gmail,</text>
+          <text class="t-body" x="938" y="318">phone, amazon, todoist,</text>
+          <text class="t-body" x="938" y="338">simple_note, splitwise,</text>
+          <text class="t-body" x="938" y="358">file_system</text>
+          <text class="t-small" x="938" y="400">graded once, at the end,</text>
+          <text class="t-small" x="938" y="418">by AppWorld's own tests</text>
+
+          <!-- agents <-> log -->
+          <line class="edge" x1="240" y1="134" x2="386" y2="134" marker-end="url(#a1)"/>
+          <text class="t-lmono" x="314" y="110" text-anchor="middle">wal_read</text>
+          <text class="t-lmono" x="314" y="126" text-anchor="middle">wal_intend</text>
+          <line class="edge" x1="390" y1="168" x2="244" y2="168" marker-end="url(#a1)"/>
+          <text class="t-lbl" x="314" y="188" text-anchor="middle">unread entries;</text>
+          <text class="t-lbl" x="314" y="204" text-anchor="middle">posted, or refused</text>
+
+          <!-- agents <-> main thread -->
+          <line class="edge" x1="240" y1="436" x2="386" y2="436" marker-end="url(#a1)"/>
+          <text class="t-lbl" x="314" y="410" text-anchor="middle">code cell</text>
+          <text class="t-lmono" x="314" y="428" text-anchor="middle">execute_python</text>
+          <line class="edge" x1="390" y1="470" x2="244" y2="470" marker-end="url(#a1)"/>
+          <text class="t-lbl" x="314" y="490" text-anchor="middle">output, or the</text>
+          <text class="t-lbl" x="314" y="506" text-anchor="middle">refusal's message</text>
+
+          <!-- writes up to the gate, refusals back down -->
+          <line class="edge" x1="560" y1="380" x2="560" y2="290" marker-end="url(#a1)"/>
+          <text class="t-lbl" x="550" y="330" text-anchor="end" font-weight="600">writes</text>
+          <text class="t-lbl" x="550" y="346" text-anchor="end">POST · PUT · PATCH · DELETE</text>
+          <line class="edge-ref" x1="660" y1="288" x2="660" y2="376" marker-end="url(#a1r)"/>
+          <text class="t-lbl t-ref" x="670" y="330">refused:</text>
+          <text class="t-lbl t-ref" x="670" y="346">nothing changed</text>
+
+          <!-- to the file and the apps -->
+          <line class="edge" x1="810" y1="96" x2="916" y2="96" marker-end="url(#a1)"/>
+          <text class="t-lbl" x="864" y="86" text-anchor="middle">appends</text>
+          <line class="edge" x1="810" y1="252" x2="916" y2="252" marker-end="url(#a1)"/>
+          <text class="t-lbl" x="864" y="242" text-anchor="middle">allowed write</text>
+          <line class="edge" x1="810" y1="446" x2="916" y2="446" marker-end="url(#a1)"/>
+          <text class="t-lbl" x="864" y="422" text-anchor="middle">reads go</text>
+          <text class="t-lbl" x="864" y="436" text-anchor="middle">straight</text>
+        </svg>

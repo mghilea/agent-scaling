@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 650" role="img" aria-label="Posting an intent and making a write each pass three checks in order: claims (that claims name their records, or that the write is claimed), catching up on unread entries, and no conflict with a teammate. A failed check refuses the post or the write. The dots in each check show which levels enforce it.">
+<style>svg { background: #fbfcfd; }
+/* SVG text and shapes */
+.t-title { font: 600 16px "IBM Plex Sans Condensed", "IBM Plex Sans", "Arial Narrow", Arial, sans-serif; fill: #16202e; }
+.t-body { font: 13px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; fill: #3e4a5c; }
+.t-small { font: 12px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; fill: #5d6879; }
+.t-mono { font: 500 13px "IBM Plex Mono", ui-monospace, Menlo, Consolas, "Courier New", monospace; fill: #16202e; }
+.t-lbl { font: 12px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; fill: #3e4a5c; }
+.t-lmono { font: 12px "IBM Plex Mono", ui-monospace, Menlo, Consolas, "Courier New", monospace; fill: #3e4a5c; }
+.t-cap { font: 600 10.5px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; letter-spacing: .07em; fill: #5d6879; }
+.t-acc { fill: #2a78d6; }
+.t-ref { fill: #b3261e; }
+.box { fill: #fbfcfd; stroke: #c9d1dc; stroke-width: 1.2; }
+.box-key { fill: #fbfcfd; stroke: #2a78d6; stroke-width: 2; }
+.gate { fill: #e2edfb; stroke: #2a78d6; stroke-width: 1.5; }
+.card { fill: #e7ebf1; stroke: none; }
+.refbar { fill: #fbe2df; stroke: none; }
+.edge { stroke: #3e4a5c; stroke-width: 1.5; fill: none; }
+.edge-ref { stroke: #b3261e; stroke-width: 1.5; stroke-dasharray: 5 4; fill: none; }
+.dot-on { fill: #2a78d6; }
+.dot-part { fill: #fbfcfd; stroke: #2a78d6; stroke-width: 1.8; }
+.dot-off { fill: #c9d1dc; }
+</style>
+          <defs>
+            <marker id="b1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3e4a5c"/></marker>
+            <marker id="b1r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b3261e"/></marker>
+          </defs>
+          <text class="t-cap" x="330" y="18" text-anchor="middle">POSTING AN INTENT</text>
+          <text class="t-cap" x="670" y="18" text-anchor="middle">MAKING A CHANGE</text>
+          <rect class="box" x="180" y="30" width="300" height="62" rx="9"/>
+          <text class="t-mono" x="198" y="56">wal_intend(plan, claims)</text>
+          <text class="t-small" x="198" y="77">each claim: {app, api, target}</text>
+          <rect class="box" x="520" y="30" width="300" height="62" rx="9"/>
+          <text class="t-title" x="538" y="56">A write in a code cell</text>
+          <text class="t-small" x="538" y="77">complete_task is logged but never checked</text>
+
+          <rect class="box" x="180" y="122" width="300" height="96" rx="9"/>
+          <text class="t-title" x="198" y="148">Records named?</text>
+          <text class="t-body" x="198" y="180">a claim on an existing record</text>
+          <text class="t-body" x="198" y="200">must name its id</text>
+          <g><text class="t-small" x="352" y="146">L1</text><text class="t-small" x="376" y="146">L2</text><text class="t-small" x="400" y="146">L3</text><text class="t-small" x="424" y="146">L4</text><text class="t-small" x="446" y="146">L4s</text><circle class="dot-off" cx="358" cy="158" r="3"/><circle class="dot-on" cx="382" cy="158" r="5"/><circle class="dot-on" cx="406" cy="158" r="5"/><circle class="dot-on" cx="430" cy="158" r="5"/><circle class="dot-on" cx="456" cy="158" r="5"/></g>
+          <rect class="box" x="520" y="122" width="300" height="96" rx="9"/>
+          <text class="t-title" x="538" y="148">Claimed?</text>
+          <text class="t-body" x="538" y="180">the agent's current intent claims this</text>
+          <text class="t-body" x="538" y="200">app and API, and the record's id</text>
+          <g><text class="t-small" x="692" y="146">L1</text><text class="t-small" x="716" y="146">L2</text><text class="t-small" x="740" y="146">L3</text><text class="t-small" x="764" y="146">L4</text><text class="t-small" x="786" y="146">L4s</text><circle class="dot-off" cx="698" cy="158" r="3"/><circle class="dot-on" cx="722" cy="158" r="5"/><circle class="dot-on" cx="746" cy="158" r="5"/><circle class="dot-on" cx="770" cy="158" r="5"/><circle class="dot-on" cx="796" cy="158" r="5"/></g>
+
+          <rect class="box" x="180" y="248" width="640" height="112" rx="9"/>
+          <text class="t-title" x="198" y="274">Caught up?</text>
+          <text class="t-body" x="198" y="302">L3, L4-strict: the agent must have read every entry in the log.</text>
+          <text class="t-body" x="198" y="322">L4: only unread entries about the same records (for new items, the same API) block; the</text>
+          <text class="t-body" x="198" y="342">rest are shown with the reply. A refusal shows the missed entries, which then count as read.</text>
+          <g><text class="t-small" x="692" y="272">L1</text><text class="t-small" x="716" y="272">L2</text><text class="t-small" x="740" y="272">L3</text><text class="t-small" x="764" y="272">L4</text><text class="t-small" x="786" y="272">L4s</text><circle class="dot-off" cx="698" cy="284" r="3"/><circle class="dot-off" cx="722" cy="284" r="3"/><circle class="dot-on" cx="746" cy="284" r="5"/><circle class="dot-part" cx="770" cy="284" r="4.5"/><circle class="dot-on" cx="796" cy="284" r="5"/></g>
+
+          <rect class="box" x="180" y="390" width="640" height="92" rx="9"/>
+          <text class="t-title" x="198" y="416">No conflict?</text>
+          <text class="t-body" x="198" y="444">No teammate holds an open claim on the same record (or new item),</text>
+          <text class="t-body" x="198" y="464">and none has already changed or created it.</text>
+          <g><text class="t-small" x="692" y="414">L1</text><text class="t-small" x="716" y="414">L2</text><text class="t-small" x="740" y="414">L3</text><text class="t-small" x="764" y="414">L4</text><text class="t-small" x="786" y="414">L4s</text><circle class="dot-off" cx="698" cy="426" r="3"/><circle class="dot-off" cx="722" cy="426" r="3"/><circle class="dot-off" cx="746" cy="426" r="3"/><circle class="dot-on" cx="770" cy="426" r="5"/><circle class="dot-on" cx="796" cy="426" r="5"/></g>
+
+          <rect class="box-key" x="180" y="512" width="300" height="96" rx="9"/>
+          <text class="t-title" x="198" y="538">Intent posted</text>
+          <text class="t-body" x="198" y="562">replaces the agent's last intent and</text>
+          <text class="t-body" x="198" y="581">releases its unfinished claims;</text>
+          <text class="t-body" x="198" y="600">the new claims open</text>
+          <rect class="box-key" x="520" y="512" width="300" height="96" rx="9"/>
+          <text class="t-title" x="538" y="538">The write runs</text>
+          <text class="t-body" x="538" y="562">pending line (fsync), then the write,</text>
+          <text class="t-body" x="538" y="581">then a change entry (done or failed);</text>
+          <text class="t-body" x="538" y="600">its record ids leave the claim</text>
+          <line class="edge" x1="330" y1="92" x2="330" y2="118" marker-end="url(#b1)"/>
+          <line class="edge" x1="670" y1="92" x2="670" y2="118" marker-end="url(#b1)"/>
+          <line class="edge" x1="330" y1="218" x2="330" y2="244" marker-end="url(#b1)"/>
+          <line class="edge" x1="670" y1="218" x2="670" y2="244" marker-end="url(#b1)"/>
+          <line class="edge" x1="330" y1="360" x2="330" y2="386" marker-end="url(#b1)"/>
+          <line class="edge" x1="670" y1="360" x2="670" y2="386" marker-end="url(#b1)"/>
+          <line class="edge" x1="330" y1="482" x2="330" y2="508" marker-end="url(#b1)"/>
+          <line class="edge" x1="670" y1="482" x2="670" y2="508" marker-end="url(#b1)"/>
+          <text class="t-small" x="338" y="236">passes</text>
+          <text class="t-small" x="678" y="236">passes</text>
+
+          <rect class="refbar" x="6" y="122" width="148" height="360" rx="9"/>
+          <text class="t-title t-ref" x="20" y="150">Not posted</text>
+          <text class="t-lbl" x="20" y="176">the agent is told</text>
+          <text class="t-lbl" x="20" y="194">which rule and why,</text>
+          <text class="t-lbl" x="20" y="212">and may revise and</text>
+          <text class="t-lbl" x="20" y="230">post again</text>
+          <rect class="refbar" x="846" y="122" width="148" height="360" rx="9"/>
+          <text class="t-title t-ref" x="860" y="150">Refused</text>
+          <text class="t-lbl" x="860" y="176">nothing changed;</text>
+          <text class="t-lbl" x="860" y="194">an error in the</text>
+          <text class="t-lbl" x="860" y="212">agent's code says</text>
+          <text class="t-lbl" x="860" y="230">which rule and why</text>
+          <line class="edge-ref" x1="180" y1="190" x2="158" y2="190" marker-end="url(#b1r)"/>
+          <line class="edge-ref" x1="820" y1="190" x2="842" y2="190" marker-end="url(#b1r)"/>
+          <line class="edge-ref" x1="180" y1="316" x2="158" y2="316" marker-end="url(#b1r)"/>
+          <line class="edge-ref" x1="820" y1="316" x2="842" y2="316" marker-end="url(#b1r)"/>
+          <line class="edge-ref" x1="180" y1="448" x2="158" y2="448" marker-end="url(#b1r)"/>
+          <line class="edge-ref" x1="820" y1="448" x2="842" y2="448" marker-end="url(#b1r)"/>
+
+          <circle class="dot-on" cx="186" cy="636" r="5"/><text class="t-small" x="198" y="640">checked</text>
+          <circle class="dot-part" cx="272" cy="636" r="4.5"/><text class="t-small" x="284" y="640">relevant entries only</text>
+          <circle class="dot-off" cx="424" cy="636" r="3"/><text class="t-small" x="434" y="640">not checked</text>
+          <text class="t-small" x="820" y="640" text-anchor="end">L4s = L4-strict · L0 has no log</text>
+        </svg>

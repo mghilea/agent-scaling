@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 280" role="img" aria-label="A claim opens when its intent is posted. It closes when its record ids have all been written, is released when the agent posts a new intent or stops, and expires after 90 seconds without its change.">
+<style>svg { background: #fbfcfd; }
+/* SVG text and shapes */
+.t-title { font: 600 16px "IBM Plex Sans Condensed", "IBM Plex Sans", "Arial Narrow", Arial, sans-serif; fill: #16202e; }
+.t-body { font: 13px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; fill: #3e4a5c; }
+.t-small { font: 12px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; fill: #5d6879; }
+.t-mono { font: 500 13px "IBM Plex Mono", ui-monospace, Menlo, Consolas, "Courier New", monospace; fill: #16202e; }
+.t-lbl { font: 12px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; fill: #3e4a5c; }
+.t-lmono { font: 12px "IBM Plex Mono", ui-monospace, Menlo, Consolas, "Courier New", monospace; fill: #3e4a5c; }
+.t-cap { font: 600 10.5px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; letter-spacing: .07em; fill: #5d6879; }
+.t-acc { fill: #2a78d6; }
+.t-ref { fill: #b3261e; }
+.box { fill: #fbfcfd; stroke: #c9d1dc; stroke-width: 1.2; }
+.box-key { fill: #fbfcfd; stroke: #2a78d6; stroke-width: 2; }
+.gate { fill: #e2edfb; stroke: #2a78d6; stroke-width: 1.5; }
+.card { fill: #e7ebf1; stroke: none; }
+.refbar { fill: #fbe2df; stroke: none; }
+.edge { stroke: #3e4a5c; stroke-width: 1.5; fill: none; }
+.edge-ref { stroke: #b3261e; stroke-width: 1.5; stroke-dasharray: 5 4; fill: none; }
+.dot-on { fill: #2a78d6; }
+.dot-part { fill: #fbfcfd; stroke: #2a78d6; stroke-width: 1.8; }
+.dot-off { fill: #c9d1dc; }
+</style>
+          <defs>
+            <marker id="c1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3e4a5c"/></marker>
+          </defs>
+          <rect class="box" x="10" y="110" width="160" height="62" rx="9"/>
+          <text class="t-mono" x="26" y="136">wal_intend</text>
+          <text class="t-small" x="26" y="157">intent posted</text>
+          <line class="edge" x1="170" y1="141" x2="226" y2="141" marker-end="url(#c1)"/>
+          <text class="t-lbl" x="198" y="132" text-anchor="middle">opens</text>
+
+          <rect class="box-key" x="230" y="82" width="240" height="122" rx="9"/>
+          <text class="t-title" x="248" y="107">Open claim</text>
+          <text class="t-lmono" x="248" y="128">app.api target, intent #n</text>
+          <text class="t-body" x="248" y="152">L2+: lets its agent write it</text>
+          <text class="t-body" x="248" y="172">L4: blocks teammates' claims</text>
+          <text class="t-body" x="248" y="190">and writes on the same thing</text>
+
+          <path class="edge" d="M470,141 H520 V37 H676" marker-end="url(#c1)"/>
+          <path class="edge" d="M520,141 V105 H676" marker-end="url(#c1)"/>
+          <path class="edge" d="M520,141 V173 H676" marker-end="url(#c1)"/>
+          <path class="edge" d="M520,141 V241 H676" marker-end="url(#c1)"/>
+          <text class="t-lbl" x="600" y="29" text-anchor="middle">all its ids written</text>
+          <text class="t-lbl" x="600" y="97" text-anchor="middle">new intent posted</text>
+          <text class="t-lbl" x="600" y="165" text-anchor="middle">agent stops</text>
+          <text class="t-lbl" x="600" y="233" text-anchor="middle">90 s without its change</text>
+
+          <rect class="box" x="680" y="10" width="310" height="54" rx="9"/>
+          <text class="t-title" x="696" y="33">Closed</text>
+          <text class="t-small" x="696" y="53">no entry: the change entries record it</text>
+          <rect class="box" x="680" y="78" width="310" height="54" rx="9"/>
+          <text class="t-title" x="696" y="101">Released</text>
+          <text class="t-small" x="696" y="121">listed in the new intent entry</text>
+          <rect class="box" x="680" y="146" width="310" height="54" rx="9"/>
+          <text class="t-title" x="696" y="169">Released</text>
+          <text class="t-small" x="696" y="189">release entry (stopped)</text>
+          <rect class="box" x="680" y="214" width="310" height="54" rx="9"/>
+          <text class="t-title" x="696" y="237">Expired</text>
+          <text class="t-small" x="696" y="257">release entry (expired)</text>
+        </svg>
