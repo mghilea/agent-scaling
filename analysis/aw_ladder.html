@@ -149,7 +149,7 @@ a { color: var(--accent); }
 
   <section id="why-sec">
     <div class="sectionhead">
-      <h2>Why is L3 less accurate than no log?</h2>
+      <h2>Why does enforcement lower accuracy?</h2>
       <p id="whylede">L3 removes almost every conflict, yet solves fewer tasks than L0. Three findings explain the gap.</p>
     </div>
     <ul class="points" id="why"></ul>
@@ -282,11 +282,13 @@ if (S.L0 && S[topLvl]) {
   const v3 = D.vs_L0 && D.vs_L0.L3;
   if (v3 && v3.lost) why.push(`<b>What enforcement adds is work left undone.</b> On the ${v3.lost} task-runs that L0 solved and L3 failed (same task, same run; ${v3.won} went the other way), the L3 team made ${v3.writes_lost.toFixed(0)} writes against ${v3.writes_L0_lost.toFixed(0)} for L0.`);
   const v2 = D.vs_L0 && D.vs_L0.L2;
-  if (v2 && v3 && S.L2.acc_ended_open != null) why.push(`<b>One cause: a teammate's plan read as finished work.</b> An agent posts an intent; a teammate, refused for not having caught up, is shown that intent and calls <code>complete_task</code> at once. The task ends before the work is done, and every agent reports success (in one task-run, nothing at all was changed). The task ended while a teammate still held open claims in ${pct(S.L2.ended_open)} of L2 task-runs (solved ${pct(S.L2.acc_ended_open)} vs ${pct(S.L2.acc_not_ended_open)} otherwise) and ${pct(S.L3.ended_open)} of L3 task-runs (${pct(S.L3.acc_ended_open)} vs ${pct(S.L3.acc_not_ended_open)}). It accounts for ${v2.lost_ended_open} of L2's ${v2.lost} losses against L0, and ${v3.lost_ended_open} of L3's ${v3.lost}. The deferred-completion rule (built, not yet run) targets this; the rest of L3's losses are still being looked into.`);
+  const bs = D.by_size && D.by_size.big;
+  if (bs && bs.L0 && bs.L1 && bs.L2 && bs.L3) why.push(`<b>The loss is on big tasks: agents do the records they claimed, and claim too few.</b> On the ${bs.tasks} tasks where the team without the log makes over 20 writes, accuracy goes ${pct(bs.L0.accuracy)} (L0), ${pct(bs.L1.accuracy)} (L1), ${pct(bs.L2.accuracy)} (L2), ${pct(bs.L3.accuracy)} (L3), and writes fall from ${bs.L1.writes.toFixed(0)} (L1) to ${bs.L2.writes.toFixed(0)} (L2). On small tasks the levels differ by a few points. With a claim required per record, agents list the records first and then write roughly what they listed, and on big tasks the list falls short${bs.L2_lost_vs_L1 ? ` (on the ${bs.L2_lost_vs_L1.n} big task-runs L1 solved and L2 failed, L2 claimed ${bs.L2_lost_vs_L1.claimed.toFixed(0)} records and wrote ${bs.L2_lost_vs_L1.writes_L2.toFixed(0)} times, where L1 wrote ${bs.L2_lost_vs_L1.writes_L1.toFixed(0)} times)` : ""}. Why the lists fall short is the next thing to check.`);
+  if (v2 && v3 && S.L2.acc_ended_open != null) why.push(`<b>Completing with claimed work undone hurts at every level, but it doesn't explain the drop.</b> An agent can be shown a teammate's intent and call <code>complete_task</code> at once, or complete with its own claims undone; every agent then reports success (in one task-run, nothing at all was changed). Completing while a claimed record was still unwritten happened in ${pct(S.L2.ended_open)} of L2 task-runs (solved ${pct(S.L2.acc_ended_open)} vs ${pct(S.L2.acc_not_ended_open)} otherwise) and ${pct(S.L3.ended_open)} of L3 task-runs (${pct(S.L3.acc_ended_open)} vs ${pct(S.L3.acc_not_ended_open)}). But it explains only a small part of the drop: it appears in ${v2.lost_ended_open} of L2's ${v2.lost} losses against L0 and ${v2.won_ended_open} of its ${v2.won_n} wins, and in ${v3.lost_ended_open} of L3's ${v3.lost} losses and ${v3.won_ended_open} of its ${v3.won_n} wins. The deferred-completion rule (built, not yet run) targets it.`);
   if (single && S.L0) out.push(`<b>Team vs one agent.</b> A three-agent team without the log solves ${pct(S.L0.accuracy, 1)} of tasks, against ${pct(single.accuracy, 1)} for a single agent, using ${(S.L0.tokens / single.tokens).toFixed(1)}× the tokens. Neither the team's lead nor L3's deficit against the single agent is significant task by task, and the single agent has one run so far.`);
   $("findings").innerHTML = out.map((x) => `<li>${x}</li>`).join("");
   const s03 = step("L0", "L3");
-  if (s03) $("whylede").textContent = `L3 removes almost every conflict, yet solves ${f1(s03.correct.diff)} points fewer tasks than L0 (${pv(s03.correct.p)}). Three findings explain the gap.`;
+  if (s03 && a12) $("whylede").textContent = `L3 removes almost every conflict, yet solves ${f1(s03.correct.diff)} points fewer tasks than L0 (${pv(s03.correct.p)}). The drop arrives with L2, when intents become required (${sg(a12.correct.diff)}${f1(a12.correct.diff)} points, ${pv(a12.correct.p)}).`;
   $("why").innerHTML = why.map((x) => `<li>${x}</li>`).join("");
 }
 

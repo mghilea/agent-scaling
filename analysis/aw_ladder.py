@@ -46,19 +46,35 @@ def load(level, dataset, tag):
             continue
         for line in open(Path(d, "results.jsonl")):
             r = json.loads(line)
-            r["_ended_open"] = ended_with_open_claims(Path(d, "traces", f"{r['id']}.json")) if level != "L0" else False
+            own, mate = unfinished_at_completion(Path(d, "traces", f"{r['id']}.json")) if level != "L0" else (False, False)
+            r["_ended_open"] = own or mate
+            r["_claimed_records"] = claimed_records(Path(d, "traces", f"{r['id']}.json")) if level != "L0" else 0
             out[(rep, r["id"])] = r
     return out
 
 
-def ended_with_open_claims(trace):
-    """Whether the task ended (first complete_task) while a teammate of the completer still held open claims: claims
-    released because their agent stopped, after the complete_task change, for an agent other than the completer."""
+def claimed_records(trace):
+    """How many distinct existing records the team claimed (by app, API and id)."""
     if not trace.exists():
-        return False
+        return 0
     log = json.load(open(trace)).get("wal_log") or []
+    return len({(c["app"], c["api"], i) for e in log if e["kind"] == "intent" for c in e["claims"] for i in c.get("ids") or []})
+
+
+def unfinished_at_completion(trace):
+    """(completer, teammates): whether, when the first complete_task ran, that agent or a teammate still held a claim on
+    an existing record it hadn't written. Claims on new items are left out: they don't close when the item is created,
+    so an open one doesn't show that work was left undone."""
+    if not trace.exists():
+        return False, False
+    log = json.load(open(trace)).get("wal_log") or []
+    record = {(e["id"], f"{c['app']}.{c['api']} {c['target']}"): bool(c.get("ids"))
+              for e in log if e["kind"] == "intent" for c in e["claims"]}
     i = next((j for j, e in enumerate(log) if e["kind"] == "change" and "complete_task" in e.get("call", "")), None)
-    return i is not None and any(e["kind"] == "release" and e.get("owner") != log[i]["agent"] for e in log[i + 1:])
+    if i is None:
+        return False, False
+    rel = [e for e in log[i + 1:] if e["kind"] == "release" and record.get((e.get("intent"), e.get("claim")))]
+    return any(e.get("owner") == log[i]["agent"] for e in rel), any(e.get("owner") != log[i]["agent"] for e in rel)
 
 
 def m(r, key):
@@ -80,6 +96,34 @@ def m(r, key):
 KINDS = {"dup": lambda r: m(r, "duplicate_writes") > 0,
          "coll_only": lambda r: m(r, "duplicate_writes") == 0 and m(r, "collisions") > 0,
          "no_conflict": lambda r: m(r, "conflicts") == 0}
+
+
+SIZES = [("small", "1–5 writes", 0, 5.5), ("medium", "6–20 writes", 5.5, 20.5), ("big", "over 20 writes", 20.5, 1e9)]
+
+
+def by_size(data):
+    """Accuracy and writes per level, with tasks grouped by how many writes the team without the log made on them."""
+    if not data.get("L0"):
+        return {}
+    w = defaultdict(list)
+    for (rep, t), r in data["L0"].items():
+        w[t].append(m(r, "writes"))
+    size = {t: st.mean(v) for t, v in w.items()}
+    out = {}
+    for key, label, lo, hi in SIZES:
+        ts = {t for t, v in size.items() if lo <= v < hi}
+        out[key] = {"label": label, "tasks": len(ts),
+                    **{lvl: {"accuracy": st.mean(int(bool(r["correct"])) for (rep, t), r in rows.items() if t in ts),
+                             "writes": st.mean(m(r, "writes") for (rep, t), r in rows.items() if t in ts)}
+                       for lvl, rows in data.items() if rows and ts}}
+    big = {t for t, v in size.items() if v >= SIZES[-1][2]}
+    if data.get("L1") and data.get("L2"):
+        lost = [k for k in data["L2"] if k[1] in big and data["L1"][k]["correct"] and not data["L2"][k]["correct"]]
+        if lost:
+            out["big"]["L2_lost_vs_L1"] = {"n": len(lost), "claimed": st.mean(data["L2"][k]["_claimed_records"] for k in lost),
+                                           "writes_L2": st.mean(m(data["L2"][k], "writes") for k in lost),
+                                           "writes_L1": st.mean(m(data["L1"][k], "writes") for k in lost)}
+    return out
 
 
 def summary(rows):
@@ -166,9 +210,12 @@ def main():
            "vs_L0": {lvl: {"lost": len(lost), "won": sum(1 for k in rows if not data["L0"][k]["correct"] and rows[k]["correct"]),
                            "writes_lost": st.mean(m(rows[k], "writes") for k in lost) if lost else None,
                            "writes_L0_lost": st.mean(m(data["L0"][k], "writes") for k in lost) if lost else None,
-                           "lost_ended_open": sum(rows[k]["_ended_open"] for k in lost)}
+                           "lost_ended_open": sum(rows[k]["_ended_open"] for k in lost),
+                           "won_ended_open": sum(rows[k]["_ended_open"] for k in won), "won_n": len(won)}
                      for lvl, rows in data.items() if lvl != "L0" and rows and data["L0"]
-                     for lost in [[k for k in rows if data["L0"][k]["correct"] and not rows[k]["correct"]]]}}
+                     for lost in [[k for k in rows if data["L0"][k]["correct"] and not rows[k]["correct"]]]
+                     for won in [[k for k in rows if not data["L0"][k]["correct"] and rows[k]["correct"]]]},
+           "by_size": by_size(data)}
     single = [json.loads(line) for d in glob.glob(str(ROOT / "runs" / f"*-sas-rc-appworld-{dataset}-*-base02"))
               for line in open(Path(d, "results.jsonl"))]
     single = [r for r in single if r["id"] in {k[1] for k in common}]  # the same tasks as the teams
