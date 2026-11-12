@@ -26,7 +26,7 @@ single agent so far): 9 apps driven by Python code through 457 APIs, scored by A
 venv (`$APPWORLD_PYTHON`, built by `APPWORLD=1 source setup.sh`; `run.sbatch` does this for `--benchmark appworld`), with data in
 `/scratch/$USER/appworld`. Its license requires encrypted redistribution, so task contents stay out of git and off artifact pages.
 AppWorld teams (`appworld_team.py`, `--topology agent-driven --comm none --agents N`): one shared world, a shell per agent, code run
-one cell at a time on the main thread. `--wal-level L1|L2|L3a|L3b|L4` adds the second-version write-ahead log (`wal2.py`: claims
+one cell at a time on the main thread. `--wal-level L1|L2|L3|L4` (L4v0/L4v0-strict: the earlier L4s, runs lad02-lad06) adds the second-version write-ahead log (`wal2.py`: claims
 {app, api, target}, levels from nothing enforced to conflicts refused, a JSON-lines file per task); `wal.py`/`--wal` is the
 first version, WorkBench only, kept unchanged so earlier runs stay reproducible. No more WorkBench work (user, 2026-11-11).
 

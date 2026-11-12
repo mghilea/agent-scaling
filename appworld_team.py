@@ -1,6 +1,6 @@
 """AppWorld teams: several agents on the same task in one shared world, optionally with the write-ahead log (wal2.py).
 
-agent.py --benchmark appworld --topology agent-driven --comm none [--agents 3] [--wal-level L1|L2|L3|L4|L4-strict]
+agent.py --benchmark appworld --topology agent-driven --comm none [--agents 3] [--wal-level L1|L2|L3|L4]
 
 Every agent gets the same task and works on the same apps and accounts: one AppWorld world per task (one set of
 databases, scored once at the end by AppWorld's tests). Each agent has its own Python shell (its own variables),
@@ -24,7 +24,6 @@ import json
 import os
 import queue
 import threading
-import time
 from collections import Counter
 from pathlib import Path
 
@@ -101,7 +100,7 @@ def _capture_preamble(task_id, experiment_name):
 
 class Team:
     def __init__(self, task_id, make_agent, n_agents, run_dir, level=None, claim_ttl=wal2.CLAIM_TTL, max_turns=100):
-        self.t0 = time.time()
+        self.t0 = wal2.now()
         self.ids = [f"agent_{i}" for i in range(1, n_agents + 1)]
         self.events, self.max_turns, self.task_id = [], max_turns, task_id
         self.world, preamble = _capture_preamble(task_id, run_dir.name)
@@ -144,7 +143,7 @@ class Team:
             self.agents[me].max_turns = max_turns
 
     def event(self, agent, kind, **data):
-        self.events.append({"seq": len(self.events), "t": round(time.time() - self.t0, 2), "agent": agent,
+        self.events.append({"seq": len(self.events), "t": round(wal2.now() - self.t0, 2), "agent": agent,
                             "kind": kind, **data})
 
     # ---- the apps, through the log ----------------------------------------------------------------------------
@@ -189,14 +188,14 @@ class Team:
             return OVER
         if self.expired:
             return "The team's time for this task is up. Stop: reply with a short summary, without calling a tool."
-        box = {"queued": time.time()}
+        box = {"queued": wal2.now()}
         done = threading.Event()
         self.jobs.put((me, code, box, done))
         done.wait()
         return box["out"]
 
     def _run_cell(self, me, code, box):
-        box["waited"] = time.time() - box["queued"]
+        box["waited"] = wal2.now() - box["queued"]
         self.waits.append(box["waited"])
         if self.over:
             box["out"] = OVER
@@ -242,7 +241,7 @@ class Team:
         for th in threads:
             th.start()
         while len(self.done_agents) < len(self.ids):
-            if time.time() - self.t0 > TIME_LIMIT:
+            if wal2.now() - self.t0 > TIME_LIMIT:
                 self.expired = True
             try:
                 job = self.jobs.get(timeout=1)

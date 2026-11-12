@@ -209,25 +209,24 @@ td { color: var(--ink-2); }
           <text class="t-title" x="198" y="148">Records named?</text>
           <text class="t-body" x="198" y="180">a claim on an existing record</text>
           <text class="t-body" x="198" y="200">must name its id</text>
-          <g><text class="t-small" x="352" y="146">L1</text><text class="t-small" x="376" y="146">L2</text><text class="t-small" x="400" y="146">L3</text><text class="t-small" x="424" y="146">L4</text><text class="t-small" x="446" y="146">L4s</text><circle class="dot-off" cx="358" cy="158" r="3"/><circle class="dot-on" cx="382" cy="158" r="5"/><circle class="dot-on" cx="406" cy="158" r="5"/><circle class="dot-on" cx="430" cy="158" r="5"/><circle class="dot-on" cx="456" cy="158" r="5"/></g>
+          <g><text class="t-small" x="376" y="146">L1</text><text class="t-small" x="400" y="146">L2</text><text class="t-small" x="424" y="146">L3</text><text class="t-small" x="448" y="146">L4</text><circle class="dot-off" cx="382" cy="158" r="3"/><circle class="dot-on" cx="406" cy="158" r="5"/><circle class="dot-on" cx="430" cy="158" r="5"/><circle class="dot-on" cx="454" cy="158" r="5"/></g>
           <rect class="box" x="520" y="122" width="300" height="96" rx="9"/>
           <text class="t-title" x="538" y="148">Claimed?</text>
           <text class="t-body" x="538" y="180">the agent's current intent claims this</text>
           <text class="t-body" x="538" y="200">app and API, and the record's id</text>
-          <g><text class="t-small" x="692" y="146">L1</text><text class="t-small" x="716" y="146">L2</text><text class="t-small" x="740" y="146">L3</text><text class="t-small" x="764" y="146">L4</text><text class="t-small" x="786" y="146">L4s</text><circle class="dot-off" cx="698" cy="158" r="3"/><circle class="dot-on" cx="722" cy="158" r="5"/><circle class="dot-on" cx="746" cy="158" r="5"/><circle class="dot-on" cx="770" cy="158" r="5"/><circle class="dot-on" cx="796" cy="158" r="5"/></g>
+          <g><text class="t-small" x="716" y="146">L1</text><text class="t-small" x="740" y="146">L2</text><text class="t-small" x="764" y="146">L3</text><text class="t-small" x="788" y="146">L4</text><circle class="dot-off" cx="722" cy="158" r="3"/><circle class="dot-on" cx="746" cy="158" r="5"/><circle class="dot-on" cx="770" cy="158" r="5"/><circle class="dot-on" cx="794" cy="158" r="5"/></g>
 
           <rect class="box" x="180" y="248" width="640" height="112" rx="9"/>
           <text class="t-title" x="198" y="274">Caught up?</text>
-          <text class="t-body" x="198" y="302">L3, L4-strict: the agent must have read every entry in the log.</text>
-          <text class="t-body" x="198" y="322">L4: only unread entries about the same records (for new items, the same API) block; the</text>
-          <text class="t-body" x="198" y="342">rest are shown with the reply. A refusal shows the missed entries, which then count as read.</text>
-          <g><text class="t-small" x="692" y="272">L1</text><text class="t-small" x="716" y="272">L2</text><text class="t-small" x="740" y="272">L3</text><text class="t-small" x="764" y="272">L4</text><text class="t-small" x="786" y="272">L4s</text><circle class="dot-off" cx="698" cy="284" r="3"/><circle class="dot-off" cx="722" cy="284" r="3"/><circle class="dot-on" cx="746" cy="284" r="5"/><circle class="dot-part" cx="770" cy="284" r="4.5"/><circle class="dot-on" cx="796" cy="284" r="5"/></g>
+          <text class="t-body" x="198" y="306">L3, L4: the agent must have read every entry in the log, before posting and before writing.</text>
+          <text class="t-body" x="198" y="328">A refusal shows the entries it missed, which then count as read.</text>
+                    <g><text class="t-small" x="716" y="272">L1</text><text class="t-small" x="740" y="272">L2</text><text class="t-small" x="764" y="272">L3</text><text class="t-small" x="788" y="272">L4</text><circle class="dot-off" cx="722" cy="284" r="3"/><circle class="dot-off" cx="746" cy="284" r="3"/><circle class="dot-on" cx="770" cy="284" r="5"/><circle class="dot-on" cx="794" cy="284" r="5"/></g>
 
           <rect class="box" x="180" y="390" width="640" height="92" rx="9"/>
           <text class="t-title" x="198" y="416">No conflict?</text>
-          <text class="t-body" x="198" y="444">No teammate holds an open claim on the same record (or new item),</text>
-          <text class="t-body" x="198" y="464">and none has already changed or created it.</text>
-          <g><text class="t-small" x="692" y="414">L1</text><text class="t-small" x="716" y="414">L2</text><text class="t-small" x="740" y="414">L3</text><text class="t-small" x="764" y="414">L4</text><text class="t-small" x="786" y="414">L4s</text><circle class="dot-off" cx="698" cy="426" r="3"/><circle class="dot-off" cx="722" cy="426" r="3"/><circle class="dot-off" cx="746" cy="426" r="3"/><circle class="dot-on" cx="770" cy="426" r="5"/><circle class="dot-on" cx="796" cy="426" r="5"/></g>
+          <text class="t-body" x="198" y="444">No teammate holds an open claim on the same target (a record, or a new item).</text>
+          <text class="t-body" x="198" y="464">Once a claim closes or is released, its target is free again.</text>
+          <g><text class="t-small" x="716" y="414">L1</text><text class="t-small" x="740" y="414">L2</text><text class="t-small" x="764" y="414">L3</text><text class="t-small" x="788" y="414">L4</text><circle class="dot-off" cx="722" cy="426" r="3"/><circle class="dot-off" cx="746" cy="426" r="3"/><circle class="dot-off" cx="770" cy="426" r="3"/><circle class="dot-on" cx="794" cy="426" r="5"/></g>
 
           <rect class="box-key" x="180" y="512" width="300" height="96" rx="9"/>
           <text class="t-title" x="198" y="538">Intent posted</text>
@@ -270,9 +269,8 @@ td { color: var(--ink-2); }
           <line class="edge-ref" x1="820" y1="448" x2="842" y2="448" marker-end="url(#b1r)"/>
 
           <circle class="dot-on" cx="186" cy="636" r="5"/><text class="t-small" x="198" y="640">checked</text>
-          <circle class="dot-part" cx="272" cy="636" r="4.5"/><text class="t-small" x="284" y="640">relevant entries only</text>
-          <circle class="dot-off" cx="424" cy="636" r="3"/><text class="t-small" x="434" y="640">not checked</text>
-          <text class="t-small" x="820" y="640" text-anchor="end">L4s = L4-strict · L0 has no log</text>
+          <circle class="dot-off" cx="272" cy="636" r="3"/><text class="t-small" x="282" y="640">not checked</text>
+          <text class="t-small" x="820" y="640" text-anchor="end">L0 has no log</text>
         </svg>
       </div>
       <figcaption><b>Figure 2.</b> Both paths run under the log's lock, so a check and what follows it can't interleave with a teammate's. At L1 nothing is checked, but agents can still read the log and post intents, and every change is logged. Dashed arrows are refusals: a refused post leaves the log unchanged, and a refused write leaves the world unchanged.</figcaption>
@@ -298,7 +296,7 @@ td { color: var(--ink-2); }
           <text class="t-lmono" x="248" y="128">app.api target, intent #n</text>
           <text class="t-body" x="248" y="152">L2+: lets its agent write it</text>
           <text class="t-body" x="248" y="172">L4: blocks teammates' claims</text>
-          <text class="t-body" x="248" y="190">and writes on the same thing</text>
+          <text class="t-body" x="248" y="190">and writes on the same target</text>
 
           <path class="edge" d="M470,141 H520 V37 H676" marker-end="url(#c1)"/>
           <path class="edge" d="M520,141 V105 H676" marker-end="url(#c1)"/>
@@ -323,7 +321,7 @@ td { color: var(--ink-2); }
           <text class="t-small" x="696" y="257">release entry (expired)</text>
         </svg>
       </div>
-      <figcaption><b>Figure 3.</b> A claim names one API and its target: a record's id (one or several), or for something new a short description. Only claims on existing records close by being done, one id at a time. A claim on something new stays open until its agent posts a new intent or stops, or until it expires. In the AppWorld ladder runs, no claim ever expired.</figcaption>
+      <figcaption><b>Figure 3.</b> A claim names one API and its target: a record's id (one or several), or for something new a short description. Only claims on existing records close by being done, one id at a time. A claim on something new stays open until its agent posts a new intent or stops, or until it expires. Until 2026-11-12 expiry never fired: AppWorld freezes the clock while a task runs, so every claim looked zero seconds old. The log now keeps the real clock.</figcaption>
     </figure>
   </section>
 
@@ -336,10 +334,9 @@ td { color: var(--ink-2); }
         <tr><td>L1</td><td>The log exists and agents are asked to read it and post intents, but nothing is checked.</td></tr>
         <tr><td>L2</td><td>A write needs a claim in the agent's current intent: same app and API, and the record's id.</td></tr>
         <tr><td>L3</td><td>L2, and the agent must have read every entry before posting or writing.</td></tr>
-        <tr><td>L4</td><td>L2, catching up only on entries about the same records (the rest are delivered without blocking), and conflicts with a teammate refused.</td></tr>
-        <tr><td>L4-strict</td><td>L4 with L3's full catch-up, as a comparison.</td></tr>
+        <tr><td>L4</td><td>L3, and a post or write is refused if a teammate holds an open claim on the same target: the same record, or the same new item.</td></tr>
       </tbody>
     </table></div>
-    <p class="foot">Code: <code>wal2.py</code> (the log, independent of the benchmark) and <code>appworld_team.py</code> (the AppWorld teams, the adapter that tells writes from reads, and the main thread). Results by level are on the AppWorld ladder page.</p>
+    <p class="foot">Code: <code>wal2.py</code> (the log, independent of the benchmark) and <code>appworld_team.py</code> (the AppWorld teams, the adapter that tells writes from reads, and the main thread). Results by level are on the AppWorld ladder page. The ladder runs of 2026-11-11 (lad02–lad06) used two earlier definitions of L4, now called L4v0 (catch-up on relevant entries only, and work a teammate already did refused as well as open claims) and L4v0-strict (the same with full catch-up).</p>
   </section>
 </div>

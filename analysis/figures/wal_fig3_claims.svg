@@ -36,7 +36,7 @@
           <text class="t-lmono" x="248" y="128">app.api target, intent #n</text>
           <text class="t-body" x="248" y="152">L2+: lets its agent write it</text>
           <text class="t-body" x="248" y="172">L4: blocks teammates' claims</text>
-          <text class="t-body" x="248" y="190">and writes on the same thing</text>
+          <text class="t-body" x="248" y="190">and writes on the same target</text>
 
           <path class="edge" d="M470,141 H520 V37 H676" marker-end="url(#c1)"/>
           <path class="edge" d="M520,141 V105 H676" marker-end="url(#c1)"/>

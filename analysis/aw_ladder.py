@@ -22,10 +22,13 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parent.parent
 LEVELS = [("L0", "No log"), ("L1", "Log, nothing enforced"), ("L2", "Claims required"),
-          ("L3", "+ Catch up on every entry"), ("L4", "Claims + relevant catch-up + conflicts refused"),
-          ("L4-strict", "L4 with catch-up on every entry")]
-STEPS = [("L0", "L1"), ("L1", "L2"), ("L2", "L3"), ("L3", "L4"), ("L4-strict", "L4"), ("L0", "L4"), ("L0", "L3")]
-RULES = ["intent", "read_before_post", "read_before_write", "relevant_read", "no_conflict"]
+          ("L3", "+ Catch up on every entry"), ("L4", "L3 + teammates' open claims refused"),
+          # earlier definitions of L4 (runs lad02-lad06): relevant catch-up, and also refusing work already done
+          ("L4v0", "Earlier L4: relevant catch-up, open claims and done work refused"),
+          ("L4v0-strict", "Earlier L4 with catch-up on every entry")]
+STEPS = [("L0", "L1"), ("L1", "L2"), ("L2", "L3"), ("L3", "L4"), ("L0", "L4"), ("L0", "L3"),
+         ("L3", "L4v0"), ("L4v0-strict", "L4v0")]
+RULES = ["intent", "read_before_post", "read_before_write", "relevant_read", "no_conflict", "no_redo"]
 
 
 def run_dirs(level, dataset, tag):

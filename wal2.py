@@ -15,11 +15,13 @@ changes through the environment as usual, and every write passes commit(), which
 the pending line, runs the write and records the change, all under one lock (the caller's).
 
 Levels: L1 nothing is checked; L2 a write needs a claim of the agent's current intent (same app and API, and for an
-existing record its id in the target); L3 also, posting and writing need every entry read; L4 is L2 plus: an intent
-or write may not conflict with a teammate's (the same record claimed or already changed by another agent, or a new
-item another agent already claimed or created), and catching up is required only for unread entries relevant to it
-(teammates' intents and changes on the same records, or for new items the same API); other unread entries are shown
-with the result instead of blocking. L4-strict is L4 with L3's catch-up on every entry, as a comparison.
+existing record its id in the target); L3 also, posting and writing need every entry read; L4 is L3 plus: an intent
+or write may not touch a target a teammate holds an open claim on (the same record, or the same new item). Once a
+claim closes, its target is free again: the log doesn't stop an agent from redoing what a teammate already did.
+Earlier definitions, kept so the runs tagged lad02-lad06 can be reproduced: L4v0 is L2 plus catch-up on relevant
+entries only (teammates' intents and changes on the same records, or for new items the same API; the rest are shown
+with the result instead of blocking) plus refusing both open claims and work a teammate already did ("no_redo");
+L4v0-strict is L4v0 with L3's catch-up on every entry.
 Claims name their targets at every level; from L2 on, a claim on an existing record must name its id.
 
 The adapter describes the environment: is_write(app, api), has_ids(app, api), the apps and their write APIs.
@@ -40,10 +42,28 @@ LEVELS = {
     "L1": set(),
     "L2": {"intent"},
     "L3": {"intent", "read_before_post", "read_before_write"},
-    "L4": {"intent", "relevant_read", "no_conflict"},
-    "L4-strict": {"intent", "read_before_post", "read_before_write", "no_conflict"},  # a comparison for L4
+    "L4": {"intent", "read_before_post", "read_before_write", "no_conflict"},
+    # earlier definitions (runs tagged lad02-lad06, which were named L4 and L4-strict), kept for reproducibility
+    "L4v0": {"intent", "relevant_read", "no_conflict", "no_redo"},
+    "L4v0-strict": {"intent", "read_before_post", "read_before_write", "no_conflict", "no_redo"},
 }
 CLAIM_TTL = 90  # seconds a claim stays open without its change (L4 makes claims exclusive; this frees abandoned ones)
+
+# AppWorld freezes the clock with freezegun for as long as a task's world is open: the time module's clock then
+# returns the task's simulated date, constant, wherever the call stack has no threading frame within freezegun's
+# 5-frame look-up, i.e. in nearly all of the log's code, so claims never aged (runs before 2026-11-12). The log keeps
+# the real clock inside a tuple, where freezegun's scan of module attributes doesn't swap it for the fake one.
+try:
+    import freezegun.api as _fg
+    _CLOCK = (_fg.real_time,)
+    del _fg
+except ImportError:
+    _CLOCK = (time.time,)
+
+
+def now():
+    """Seconds since the epoch, from the real clock even while AppWorld's is frozen."""
+    return _CLOCK[0]()
 
 
 class Refused(Exception):
@@ -94,7 +114,7 @@ class Log:
             raise ValueError(f"unknown WAL level {level!r}")
         self.level, self.rules, self.adapter = level, LEVELS[level], adapter
         self.lock, self.event = lock, event
-        self.t0 = time.time() if t0 is None else t0
+        self.t0 = now() if t0 is None else t0
         self.claim_ttl = claim_ttl
         self.entries = []              # what agents see: intents, changes, releases (ids are positions + 1)
         self.seen = Counter()          # agent -> entries seen
@@ -114,7 +134,7 @@ class Log:
         os.fsync(self._file.fileno())
 
     def _append(self, agent, kind, **data):
-        e = {"id": len(self.entries) + 1, "t": round(time.time() - self.t0, 2), "agent": agent, "kind": kind, **data}
+        e = {"id": len(self.entries) + 1, "t": round(now() - self.t0, 2), "agent": agent, "kind": kind, **data}
         caught_up = self.seen[agent] >= len(self.entries)
         self.entries.append(e)
         self._write(e)
@@ -178,9 +198,9 @@ class Log:
 
     # ---- claims --------------------------------------------------------------------------------------------
     def _expire(self):
-        now = time.time()
+        t = now()
         for agent, claims in self.claims.items():
-            for c in [c for c in claims if now - c.t > self.claim_ttl]:
+            for c in [c for c in claims if t - c.t > self.claim_ttl]:
                 claims.remove(c)
                 self._append("", "release", owner=agent, claim=c.show(), intent=c.intent, reason="expired")
 
@@ -199,15 +219,22 @@ class Log:
             return same and bool(set(action.ids) & claim.ids)
         return claim.api == action.api
 
-    def _conflicting_claim(self, me, action):
+    def _conflicting_claim(self, me, action, own=None):
+        """A teammate's open claim on the target of this write: the same record or, for something new, the same target
+        as the writer's own claim that covers the write. (The earlier definitions matched the call's identifying
+        arguments against the claim's text instead.)"""
         for agent, claims in self.claims.items():
             if agent == me:
                 continue
             for c in claims:
                 if action.ids and self._matches(c, action):
                     return agent, c
-                if not action.ids and c.app == action.app and c.api == action.api and action.identity and all(
-                        _norm(v) in _norm(c.target) for v in action.identity if len(str(v)) >= 3):
+                if action.ids or c.app != action.app or c.api != action.api:
+                    continue
+                if "no_redo" not in self.rules and own is not None:
+                    if _norm(c.target) == _norm(own.target):
+                        return agent, c
+                elif action.identity and all(_norm(v) in _norm(c.target) for v in action.identity if len(str(v)) >= 3):
                     return agent, c
         return None
 
@@ -279,44 +306,46 @@ class Log:
                 if no:
                     self.event(me, "wal_delivered", at="post", n=no)
                 news = self._news(other, no)
-            if "no_conflict" in self.rules:
-                for c in parsed:
-                    hit = self._claim_conflict(me, c)
-                    if hit:
-                        self.event(me, "wal_refused", rule="no_conflict", at="post", claim=c, reason=hit)
-                        return (f"[WAL] Not posted: your claim {c['app']}.{c['api']} {c['target']} conflicts with "
-                                f"{hit}. Leave that work to them, or claim something else.")
+            for c in parsed:
+                hit = self._claim_conflict(me, c)
+                if hit:
+                    self.event(me, "wal_refused", rule=hit[0], at="post", claim=c, reason=hit[1])
+                    return (f"[WAL] Not posted: your claim {c['app']}.{c['api']} {c['target']} conflicts with "
+                            f"{hit[1]}. Leave that work to them, or claim something else.")
             old = self.claims.pop(me, [])
             e = self._append(me, "intent", plan=str(plan).strip(), claims=parsed,
                              replaces=self.intent.get(me), released=[c.show() for c in old])
             self.intent[me] = e["id"]
-            now = time.time()
-            self.claims[me] = [Claim(c["app"], c["api"], c["target"], set(c["ids"]), e["id"], me, now) for c in parsed]
+            t = now()
+            self.claims[me] = [Claim(c["app"], c["api"], c["target"], set(c["ids"]), e["id"], me, t) for c in parsed]
         self.event(me, "wal_intend", id=e["id"], claims=parsed)
         return f"Posted as intent #{e['id']}." + news
 
     def _claim_conflict(self, me, c):
-        """A teammate's open claim or completed change on the same record or new item, as text, or None."""
+        """(rule, text) for a teammate's open claim on the same target (no_conflict) or, in the earlier definitions,
+        a change a teammate already made to it (no_redo); None if neither."""
         same_path = self.adapter.path(c["app"], c["api"])
-        for agent, claims in self.claims.items():
-            if agent == me:
-                continue
-            for o in claims:
-                if o.app != c["app"]:
+        if "no_conflict" in self.rules:
+            for agent, claims in self.claims.items():
+                if agent == me:
                     continue
-                if c["ids"] and (o.api == c["api"] or self.adapter.path(o.app, o.api) == same_path) \
-                        and o.ids & set(c["ids"]):
-                    return f"{agent}'s open claim {o.show()} (intent #{o.intent})"
-                if not c["ids"] and o.api == c["api"] and _norm(o.target) == _norm(c["target"]):
-                    return f"{agent}'s open claim {o.show()} (intent #{o.intent})"
-        for key, (agent, eid) in self.done.items():
-            if agent == me or key[0] != c["app"]:
-                continue
-            if c["ids"] and key[1] == same_path and set(key[2]) & set(c["ids"]):
-                return f"a change {agent} already made (#{eid})"
-            if not c["ids"] and key[1] == c["api"] and key[2] and all(
-                    _norm(v) in _norm(c["target"]) for v in key[2] if len(str(v)) >= 3):
-                return f"a change {agent} already made (#{eid})"
+                for o in claims:
+                    if o.app != c["app"]:
+                        continue
+                    if c["ids"] and (o.api == c["api"] or self.adapter.path(o.app, o.api) == same_path) \
+                            and o.ids & set(c["ids"]):
+                        return "no_conflict", f"{agent}'s open claim {o.show()} (intent #{o.intent})"
+                    if not c["ids"] and o.api == c["api"] and _norm(o.target) == _norm(c["target"]):
+                        return "no_conflict", f"{agent}'s open claim {o.show()} (intent #{o.intent})"
+        if "no_redo" in self.rules:
+            for key, (agent, eid) in self.done.items():
+                if agent == me or key[0] != c["app"]:
+                    continue
+                if c["ids"] and key[1] == same_path and set(key[2]) & set(c["ids"]):
+                    return "no_redo", f"a change {agent} already made (#{eid})"
+                if not c["ids"] and key[1] == c["api"] and key[2] and all(
+                        _norm(v) in _norm(c["target"]) for v in key[2] if len(str(v)) >= 3):
+                    return "no_redo", f"a change {agent} already made (#{eid})"
         return None
 
     # ---- the gate ------------------------------------------------------------------------------------------
@@ -353,14 +382,13 @@ class Log:
                 if no:
                     self.event(me, "wal_delivered", at="write", n=no)
                     print(self._news(other, no).strip())  # shown in the agent's cell output
-            if "no_conflict" in self.rules:
-                hit = self._conflicting_claim(me, action)
-                prior = self.done.get(action.key)
-                if hit or (prior and prior[0] != me):
-                    why = (f"{hit[0]}'s open claim {hit[1].show()} (intent #{hit[1].intent})" if hit
-                           else f"a change {prior[0]} already made (#{prior[1]})")
-                    self.event(me, "wal_refused", rule="no_conflict", at="write", call=action.call, reason=why)
-                    raise Refused(f"[WAL] Refused: {action.call} conflicts with {why}. Nothing was changed.")
+            hit = self._conflicting_claim(me, action, claim) if "no_conflict" in self.rules else None
+            prior = self.done.get(action.key) if "no_redo" in self.rules else None
+            if hit or (prior and prior[0] != me):
+                rule, why = (("no_conflict", f"{hit[0]}'s open claim {hit[1].show()} (intent #{hit[1].intent})") if hit
+                             else ("no_redo", f"a change {prior[0]} already made (#{prior[1]})"))
+                self.event(me, "wal_refused", rule=rule, at="write", call=action.call, reason=why)
+                raise Refused(f"[WAL] Refused: {action.call} conflicts with {why}. Nothing was changed.")
         self._write({"kind": "pending", "agent": me, "call": action.call, "intent": self.intent.get(me)})
         try:
             out = execute()
@@ -406,7 +434,7 @@ class Log:
         return {"wal_level": self.level, "wal_intents": kinds["wal_intend"], "wal_reads": kinds["wal_read"],
                 "wal_changes": sum(e["kind"] == "change" for e in self.entries),
                 **{f"wal_refused_{r}": refused[r] for r in ("intent", "read_before_post", "read_before_write",
-                                                            "relevant_read", "no_conflict")},
+                                                            "relevant_read", "no_conflict", "no_redo")},
                 "wal_delivered": kinds["wal_delivered"],
                 **{f"wal_released_{r}": releases[r] for r in ("stopped", "expired")}}
 
@@ -420,15 +448,19 @@ CATCH_UP = "Posting an intent, and making a change, are refused while the WAL ha
 CATCH_UP_RELEVANT = ("Posting an intent, and making a change, are refused while the WAL has entries you haven't read about the "
                      "same records (or, for something new, the same API); you are then shown them. Other new entries are shown "
                      "to you with the result instead.")
-CONFLICT = ("An intent or a change is also refused if it conflicts with a teammate's: a record another agent has claimed or "
-            "already changed, or a new item another agent has claimed or already created. Claims are released when their "
-            "change is made, when their agent posts a new intent, when it stops, or after {ttl} seconds.")
+CONFLICT = ("An intent or a change is also refused if a teammate has an open claim on the same target: the same record, or "
+            "the same new item. A claim on an existing record closes once its change is made; any claim is released when "
+            "its agent posts a new intent or stops, or after {ttl} seconds.")
+CONFLICT_V0 = ("An intent or a change is also refused if it conflicts with a teammate's: a record another agent has claimed "
+               "or already changed, or a new item another agent has claimed or already created. Claims are released when "
+               "their change is made, when their agent posts a new intent, when it stops, or after {ttl} seconds.")
 RULES = {
     "L1": "Nothing checks that you do this: it is up to you.",
     "L2": CLAIM,
     "L3": CLAIM + " " + CATCH_UP,
-    "L4": CLAIM + " " + CATCH_UP_RELEVANT + " " + CONFLICT,
-    "L4-strict": CLAIM + " " + CATCH_UP + " " + CONFLICT,
+    "L4": CLAIM + " " + CATCH_UP + " " + CONFLICT,
+    "L4v0": CLAIM + " " + CATCH_UP_RELEVANT + " " + CONFLICT_V0,
+    "L4v0-strict": CLAIM + " " + CATCH_UP + " " + CONFLICT_V0,
 }
 
 

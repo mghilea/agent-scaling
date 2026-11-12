@@ -39,25 +39,24 @@
           <text class="t-title" x="198" y="148">Records named?</text>
           <text class="t-body" x="198" y="180">a claim on an existing record</text>
           <text class="t-body" x="198" y="200">must name its id</text>
-          <g><text class="t-small" x="352" y="146">L1</text><text class="t-small" x="376" y="146">L2</text><text class="t-small" x="400" y="146">L3</text><text class="t-small" x="424" y="146">L4</text><text class="t-small" x="446" y="146">L4s</text><circle class="dot-off" cx="358" cy="158" r="3"/><circle class="dot-on" cx="382" cy="158" r="5"/><circle class="dot-on" cx="406" cy="158" r="5"/><circle class="dot-on" cx="430" cy="158" r="5"/><circle class="dot-on" cx="456" cy="158" r="5"/></g>
+          <g><text class="t-small" x="376" y="146">L1</text><text class="t-small" x="400" y="146">L2</text><text class="t-small" x="424" y="146">L3</text><text class="t-small" x="448" y="146">L4</text><circle class="dot-off" cx="382" cy="158" r="3"/><circle class="dot-on" cx="406" cy="158" r="5"/><circle class="dot-on" cx="430" cy="158" r="5"/><circle class="dot-on" cx="454" cy="158" r="5"/></g>
           <rect class="box" x="520" y="122" width="300" height="96" rx="9"/>
           <text class="t-title" x="538" y="148">Claimed?</text>
           <text class="t-body" x="538" y="180">the agent's current intent claims this</text>
           <text class="t-body" x="538" y="200">app and API, and the record's id</text>
-          <g><text class="t-small" x="692" y="146">L1</text><text class="t-small" x="716" y="146">L2</text><text class="t-small" x="740" y="146">L3</text><text class="t-small" x="764" y="146">L4</text><text class="t-small" x="786" y="146">L4s</text><circle class="dot-off" cx="698" cy="158" r="3"/><circle class="dot-on" cx="722" cy="158" r="5"/><circle class="dot-on" cx="746" cy="158" r="5"/><circle class="dot-on" cx="770" cy="158" r="5"/><circle class="dot-on" cx="796" cy="158" r="5"/></g>
+          <g><text class="t-small" x="716" y="146">L1</text><text class="t-small" x="740" y="146">L2</text><text class="t-small" x="764" y="146">L3</text><text class="t-small" x="788" y="146">L4</text><circle class="dot-off" cx="722" cy="158" r="3"/><circle class="dot-on" cx="746" cy="158" r="5"/><circle class="dot-on" cx="770" cy="158" r="5"/><circle class="dot-on" cx="794" cy="158" r="5"/></g>
 
           <rect class="box" x="180" y="248" width="640" height="112" rx="9"/>
           <text class="t-title" x="198" y="274">Caught up?</text>
-          <text class="t-body" x="198" y="302">L3, L4-strict: the agent must have read every entry in the log.</text>
-          <text class="t-body" x="198" y="322">L4: only unread entries about the same records (for new items, the same API) block; the</text>
-          <text class="t-body" x="198" y="342">rest are shown with the reply. A refusal shows the missed entries, which then count as read.</text>
-          <g><text class="t-small" x="692" y="272">L1</text><text class="t-small" x="716" y="272">L2</text><text class="t-small" x="740" y="272">L3</text><text class="t-small" x="764" y="272">L4</text><text class="t-small" x="786" y="272">L4s</text><circle class="dot-off" cx="698" cy="284" r="3"/><circle class="dot-off" cx="722" cy="284" r="3"/><circle class="dot-on" cx="746" cy="284" r="5"/><circle class="dot-part" cx="770" cy="284" r="4.5"/><circle class="dot-on" cx="796" cy="284" r="5"/></g>
+          <text class="t-body" x="198" y="306">L3, L4: the agent must have read every entry in the log, before posting and before writing.</text>
+          <text class="t-body" x="198" y="328">A refusal shows the entries it missed, which then count as read.</text>
+                    <g><text class="t-small" x="716" y="272">L1</text><text class="t-small" x="740" y="272">L2</text><text class="t-small" x="764" y="272">L3</text><text class="t-small" x="788" y="272">L4</text><circle class="dot-off" cx="722" cy="284" r="3"/><circle class="dot-off" cx="746" cy="284" r="3"/><circle class="dot-on" cx="770" cy="284" r="5"/><circle class="dot-on" cx="794" cy="284" r="5"/></g>
 
           <rect class="box" x="180" y="390" width="640" height="92" rx="9"/>
           <text class="t-title" x="198" y="416">No conflict?</text>
-          <text class="t-body" x="198" y="444">No teammate holds an open claim on the same record (or new item),</text>
-          <text class="t-body" x="198" y="464">and none has already changed or created it.</text>
-          <g><text class="t-small" x="692" y="414">L1</text><text class="t-small" x="716" y="414">L2</text><text class="t-small" x="740" y="414">L3</text><text class="t-small" x="764" y="414">L4</text><text class="t-small" x="786" y="414">L4s</text><circle class="dot-off" cx="698" cy="426" r="3"/><circle class="dot-off" cx="722" cy="426" r="3"/><circle class="dot-off" cx="746" cy="426" r="3"/><circle class="dot-on" cx="770" cy="426" r="5"/><circle class="dot-on" cx="796" cy="426" r="5"/></g>
+          <text class="t-body" x="198" y="444">No teammate holds an open claim on the same target (a record, or a new item).</text>
+          <text class="t-body" x="198" y="464">Once a claim closes or is released, its target is free again.</text>
+          <g><text class="t-small" x="716" y="414">L1</text><text class="t-small" x="740" y="414">L2</text><text class="t-small" x="764" y="414">L3</text><text class="t-small" x="788" y="414">L4</text><circle class="dot-off" cx="722" cy="426" r="3"/><circle class="dot-off" cx="746" cy="426" r="3"/><circle class="dot-off" cx="770" cy="426" r="3"/><circle class="dot-on" cx="794" cy="426" r="5"/></g>
 
           <rect class="box-key" x="180" y="512" width="300" height="96" rx="9"/>
           <text class="t-title" x="198" y="538">Intent posted</text>
@@ -100,7 +99,6 @@
           <line class="edge-ref" x1="820" y1="448" x2="842" y2="448" marker-end="url(#b1r)"/>
 
           <circle class="dot-on" cx="186" cy="636" r="5"/><text class="t-small" x="198" y="640">checked</text>
-          <circle class="dot-part" cx="272" cy="636" r="4.5"/><text class="t-small" x="284" y="640">relevant entries only</text>
-          <circle class="dot-off" cx="424" cy="636" r="3"/><text class="t-small" x="434" y="640">not checked</text>
-          <text class="t-small" x="820" y="640" text-anchor="end">L4s = L4-strict · L0 has no log</text>
+          <circle class="dot-off" cx="272" cy="636" r="3"/><text class="t-small" x="282" y="640">not checked</text>
+          <text class="t-small" x="820" y="640" text-anchor="end">L0 has no log</text>
         </svg>

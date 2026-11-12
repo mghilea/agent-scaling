@@ -1,10 +1,10 @@
 # AppWorld enforcement ladder: a 3-agent team with no channels, without the write-ahead log (L0) and with it (wal2.py):
 # L1 nothing enforced; L2 a write needs a claim of the agent's intent; L3 + posting and writing need every entry read;
-# L4 = L2 + catch-up only on relevant entries + conflicts refused; L4-strict = L4 with L3's full catch-up (comparison).
+# L4 = L3 + a post or write refused when a teammate holds an open claim on the same target (redefined 2026-11-12;
+# runs tagged lad02-lad06 used the earlier L4 and L4-strict, now named L4v0 and L4v0-strict).
 # Side by side on one GPU, so their times are comparable. Submit with --dataset ... --tag ladNN.
 --benchmark appworld --topology agent-driven --comm none --agents 3 --repair-calls
 --benchmark appworld --topology agent-driven --comm none --agents 3 --repair-calls --wal-level L1
 --benchmark appworld --topology agent-driven --comm none --agents 3 --repair-calls --wal-level L2
 --benchmark appworld --topology agent-driven --comm none --agents 3 --repair-calls --wal-level L3
 --benchmark appworld --topology agent-driven --comm none --agents 3 --repair-calls --wal-level L4
---benchmark appworld --topology agent-driven --comm none --agents 3 --repair-calls --wal-level L4-strict
