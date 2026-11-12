@@ -25,6 +25,10 @@ Third benchmark, started 2026-11-11: AppWorld (`appworld_bench.py`, `agent.py --
 single agent so far): 9 apps driven by Python code through 457 APIs, scored by AppWorld's own state-based tests. It runs in its own
 venv (`$APPWORLD_PYTHON`, built by `APPWORLD=1 source setup.sh`; `run.sbatch` does this for `--benchmark appworld`), with data in
 `/scratch/$USER/appworld`. Its license requires encrypted redistribution, so task contents stay out of git and off artifact pages.
+AppWorld teams (`appworld_team.py`, `--topology agent-driven --comm none --agents N`): one shared world, a shell per agent, code run
+one cell at a time on the main thread. `--wal-level L1|L2|L3a|L3b|L4` adds the second-version write-ahead log (`wal2.py`: claims
+{app, api, target}, levels from nothing enforced to conflicts refused, a JSON-lines file per task); `wal.py`/`--wal` is the
+first version, WorkBench only, kept unchanged so earlier runs stay reproducible. No more WorkBench work (user, 2026-11-11).
 
 ## Cluster: Princeton CS Neuronic (Slurm)
 - Nodes: 8x NVIDIA L40 (46 GB each, PCIe, no NVLink), 512 GB RAM, 3.5 TB local SSD at `/scratch`,

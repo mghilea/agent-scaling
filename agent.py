@@ -437,6 +437,11 @@ def main():
     ap.add_argument("--no-pause", action="store_true",
                     help="agent-driven: one activation may use the agent's whole budget, instead of pausing "
                          "after 12 calls until a teammate contacts it")
+    ap.add_argument("--wal-level", choices=["L1", "L2", "L3a", "L3b", "L4"],
+                    help="appworld teams (--topology agent-driven): the write-ahead log of wal2.py at this "
+                         "enforcement level (L1 nothing checked ... L4 conflicts refused); without it, no log")
+    ap.add_argument("--claim-ttl", type=int, default=90,
+                    help="with --wal-level: seconds a claim stays open without its change")
     ap.add_argument("--agents", type=int, default=3, help="multi-agent: number of worker agents (paper: 3)")
     ap.add_argument("--rounds", type=int,
                     help="multi-agent: max rounds (default as in the paper: 5 centralized/hybrid, 3 decentralized)")
@@ -468,8 +473,12 @@ def main():
     if not tasks:
         sys.exit("no tasks to run")
     multi = args.topology != "single"
-    if multi and not (wb or bc):
-        sys.exit("the multi-agent topologies need --benchmark workbench or browsecomp (appworld: single agent so far)")
+    if multi and not (wb or bc or (aw and args.topology == "agent-driven")):
+        sys.exit("the multi-agent topologies need --benchmark workbench or browsecomp (appworld: --topology agent-driven)")
+    if aw and multi and args.comm != "none":
+        sys.exit("AppWorld teams have no channels between agents yet: add --comm none")
+    if args.wal_level and not (aw and args.topology == "agent-driven"):
+        sys.exit("--wal-level is for AppWorld teams (--benchmark appworld --topology agent-driven); WorkBench uses --wal")
     if args.wal and not (wb and multi):
         sys.exit("--wal needs --benchmark workbench and a multi-agent topology")
     if (args.wal_piggyback or args.wal_drafts or args.wal_mode != "full") and not (args.wal and args.topology == "agent-driven"):
@@ -490,14 +499,18 @@ def main():
     if multi and not driven:
         import mas
         args.rounds = args.rounds or mas.DEFAULT_ROUNDS[args.topology]
-    if driven:
+    aw_team = bool(aw) and driven
+    if driven and not aw_team:
         import agent_driven
+    if aw_team:
+        import appworld_team
     topo_name = f"agent-driven-{args.comm}{'-coord' if args.coordinate else ''}{'-wal' if args.wal else ''}{'-' + args.wal_mode if args.wal_mode != 'full' else ''}{'-pb' if args.wal_piggyback else ''}{'-dr' if args.wal_drafts else ''}" if driven else args.topology
     topo_name += "-wal" if args.wal and not driven else ""
     topo_name += f"-split{args.split}" if args.split else ""
     topo_name += "-propose" if driven and bc and args.team_answer == "propose" else ""
     topo_name += "-np" if args.no_pause else ""
     topo_name += f"-tb{args.turn_budget}" if args.turn_budget else ""
+    topo_name += f"-{args.wal_level}" if args.wal_level else ""
     kind = "ask" if args.ask else ("sas" if not multi else topo_name) + ("-rc" if args.repair_calls else "") + \
         ("-workbench" if wb else "-browsecomp" if bc else f"-appworld-{args.dataset}" if aw else "")
     run_dir = ROOT / "runs" / f"{datetime.now():%Y%m%d-%H%M%S}-{kind}-{args.model}{'-' + args.tag if args.tag else ''}"
@@ -515,7 +528,7 @@ def main():
             print(_block(label, text, DIM, limit=600), flush=True)
 
     budget_name = (f"--turn-budget {args.turn_budget or (agent_driven.TURN_BUDGET_BC if bc else agent_driven.TURN_BUDGET)}"
-                   if driven
+                   if driven and not aw_team
                    else f"--max-turns {args.max_turns}" if not args.ask else "")
     rows = []
     for t in tasks:
@@ -523,7 +536,10 @@ def main():
         start = time.time()
         actions, session = [], None
         try:
-            if driven:
+            if aw_team:
+                r = appworld_team.run(t["id"], make_agent, args.agents, run_dir, level=args.wal_level,
+                                      claim_ttl=args.claim_ttl, max_turns=args.max_turns)
+            elif driven:
                 r = agent_driven.run(t["question"], make_agent, args.agents, args.comm, log_message, seed=t["id"],
                                      coordinate=args.coordinate, browsecomp=bool(bc), split=args.split,
                                      answer_rule=args.team_answer, wal=args.wal, wal_piggyback=args.wal_piggyback,
@@ -573,7 +589,10 @@ def main():
             answer, expected = response, t["answer"]
         elif aw:
             # Scored on the final state of the task's databases (and the answer given to complete_task).
-            if session is None:  # the world never opened
+            if aw_team:
+                verdict = r.get("verdict") or {"correct": False, "tests_passed": 0, "tests": None, "difficulty": None,
+                                               "completed": False}
+            elif session is None:  # the world never opened
                 verdict = {"correct": False, "tests_passed": 0, "tests": None, "difficulty": None, "completed": False}
             else:
                 verdict = session.score()
@@ -616,7 +635,8 @@ def main():
                      f"difficulty={verdict['difficulty']}" + (" reminded" if verdict.get("reminded") else ""))
         else:
             shown = f"answer={answer!r}" + (f" expected={expected!r}" if "answer" in t else "")
-        extra = f"agents={row['agents']} rounds={row['rounds']} messages={row['agent_messages']} " if multi else ""
+        extra = (f"agents={row.get('agents')} rounds={row.get('rounds')} messages={row['agent_messages']} "
+                 if multi else "")
         print(f"{mark}  {shown}  {extra}turns={row['turns']} "
               f"tools={row['tool_calls']} tool_errors={row['tool_errors']} tokens={row['prompt_tokens'] + row['completion_tokens']} "
               f"{row['seconds']}s  stop={row['stop']}", flush=True)
