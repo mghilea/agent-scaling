@@ -437,9 +437,10 @@ def main():
     ap.add_argument("--no-pause", action="store_true",
                     help="agent-driven: one activation may use the agent's whole budget, instead of pausing "
                          "after 12 calls until a teammate contacts it")
-    ap.add_argument("--wal-level", choices=["L1", "L2", "L3a", "L3b", "L4"],
+    ap.add_argument("--wal-level", choices=["L1", "L2", "L3", "L4", "L4-strict"],
                     help="appworld teams (--topology agent-driven): the write-ahead log of wal2.py at this "
-                         "enforcement level (L1 nothing checked ... L4 conflicts refused); without it, no log")
+                         "enforcement level (L1 nothing checked, L2 claims, L3 catch-up, L4 relevant catch-up and conflicts "
+                         "refused, L4-strict L4 with full catch-up); without it, no log")
     ap.add_argument("--claim-ttl", type=int, default=90,
                     help="with --wal-level: seconds a claim stays open without its change")
     ap.add_argument("--agents", type=int, default=3, help="multi-agent: number of worker agents (paper: 3)")

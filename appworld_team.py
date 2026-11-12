@@ -1,6 +1,6 @@
 """AppWorld teams: several agents on the same task in one shared world, optionally with the write-ahead log (wal2.py).
 
-agent.py --benchmark appworld --topology agent-driven --comm none [--agents 3] [--wal-level L1|L2|L3a|L3b|L4]
+agent.py --benchmark appworld --topology agent-driven --comm none [--agents 3] [--wal-level L1|L2|L3|L4|L4-strict]
 
 Every agent gets the same task and works on the same apps and accounts: one AppWorld world per task (one set of
 databases, scored once at the end by AppWorld's tests). Each agent has its own Python shell (its own variables),

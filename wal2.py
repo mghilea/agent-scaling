@@ -14,10 +14,12 @@ Changes are logged by the harness, never by agents. Agents read with wal_read an
 changes through the environment as usual, and every write passes commit(), which checks the level's rules, records
 the pending line, runs the write and records the change, all under one lock (the caller's).
 
-Levels (cumulative): L1 nothing is checked; L2 a write needs a claim of the agent's current intent (same app and
-API, and for an existing record its id in the target); L3a posting needs every entry read; L3b a write needs every
-entry read; L4 an intent or write may not conflict with a teammate's: the same record claimed or already changed by
-another agent, or a new item another agent already created (same API and identifying arguments).
+Levels: L1 nothing is checked; L2 a write needs a claim of the agent's current intent (same app and API, and for an
+existing record its id in the target); L3 also, posting and writing need every entry read; L4 is L2 plus: an intent
+or write may not conflict with a teammate's (the same record claimed or already changed by another agent, or a new
+item another agent already claimed or created), and catching up is required only for unread entries relevant to it
+(teammates' intents and changes on the same records, or for new items the same API); other unread entries are shown
+with the result instead of blocking. L4-strict is L4 with L3's catch-up on every entry, as a comparison.
 Claims name their targets at every level; from L2 on, a claim on an existing record must name its id.
 
 The adapter describes the environment: is_write(app, api), has_ids(app, api), the apps and their write APIs.
@@ -37,9 +39,9 @@ from pathlib import Path
 LEVELS = {
     "L1": set(),
     "L2": {"intent"},
-    "L3a": {"intent", "read_before_post"},
-    "L3b": {"intent", "read_before_post", "read_before_write"},
-    "L4": {"intent", "read_before_post", "read_before_write", "no_conflict"},
+    "L3": {"intent", "read_before_post", "read_before_write"},
+    "L4": {"intent", "relevant_read", "no_conflict"},
+    "L4-strict": {"intent", "read_before_post", "read_before_write", "no_conflict"},  # a comparison for L4
 }
 CLAIM_TTL = 90  # seconds a claim stays open without its change (L4 makes claims exclusive; this frees abandoned ones)
 
@@ -143,6 +145,37 @@ class Log:
         self.seen[me] = len(self.entries)
         return "\n".join(map(self.line, unseen)), len(unseen)
 
+    def _relevant(self, me, e, app, api, path, ids):
+        """Whether an entry concerns the same record (ids under the same path) or, for a new item, the same API."""
+        if e["kind"] == "intent" and e["agent"] != me:
+            for c in e["claims"]:
+                if c["app"] != app:
+                    continue
+                if ids and (c["api"] == api or self.adapter.path(c["app"], c["api"]) == path) and set(c["ids"]) & set(ids):
+                    return True
+                if not ids and c["api"] == api:
+                    return True
+        if e["kind"] == "change" and e["agent"] != me and e.get("app") == app:
+            if ids and e.get("path") == path and set(e.get("ids", ())) & set(ids):
+                return True
+            if not ids and e.get("api") == api:
+                return True
+        return False
+
+    def catch_up_relevant(self, me, targets):
+        """L4: the unread entries, split into those relevant to any of targets [(app, api, path, ids)] and the rest.
+        All of them count as seen now. Returns (relevant text, other text, n relevant, n other)."""
+        unseen = self.entries[self.seen[me]:]
+        self.seen[me] = len(self.entries)
+        rel = [e for e in unseen if any(self._relevant(me, e, *t) for t in targets)]
+        other = [e for e in unseen if e not in rel]
+        return "\n".join(map(self.line, rel)), "\n".join(map(self.line, other)), len(rel), len(other)
+
+    @staticmethod
+    def _news(text, n):
+        return (f"\n[WAL] {n} new entr{'y' if n == 1 else 'ies'} from your teammates since you last read "
+                f"(you have now seen {'it' if n == 1 else 'them'}):\n{text}") if n else ""
+
     # ---- claims --------------------------------------------------------------------------------------------
     def _expire(self):
         now = time.time()
@@ -234,6 +267,18 @@ class Log:
                     self.event(me, "wal_refused", rule="read_before_post", unseen=n)
                     return (f"[WAL] Not posted: the WAL has {n} entr{'y' if n == 1 else 'ies'} you hadn't read:\n"
                             f"{unseen}\nYou have now seen them. Post your intent again, revised if they overlap with it.")
+            news = ""
+            if "relevant_read" in self.rules:
+                targets = [(c["app"], c["api"], self.adapter.path(c["app"], c["api"]), tuple(c["ids"])) for c in parsed]
+                rel, other, nr, no = self.catch_up_relevant(me, targets)
+                if nr:
+                    self.event(me, "wal_refused", rule="relevant_read", at="post", unseen=nr, other=no)
+                    return (f"[WAL] Not posted: the WAL has {nr} entr{'y' if nr == 1 else 'ies'} you hadn't read about "
+                            f"what you are claiming:\n{rel}{self._news(other, no)}\nYou have now seen them. Post your intent "
+                            "again, revised if they overlap with it.")
+                if no:
+                    self.event(me, "wal_delivered", at="post", n=no)
+                news = self._news(other, no)
             if "no_conflict" in self.rules:
                 for c in parsed:
                     hit = self._claim_conflict(me, c)
@@ -248,7 +293,7 @@ class Log:
             now = time.time()
             self.claims[me] = [Claim(c["app"], c["api"], c["target"], set(c["ids"]), e["id"], me, now) for c in parsed]
         self.event(me, "wal_intend", id=e["id"], claims=parsed)
-        return f"Posted as intent #{e['id']}."
+        return f"Posted as intent #{e['id']}." + news
 
     def _claim_conflict(self, me, c):
         """A teammate's open claim or completed change on the same record or new item, as text, or None."""
@@ -296,6 +341,18 @@ class Log:
                     raise Refused(f"[WAL] Refused: the WAL has {n} entr{'y' if n == 1 else 'ies'} you hadn't read:\n"
                                   f"{unseen}\nYou have now seen them. If they don't affect your plan, make the change "
                                   "again; if they do, post a revised intent first. Nothing was changed.")
+            if "relevant_read" in self.rules:
+                rel, other, nr, no = self.catch_up_relevant(me, [(action.app, action.api, action.path, action.ids)])
+                if nr:
+                    self.event(me, "wal_refused", rule="relevant_read", at="write", call=action.call, unseen=nr,
+                               other=no)
+                    raise Refused(f"[WAL] Refused: the WAL has {nr} entr{'y' if nr == 1 else 'ies'} you hadn't read about "
+                                  f"this record:\n{rel}{self._news(other, no)}\nYou have now seen them. If they don't "
+                                  "affect your plan, make the change again; if they do, post a revised intent first. "
+                                  "Nothing was changed.")
+                if no:
+                    self.event(me, "wal_delivered", at="write", n=no)
+                    print(self._news(other, no).strip())  # shown in the agent's cell output
             if "no_conflict" in self.rules:
                 hit = self._conflicting_claim(me, action)
                 prior = self.done.get(action.key)
@@ -309,9 +366,11 @@ class Log:
             out = execute()
         except Exception as ex:  # the environment refused it: logged as a change that changed nothing
             self._append(me, "change", intent=self.intent.get(me), call=action.call,
-                         result=f"failed: {str(ex).strip().splitlines()[-1][:160] if str(ex).strip() else type(ex).__name__}")
+                         result=f"failed: {str(ex).strip().splitlines()[-1][:160] if str(ex).strip() else type(ex).__name__}",
+                         app=action.app, api=action.api, path=action.path, ids=list(action.ids))
             raise
-        self._append(me, "change", intent=self.intent.get(me), call=action.call, result="done")
+        self._append(me, "change", intent=self.intent.get(me), call=action.call, result="done", app=action.app,
+                     api=action.api, path=action.path, ids=list(action.ids))
         self.done.setdefault(action.key, (me, len(self.entries)))
         if claim is not None and action.ids:
             claim.ids -= set(action.ids)
@@ -347,7 +406,8 @@ class Log:
         return {"wal_level": self.level, "wal_intents": kinds["wal_intend"], "wal_reads": kinds["wal_read"],
                 "wal_changes": sum(e["kind"] == "change" for e in self.entries),
                 **{f"wal_refused_{r}": refused[r] for r in ("intent", "read_before_post", "read_before_write",
-                                                            "no_conflict")},
+                                                            "relevant_read", "no_conflict")},
+                "wal_delivered": kinds["wal_delivered"],
                 **{f"wal_released_{r}": releases[r] for r in ("stopped", "expired")}}
 
 
@@ -355,12 +415,20 @@ class Log:
 TEXT = """The team keeps a write-ahead log (WAL): an append-only record, shared by all of you, of what each agent intends to change and of every change made through the apps' APIs. wal_read shows the entries you haven't seen (all=true shows every entry). wal_intend posts your intent: your plan, and one claim per change you will make, naming the app, the API you will call and its target: the record's id (e.g. {{"app": "spotify", "api": "download_song", "target": "114, 161"}}), or for something new a short description (e.g. {{"app": "spotify", "api": "create_playlist", "target": "playlist 'Road trip'"}}). A new intent replaces your previous one. Every change any of you makes through the APIs is added to the WAL automatically, with its result; reading data and logging in don't need the WAL.
 Before changing anything: 1. read the WAL; 2. post your intent; 3. make the change.
 {rules}"""
+CLAIM = "A change is refused unless your current intent claims it: the same app and API and, for an existing record, its id in the target."
+CATCH_UP = "Posting an intent, and making a change, are refused while the WAL has entries you haven't read; you are then shown them."
+CATCH_UP_RELEVANT = ("Posting an intent, and making a change, are refused while the WAL has entries you haven't read about the "
+                     "same records (or, for something new, the same API); you are then shown them. Other new entries are shown "
+                     "to you with the result instead.")
+CONFLICT = ("An intent or a change is also refused if it conflicts with a teammate's: a record another agent has claimed or "
+            "already changed, or a new item another agent has claimed or already created. Claims are released when their "
+            "change is made, when their agent posts a new intent, when it stops, or after {ttl} seconds.")
 RULES = {
     "L1": "Nothing checks that you do this: it is up to you.",
-    "L2": "A change is refused unless your current intent claims it: the same app and API and, for an existing record, its id in the target.",
-    "L3a": "A change is refused unless your current intent claims it: the same app and API and, for an existing record, its id in the target. Posting an intent is refused while the WAL has entries you haven't read; you are then shown them.",
-    "L3b": "A change is refused unless your current intent claims it: the same app and API and, for an existing record, its id in the target. Posting an intent, and making a change, are refused while the WAL has entries you haven't read; you are then shown them.",
-    "L4": "A change is refused unless your current intent claims it: the same app and API and, for an existing record, its id in the target. Posting an intent, and making a change, are refused while the WAL has entries you haven't read; you are then shown them. An intent or a change is also refused if it conflicts with a teammate's: a record another agent has claimed or already changed, or a new item another agent has claimed or already created. Claims are released when their change is made, when their agent posts a new intent, when it stops, or after {ttl} seconds.",
+    "L2": CLAIM,
+    "L3": CLAIM + " " + CATCH_UP,
+    "L4": CLAIM + " " + CATCH_UP_RELEVANT + " " + CONFLICT,
+    "L4-strict": CLAIM + " " + CATCH_UP + " " + CONFLICT,
 }
 
 
