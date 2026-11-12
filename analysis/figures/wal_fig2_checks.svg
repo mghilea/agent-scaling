@@ -46,6 +46,7 @@
 .p-none { fill: none; stroke: #5d6879; stroke-width: 1; stroke-dasharray: 2 3; }
 .p-num { fill: #16202e; }
 .p-mask { fill: #fbfcfd; stroke: none; }
+.p-bracket { fill: none; stroke: #3e4a5c; stroke-width: 1.2; }
 .p-num-ref { fill: #b3261e; }
 .t-num { font: 700 10px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; fill: #fbfcfd; }
 .t-h { font: 600 13px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; fill: #16202e; }

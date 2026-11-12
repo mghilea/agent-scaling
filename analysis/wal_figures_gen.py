@@ -77,11 +77,14 @@ f += [L(630, 300, 692, 300), N(661, 300, "5"), L(630, 470, 692, 470), T(661, 462
 # log -> disk
 f += [L(630, 112, 924, 112), N(700, 112, "4"), N(722, 112, "6"), T(800, 104, "append + fsync", "t-v", "middle")]
 # key to the write path
-key = [("1", "cell queued"), ("2", "write → commit(a, op)"), ("3", "rules checked, under mutex"), ("4", "pending line, fsync"),
+key = [("1", "cell queued"), ("2", "write → commit(a, op)"), ("3", "rules checked"), ("4", "pending line, fsync"),
        ("5", "op applied to the app DB"), ("6", "change entry, fsync"), ("7", "result, or Refused")]
 f += [T(872, 250, "Write path", "t-h")]
 for j, (n, text) in enumerate(key):
-    f += [N(882, 274 + j * 26, n), T(898, 278 + j * 26, text, "t-v")]
+    f += [N(900, 274 + j * 26, n), T(916, 278 + j * 26, text, "t-v")]
+# the log's mutex is held from 3 to 6, taken once per write call
+f += ['<path class="p-bracket" d="M889,317 H883 V413 H889"/>',
+      '<text class="t-bound" transform="translate(877,365) rotate(-90)" text-anchor="middle">mutex held</text>']
 f += [T(872, 466, "Reads (GET) go from the", "t-v"), T(872, 482, "code runner straight to", "t-v"), T(872, 498, "the app DB: no ②–⑥.", "t-v")]
 f.append("</svg>")
 

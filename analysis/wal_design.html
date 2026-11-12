@@ -86,6 +86,7 @@ figcaption b { color: var(--ink-2); }
 .p-none { fill: none; stroke: var(--muted); stroke-width: 1; stroke-dasharray: 2 3; }
 .p-num { fill: var(--ink); }
 .p-mask { fill: var(--surface); stroke: none; }
+.p-bracket { fill: none; stroke: var(--ink-2); stroke-width: 1.2; }
 .p-num-ref { fill: var(--fail); }
 .t-num { font: 700 10px var(--sans); fill: var(--surface); }
 .t-h { font: 600 13px var(--sans); fill: var(--ink); }
@@ -209,26 +210,28 @@ td { color: var(--ink-2); }
 <circle class="p-num" cx="722" cy="112" r="8.5"/><text class="t-num" x="722" y="115.6" text-anchor="middle">6</text>
 <text class="t-v" x="800" y="104" text-anchor="middle">append + fsync</text>
 <text class="t-h" x="872" y="250" text-anchor="start">Write path</text>
-<circle class="p-num" cx="882" cy="274" r="8.5"/><text class="t-num" x="882" y="277.6" text-anchor="middle">1</text>
-<text class="t-v" x="898" y="278" text-anchor="start">cell queued</text>
-<circle class="p-num" cx="882" cy="300" r="8.5"/><text class="t-num" x="882" y="303.6" text-anchor="middle">2</text>
-<text class="t-v" x="898" y="304" text-anchor="start">write → commit(a, op)</text>
-<circle class="p-num" cx="882" cy="326" r="8.5"/><text class="t-num" x="882" y="329.6" text-anchor="middle">3</text>
-<text class="t-v" x="898" y="330" text-anchor="start">rules checked, under mutex</text>
-<circle class="p-num" cx="882" cy="352" r="8.5"/><text class="t-num" x="882" y="355.6" text-anchor="middle">4</text>
-<text class="t-v" x="898" y="356" text-anchor="start">pending line, fsync</text>
-<circle class="p-num" cx="882" cy="378" r="8.5"/><text class="t-num" x="882" y="381.6" text-anchor="middle">5</text>
-<text class="t-v" x="898" y="382" text-anchor="start">op applied to the app DB</text>
-<circle class="p-num" cx="882" cy="404" r="8.5"/><text class="t-num" x="882" y="407.6" text-anchor="middle">6</text>
-<text class="t-v" x="898" y="408" text-anchor="start">change entry, fsync</text>
-<circle class="p-num" cx="882" cy="430" r="8.5"/><text class="t-num" x="882" y="433.6" text-anchor="middle">7</text>
-<text class="t-v" x="898" y="434" text-anchor="start">result, or Refused</text>
+<circle class="p-num" cx="900" cy="274" r="8.5"/><text class="t-num" x="900" y="277.6" text-anchor="middle">1</text>
+<text class="t-v" x="916" y="278" text-anchor="start">cell queued</text>
+<circle class="p-num" cx="900" cy="300" r="8.5"/><text class="t-num" x="900" y="303.6" text-anchor="middle">2</text>
+<text class="t-v" x="916" y="304" text-anchor="start">write → commit(a, op)</text>
+<circle class="p-num" cx="900" cy="326" r="8.5"/><text class="t-num" x="900" y="329.6" text-anchor="middle">3</text>
+<text class="t-v" x="916" y="330" text-anchor="start">rules checked</text>
+<circle class="p-num" cx="900" cy="352" r="8.5"/><text class="t-num" x="900" y="355.6" text-anchor="middle">4</text>
+<text class="t-v" x="916" y="356" text-anchor="start">pending line, fsync</text>
+<circle class="p-num" cx="900" cy="378" r="8.5"/><text class="t-num" x="900" y="381.6" text-anchor="middle">5</text>
+<text class="t-v" x="916" y="382" text-anchor="start">op applied to the app DB</text>
+<circle class="p-num" cx="900" cy="404" r="8.5"/><text class="t-num" x="900" y="407.6" text-anchor="middle">6</text>
+<text class="t-v" x="916" y="408" text-anchor="start">change entry, fsync</text>
+<circle class="p-num" cx="900" cy="430" r="8.5"/><text class="t-num" x="900" y="433.6" text-anchor="middle">7</text>
+<text class="t-v" x="916" y="434" text-anchor="start">result, or Refused</text>
+<path class="p-bracket" d="M889,317 H883 V413 H889"/>
+<text class="t-bound" transform="translate(877,365) rotate(-90)" text-anchor="middle">mutex held</text>
 <text class="t-v" x="872" y="466" text-anchor="start">Reads (GET) go from the</text>
 <text class="t-v" x="872" y="482" text-anchor="start">code runner straight to</text>
 <text class="t-v" x="872" y="498" text-anchor="start">the app DB: no ②–⑥.</text>
 </svg>
       </div>
-      <figcaption><b>Figure 1.</b> Architecture and write path. Agents run as threads with no channel between them; they share only the log and the apps' state. Each has three tools: <code>wal_intend</code>, <code>wal_read</code> and <code>execute_python</code>. Code cells run one at a time on the harness's main thread; inside a cell, an API call is a write if its HTTP method is POST, PUT, PATCH or DELETE (except logging in and out). Writes go through <code>commit</code>, which holds the log's mutex from the rule check to the change entry, so no two writes or posts interleave. Without the log (L0), writes go straight to the apps.</figcaption>
+      <figcaption><b>Figure 1.</b> Architecture and write path. Agents run as threads with no channel between them; they share only the log and the apps' state. Each has three tools: <code>wal_intend</code>, <code>wal_read</code> and <code>execute_python</code>. Code cells run one at a time on the harness's main thread; inside a cell, an API call is a write if its HTTP method is POST, PUT, PATCH or DELETE (except logging in and out). Writes go through <code>commit</code>, which holds the log's mutex from the rule check (③) to the change entry (⑥), so no post, read or other write can interleave with it. The mutex is taken once per write call, not per cell: between two writes in the same cell no other cell can run, but a teammate's <code>wal_read</code> or <code>wal_intend</code> can. Without the log (L0), writes go straight to the apps.</figcaption>
     </figure>
   </section>
 
