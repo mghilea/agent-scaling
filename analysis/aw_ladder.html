@@ -1,0 +1,432 @@
+<title>AppWorld Enforcement Ladder</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one reading column of sections; tables, logs and the diagram scroll inside their own boxes. Same system as the WorkBench analysis pages. */
+:root {
+  --ground: #f3f5f8; --surface: #fbfcfd; --sunken: #e7ebf1; --ink: #16202e; --ink-2: #3e4a5c; --muted: #5d6879; --line: #d2d9e3; --grid: #e3e8ee;
+  --accent: #2a78d6; --bar: #2a78d6; --ref: #8a5a00; --pass: #22784a; --pass-soft: #dcf1e5; --fail: #b3261e; --fail-soft: #fbe2df; --warn-soft: #fdf0d5; --warn: #8a5a00;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  --cond: "IBM Plex Sans Condensed", "IBM Plex Sans", "Arial Narrow", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, "Courier New", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground: #0e131a; --surface: #151c26; --sunken: #1d2632; --ink: #e5eaf1; --ink-2: #c3ccd8; --muted: #9aa7b8; --line: #2e3a4a; --grid: #232d3a;
+    --accent: #5c9cec; --bar: #3987e5; --ref: #e8b55c; --pass: #53c487; --pass-soft: #163527; --fail: #f2786d; --fail-soft: #3d1c1a; --warn-soft: #3a2c10; --warn: #e8b55c;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #0e131a; --surface: #151c26; --sunken: #1d2632; --ink: #e5eaf1; --ink-2: #c3ccd8; --muted: #9aa7b8; --line: #2e3a4a; --grid: #232d3a;
+  --accent: #5c9cec; --bar: #3987e5; --ref: #e8b55c; --pass: #53c487; --pass-soft: #163527; --fail: #f2786d; --fail-soft: #3d1c1a; --warn-soft: #3a2c10; --warn: #e8b55c;
+}
+* { box-sizing: border-box; }
+body { background: var(--ground); color: var(--ink); font: 16px/1.6 var(--sans); }
+.wrap { max-width: 1080px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 36px 64px; display: grid; gap: 52px; }
+header { display: grid; gap: 14px; }
+.eyebrow { margin: 0; font: 600 12px/1.4 var(--sans); letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+h1 { margin: 0; font: 600 clamp(30px, 4.4vw, 44px)/1.1 var(--cond); text-wrap: balance; max-width: 26ch; }
+h2 { margin: 0; font: 600 clamp(23px, 3vw, 29px)/1.2 var(--cond); text-wrap: balance; }
+h3 { margin: 0; font: 600 18px/1.3 var(--cond); text-wrap: balance; }
+p { margin: 0; }
+.lede { font-size: 18px; color: var(--ink-2); max-width: 72ch; }
+code { font-family: var(--mono); font-size: 13px; background: var(--sunken); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+section { display: grid; gap: 18px; min-width: 0; }
+.sectionhead { display: grid; gap: 6px; }
+.sectionhead p { color: var(--muted); max-width: 76ch; }
+.prose { display: grid; gap: 10px; max-width: 76ch; }
+.prose p { color: var(--ink-2); }
+ul.points { margin: 0; padding-left: 20px; display: grid; gap: 6px; max-width: 80ch; }
+ul.points li { color: var(--ink-2); }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 4px; align-content: start; min-width: 0; }
+.card .k { font: 600 11.5px/1.4 var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.card .v { font: 600 26px/1.15 var(--cond); font-variant-numeric: tabular-nums; }
+.card .v .arrow { color: var(--muted); font-weight: 400; padding-inline: 4px; }
+.card p { color: var(--muted); font-size: 14.5px; }
+.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
+.step { border-top: 2px solid var(--accent); padding-top: 10px; display: grid; gap: 4px; min-width: 0; }
+.step b { font: 600 15px/1.3 var(--cond); }
+.step span { color: var(--muted); font-size: 14.5px; }
+.tablewrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; min-width: 0; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; font-variant-numeric: tabular-nums; }
+table.wide { min-width: 760px; }
+th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 600 11.5px/1.4 var(--sans); letter-spacing: .05em; text-transform: uppercase; color: var(--muted); background: var(--sunken); }
+td.n, th.n { text-align: right; white-space: nowrap; }
+tr:last-child td { border-bottom: none; }
+tr.group td { background: var(--sunken); font-weight: 600; color: var(--ink-2); }
+tr.ref td { color: var(--muted); }
+.lvl { font: 600 13px/1 var(--mono); color: var(--accent); white-space: nowrap; }
+.delta { font-size: 12.5px; color: var(--muted); }
+.chip { display: inline-block; margin-top: 3px; font: 600 12px/1.5 var(--sans); padding: 0 7px; border-radius: 5px; white-space: nowrap; }
+.chip.good { background: var(--pass-soft); color: var(--pass); }
+.chip.bad { background: var(--fail-soft); color: var(--fail); }
+.chip.flat { color: var(--muted); font-weight: 500; }
+.pill { display: inline-block; font: 600 11.5px/1.5 var(--sans); padding: 1px 8px; border-radius: 999px; white-space: nowrap; }
+.pill.on { background: var(--pass-soft); color: var(--pass); }
+.pill.ask { background: var(--sunken); color: var(--muted); }
+.pill.rel { background: var(--warn-soft); color: var(--warn); }
+.note { font-size: 14px; color: var(--muted); max-width: 86ch; }
+.chartbox { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 10px; position: relative; min-width: 0; }
+.chartbox svg { display: block; width: 100%; height: auto; overflow: visible; }
+figure { margin: 0; display: grid; gap: 8px; }
+figcaption { font-size: 14px; color: var(--muted); max-width: 86ch; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13.5px; color: var(--ink-2); }
+.legend i { display: inline-block; width: 14px; height: 0; border-top: 2px dashed var(--ref); margin-right: 6px; vertical-align: 4px; }
+.legend i.dot { width: 9px; height: 9px; border: 0; border-radius: 50%; background: var(--ink-2); vertical-align: 0; }
+.lbl { fill: var(--muted); font: 12px var(--sans); }
+.cat { fill: var(--ink); font: 500 13px var(--sans); }
+.val { fill: var(--ink-2); font: 500 12px var(--sans); font-variant-numeric: tabular-nums; }
+.gridline { stroke: var(--grid); stroke-width: 1; }
+.tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--ground); font: 13px/1.4 var(--sans); padding: 6px 9px; border-radius: 6px; max-width: 260px; z-index: 5; }
+.log { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow-x: auto; font: 12.5px/1.65 var(--mono); padding: 12px 14px; min-width: 0; }
+.log div { white-space: pre; }
+.log .intent { color: var(--accent); }
+.log .rel { color: var(--warn); }
+.log .side { color: var(--muted); font-style: italic; }
+/* the diagram: agents, the log service, the apps */
+.diagram { overflow-x: auto; min-width: 0; }
+.dg { display: grid; grid-template-columns: minmax(150px, 1fr) 40px minmax(260px, 1.6fr) 40px minmax(150px, 1fr); align-items: center; min-width: 700px; gap: 0; }
+.dg .box { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: grid; gap: 6px; font-size: 14px; }
+.dg .box b { font: 600 15px/1.3 var(--cond); }
+.dg .box span { color: var(--muted); font-size: 13.5px; }
+.dg .core { border: 2px solid var(--accent); }
+.dg .core ul { margin: 0; padding-left: 18px; color: var(--ink-2); display: grid; gap: 2px; font-size: 13.5px; }
+.dg .arrow { text-align: center; color: var(--muted); font: 20px var(--sans); }
+.dg .file { grid-column: 3; margin-top: 10px; background: var(--sunken); border: 1px dashed var(--line); border-radius: 8px; padding: 8px 12px; font: 12.5px/1.5 var(--mono); color: var(--ink-2); }
+.dg .down { grid-column: 3; text-align: center; color: var(--muted); line-height: 1; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 520px) { .card .v { font-size: 22px; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow" id="eyebrow">AppWorld · gpt-oss-20b · 3-agent teams</p>
+    <h1>How much enforcement does a shared log need?</h1>
+    <p class="lede" id="lede"></p>
+    <div class="cards" id="cards"></div>
+  </header>
+
+  <section id="design">
+    <div class="sectionhead">
+      <h2>The write-ahead log</h2>
+      <p>Three agents get the same AppWorld task and work on the same apps and accounts. They cannot message each other. From level 1 on, they share a write-ahead log: an append-only record of what each agent intends to change and of every change made.</p>
+    </div>
+    <div class="diagram" role="img" aria-label="Agents read and post to the log service; every write to the apps passes through it; the service appends to a log file">
+      <div class="dg">
+        <div class="box"><b>Agents 1–3</b><span>Each writes Python in its own shell and calls the apps through <code>apis</code>. Log tools: <code>wal_read</code>, <code>wal_intend</code>.</span></div>
+        <div class="arrow">→</div>
+        <div class="box core"><b>Log service</b>
+          <ul>
+            <li>the level's rules, checked before every post and every write</li>
+            <li>one lock: check, write and log entry happen as one step</li>
+            <li>each agent's read position, current intent and open claims</li>
+          </ul>
+        </div>
+        <div class="arrow">→</div>
+        <div class="box"><b>AppWorld apps</b><span>One shared world: the same databases for all three agents, graded once at the end by AppWorld's tests.</span></div>
+        <div class="down">↓</div>
+        <div class="file">wal/&lt;task&gt;.jsonl · one JSON entry per line, forced to disk</div>
+      </div>
+    </div>
+    <div class="steps">
+      <div class="step"><b>Intent</b><span>Posted by an agent: a plan and one claim per change, naming the app, the API and its target (a record's id, or a description of something new).</span></div>
+      <div class="step"><b>Change</b><span>Recorded by the harness for every write, with its outcome. A pending line goes to disk before the write runs.</span></div>
+      <div class="step"><b>Release</b><span>Recorded by the harness when an agent's claims close because it stopped or the claims expired (90 s).</span></div>
+    </div>
+    <ul class="points">
+      <li>Reads go straight to the apps. Writes (any API call that changes something, apart from logging in and out) pass through the log service, which checks the level's rules, records the pending line, runs the write and records the change under one lock. A refused write raises an error in the agent's code that says why, and nothing changes.</li>
+      <li>Agents' code runs one cell at a time; their model calls run in parallel. Agents can only append intents; the harness writes every other entry, and no entry is ever edited.</li>
+      <li>The first <code>complete_task</code> call finishes the task for the team. It is logged, and no rule applies to it.</li>
+    </ul>
+    <figure>
+      <figcaption>An illustration of the log's format (made-up records, not from an AppWorld task):</figcaption>
+      <div class="log">
+<div class="intent">#1 agent_1 INTENT: tidy the shared notes | claims: simple_note.update_note 41, 42</div>
+<div class="intent">#2 agent_3 INTENT: archive last year's notes | claims: simple_note.delete_note 17</div>
+<div>#3 agent_1 CHANGE (intent #1): simple_note.update_note(note_id=41, ...) -> done</div>
+<div class="side">   agent_2 posts a claim on note 41 → refused at L4: agent_1 claimed it (intent #1)</div>
+<div>#4 agent_1 CHANGE (intent #1): simple_note.update_note(note_id=42, ...) -> done</div>
+<div class="rel">#5 RELEASE agent_3's claim simple_note.delete_note 17 (stopped)</div>
+      </div>
+    </figure>
+  </section>
+
+  <section id="levels">
+    <div class="sectionhead">
+      <h2>Five levels of enforcement</h2>
+      <p>Each level keeps what the previous one enforces and adds one rule, except level 4, which changes how catching up works. L4-strict is run alongside as a comparison.</p>
+    </div>
+    <div class="tablewrap"><table class="wide" id="levelstable"></table></div>
+    <p class="note">Catching up means reading every log entry the agent hasn't seen. A refusal for unread entries shows the agent what it missed, then it may retry. At L4, only unread entries about the same records (or, for new items, the same API) block a post or write; the rest are shown with the result. A conflict is a record a teammate has claimed or already changed, or a new item a teammate has claimed or already created.</p>
+  </section>
+
+  <section id="glance">
+    <div class="sectionhead">
+      <h2>Results by level</h2>
+      <p id="glanceintro"></p>
+    </div>
+    <div class="tablewrap"><table class="wide" id="glancetable"></table></div>
+    <p class="note" id="glancenote"></p>
+  </section>
+
+  <section id="conflicts">
+    <div class="sectionhead">
+      <h2>Conflicts between agents</h2>
+      <p>A conflict is a write to a record, or of a new item, that a teammate had already written. It either went through a second time (a duplicate) or failed because the work was already done (a collision, such as "already downloaded").</p>
+    </div>
+    <figure class="chartbox" id="c1box">
+      <svg id="c1" role="img" aria-labelledby="c1t"><title id="c1t">Share of task-runs with at least one conflict, by level</title></svg>
+      <div class="tip" id="c1tip" hidden></div>
+      <figcaption>Share of task-runs with at least one conflict between agents.</figcaption>
+    </figure>
+    <div class="tablewrap"><table class="wide" id="conftable"></table></div>
+  </section>
+
+  <section id="accuracy">
+    <div class="sectionhead">
+      <h2>Accuracy</h2>
+      <p>A task-run counts as solved only if every one of AppWorld's tests passes: the expected changes, nothing else changed, and the right answer for questions.</p>
+    </div>
+    <figure class="chartbox" id="c2box">
+      <div class="legend"><span><i class="dot"></i>One run</span><span><i></i>Single agent, same tasks</span></div>
+      <svg id="c2" role="img" aria-labelledby="c2t"><title id="c2t">Share of task-runs solved, by level, with each run's value and the single agent for reference</title></svg>
+      <div class="tip" id="c2tip" hidden></div>
+      <figcaption id="c2cap"></figcaption>
+    </figure>
+    <div class="tablewrap"><table class="wide" id="difftable"></table></div>
+  </section>
+
+  <section id="cost">
+    <div class="sectionhead">
+      <h2>Time, tokens and concurrency</h2>
+      <p>All levels ran side by side in the same jobs, so their times saw the same load. Time is the team's wall time per task.</p>
+    </div>
+    <figure class="chartbox" id="c3box">
+      <div class="legend"><span><i></i>Single agent, same tasks</span></div>
+      <svg id="c3" role="img" aria-labelledby="c3t"><title id="c3t">Seconds per task, by level</title></svg>
+      <div class="tip" id="c3tip" hidden></div>
+      <figcaption>Mean team wall time per task. The single agent ran in separate jobs, so its time is only roughly comparable.</figcaption>
+    </figure>
+    <div class="tablewrap"><table class="wide" id="costtable"></table></div>
+    <p class="note">Overlap: share of the team's time with two or more agents working. Parallelism: the agents' summed working time over the team's time (1 means one agent at a time, 3 means all three throughout).</p>
+  </section>
+
+  <section id="usage">
+    <div class="sectionhead">
+      <h2>How agents used the log</h2>
+      <p>Per task-run. Refusals are counted by the rule that fired; a refusal chain is a run of refusals with no accepted post or write in between.</p>
+    </div>
+    <div class="tablewrap"><table class="wide" id="usagetable"></table></div>
+  </section>
+
+  <section id="paired">
+    <div class="sectionhead">
+      <h2>Level against level, task by task</h2>
+      <p>Each task-run is compared with the same task in the same job at the other level. p is a two-sided sign-flip test; the time interval is a 95% bootstrap interval.</p>
+    </div>
+    <div class="tablewrap"><table class="wide" id="pairedtable"></table></div>
+  </section>
+
+  <section id="method">
+    <div class="sectionhead"><h2>Definitions and data</h2></div>
+    <ul class="points" id="methodpoints"></ul>
+  </section>
+</div>
+
+<script>
+const D = /*DATA*/null;
+const $ = (id) => document.getElementById(id);
+const pct = (x, d = 0) => (100 * x).toFixed(d) + "%";
+const k = (x) => (x / 1000).toFixed(0) + "k";
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const sg = (x) => (x > 0 ? "+" : x < 0 ? "−" : "±");
+const chip = (cls, text) => `<span class="chip ${cls}">${text}</span>`;
+const pv = (p) => (p < 0.001 ? "p < 0.001" : `p = ${p.toFixed(p < 0.01 ? 3 : 2)}`);
+const S = D.summary, ST = D.steps, single = D.single;
+const ORDER = ["L0", "L1", "L2", "L3", "L4", "L4-strict"];
+const NAME = { L0: "No log", L1: "Log, nothing enforced", L2: "Claims required", L3: "Catch up on everything",
+               L4: "Relevant catch-up, conflicts refused", "L4-strict": "L4 with full catch-up" };
+const SHORT = { L0: "No log", L1: "Log only", L2: "Claims", L3: "Full catch-up", L4: "Relevant catch-up", "L4-strict": "L4, full catch-up" };
+const PREV = { L1: "L0", L2: "L1", L3: "L2", L4: "L3" };  // the step each level adds to
+const levels = ORDER.filter((l) => S[l] && S[l].task_runs);
+const runs = D.reps.length, tasks = D.tasks, n = levels.length ? S[levels[0]].task_runs : 0;
+const step = (a, b) => ST[`${a}->${b}`];
+
+// ---- header ----
+$("eyebrow").textContent = `AppWorld ${D.dataset} split · ${tasks} tasks × ${runs} run${runs === 1 ? "" : "s"} · gpt-oss-20b · 3-agent teams`;
+if (S.L0 && S.L4) {
+  const c0 = S.L0.any_conflict, c4 = S.L4.any_conflict, a0 = S.L0.accuracy, a4 = S.L4.accuracy;
+  $("lede").textContent = `Without a log, ${pct(c0)} of task-runs had agents redo or collide with a teammate's work. ` +
+    `With claims, catching up on relevant entries and conflicts refused (L4), ${pct(c4)} did. ` +
+    `Accuracy went from ${pct(a0)} to ${pct(a4)}, against ${single ? pct(single.accuracy) : "–"} for a single agent on the same tasks.`;
+  const cards = [
+    ["Task-runs with a conflict", `${pct(c0)}<span class="arrow">→</span>${pct(c4)}`, "no log → L4"],
+    ["Accuracy", `${pct(a0)}<span class="arrow">→</span>${pct(a4)}`, `no log → L4; single agent ${single ? pct(single.accuracy) : "–"}`],
+    ["Seconds per task", `${S.L0.seconds.toFixed(0)}<span class="arrow">→</span>${S.L4.seconds.toFixed(0)}`, "no log → L4, team wall time"],
+    ["Refusals per task-run", `${S.L4.refusals.toFixed(1)}`, `at L4 (L3: ${S.L3 ? S.L3.refusals.toFixed(1) : "–"})`],
+  ];
+  $("cards").innerHTML = cards.map(([a, b, c]) => `<div class="card"><span class="k">${a}</span><span class="v">${b}</span><p>${c}</p></div>`).join("");
+}
+
+// ---- the levels ----
+{
+  const on = (t) => `<span class="pill on">${t}</span>`, ask = `<span class="pill ask">Asked, not checked</span>`, no = `<span class="delta">–</span>`;
+  const rel = `<span class="pill rel">Relevant entries only</span>`;
+  const rows = [
+    ["L0", "No log", no, no, no],
+    ["L1", "Log, nothing enforced", ask, ask, no],
+    ["L2", "Claims required", on("Enforced"), no, no],
+    ["L3", "Catch up on everything", on("Enforced"), on("Before posting and writing"), no],
+    ["L4", "Relevant catch-up, conflicts refused", on("Enforced"), rel, on("Enforced")],
+    ["L4-strict", "Comparison: L4 with full catch-up", on("Enforced"), on("Before posting and writing"), on("Enforced")],
+  ];
+  $("levelstable").innerHTML = `<thead><tr><th>Level</th><th>Setup</th><th>A write needs a claim in the agent's intent</th><th>Catch up on unread entries</th><th>Conflicts with a teammate refused</th></tr></thead><tbody>` +
+    rows.map((r) => `<tr${r[0] === "L4-strict" ? ' class="ref"' : ""}><td><span class="lvl">${r[0]}</span></td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td>${r[4]}</td></tr>`).join("") + "</tbody>";
+}
+
+// ---- results by level ----
+{
+  const sigChip = (s, key, fmt, goodUp) => {
+    if (!s) return "";
+    const d = s[key], sig = d.p < 0.05;
+    return "<br>" + chip(sig ? ((d.diff > 0) === goodUp ? "good" : "bad") : "flat", `${fmt(d.diff)}${sig ? ", " + pv(d.p) : ", n.s."}`);
+  };
+  const ptsF = (x) => `${sg(x)}${Math.abs(100 * x).toFixed(1)} pts`;
+  const secChip = (s) => {
+    if (!s) return "";
+    const [m, lo, hi] = s.seconds, sig = hi < 0 || lo > 0;
+    return "<br>" + chip(sig ? (m < 0 ? "good" : "bad") : "flat", `${sg(m)}${Math.abs(m).toFixed(1)} s${sig ? "" : ", n.s."}`);
+  };
+  let h = `<thead><tr><th>Level</th><th class="n">Accuracy</th><th class="n">Task-runs with<br>a conflict</th><th class="n">Conflicts<br>per task-run</th><th class="n">Refusals<br>per task-run</th><th class="n">Seconds<br>per task</th><th class="n">Tokens<br>per task</th><th class="n">Overlap</th></tr></thead><tbody>`;
+  if (single) {
+    h += `<tr class="ref"><td><span class="lvl">1 agent</span><br>Single agent, same tasks</td><td class="n">${pct(single.accuracy, 1)}</td><td class="n">–</td><td class="n">–</td><td class="n">–</td><td class="n">${single.seconds.toFixed(0)}</td><td class="n">${k(single.tokens)}</td><td class="n">–</td></tr>`;
+  }
+  for (const l of levels) {
+    const s = S[l], st = l === "L4-strict" ? null : PREV[l] ? step(PREV[l], l) : null;
+    h += `<tr${l === "L4-strict" ? ' class="ref"' : ""}><td><span class="lvl">${l}</span><br>${NAME[l]}</td>` +
+      `<td class="n">${pct(s.accuracy, 1)}${sigChip(st, "correct", ptsF, true)}</td>` +
+      `<td class="n">${pct(s.any_conflict, 1)}${sigChip(st, "any_conflict", ptsF, false)}</td>` +
+      `<td class="n">${s.conflicts.toFixed(2)}</td><td class="n">${l === "L0" ? "–" : s.refusals.toFixed(2)}</td>` +
+      `<td class="n">${s.seconds.toFixed(1)}${secChip(st)}</td><td class="n">${k(s.tokens)}</td><td class="n">${pct(s.overlap)}</td></tr>`;
+  }
+  $("glancetable").innerHTML = h + "</tbody>";
+  $("glanceintro").textContent = `${tasks} tasks, ${runs} run${runs === 1 ? "" : "s"} of each level: ${n} task-runs per level. ` +
+    `Under each value is the change from the level before it, colored when it is statistically significant (green better, red worse).`;
+  $("glancenote").textContent = `L4-strict is compared with L4 below, not stepped from it. Tokens are prompt plus completion tokens for the whole team.`;
+}
+
+// ---- charts: horizontal bars, one row per level ----
+function bars(svgId, tipId, boxId, rows, opts) {
+  const svg = $(svgId), W = 760, rowH = 36, top = 8, left = 210, right = 90, H = top + rows.length * rowH + 28;
+  const max = opts.max, x = (v) => left + (W - left - right) * v / max;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  let s = "";
+  for (const t of opts.ticks) s += `<line class="gridline" x1="${x(t)}" x2="${x(t)}" y1="${top}" y2="${H - 24}"/><text class="lbl" x="${x(t)}" y="${H - 8}" text-anchor="middle">${opts.tick(t)}</text>`;
+  rows.forEach((r, i) => {
+    const y = top + i * rowH + rowH / 2, w = Math.max(0, x(r.value) - left);
+    s += `<text class="cat" x="${left - 12}" y="${y + 4}" text-anchor="end">${esc(r.label)}</text>`;
+    s += `<rect x="${left}" y="${y - 7}" width="${Math.max(w, 0.5)}" height="14" rx="4" fill="var(--bar)" opacity="${r.muted ? 0.45 : 1}"><title>${esc(r.tip)}</title></rect>`;
+    s += `<rect x="${left}" y="${y - rowH / 2}" width="${W - left - right}" height="${rowH}" fill="transparent" data-tip="${esc(r.tip)}" tabindex="0"/>`;
+    for (const d of r.dots || []) s += `<circle cx="${x(d)}" cy="${y}" r="4" fill="var(--ink-2)" stroke="var(--surface)" stroke-width="2" pointer-events="none"/>`;
+    s += `<text class="val" x="${x(r.value) + 8}" y="${y + 4}">${opts.fmt(r.value)}</text>`;
+  });
+  if (opts.ref != null) s += `<line x1="${x(opts.ref)}" x2="${x(opts.ref)}" y1="${top}" y2="${H - 24}" stroke="var(--ref)" stroke-width="2" stroke-dasharray="5 4"/>`;
+  svg.innerHTML = svg.querySelector("title").outerHTML + s;
+  const tip = $(tipId), box = $(boxId);
+  const show = (e) => {
+    const el = e.target.closest("[data-tip]"); if (!el) { tip.hidden = true; return; }
+    tip.textContent = el.dataset.tip; tip.hidden = false;
+    const rb = box.getBoundingClientRect(), b = el.getBoundingClientRect();
+    tip.style.left = Math.min(Math.max(8, b.left - rb.left + (b.width * 0.5)), rb.width - 270) + "px"; tip.style.top = (b.top - rb.top - 34) + "px";
+  };
+  svg.addEventListener("mousemove", show); svg.addEventListener("focusin", show);
+  svg.addEventListener("mouseleave", () => (tip.hidden = true)); svg.addEventListener("focusout", () => (tip.hidden = true));
+}
+const niceMax = (v, step) => Math.max(step, Math.ceil(v / step) * step);
+const ticksTo = (max, step) => { const t = []; for (let v = 0; v <= max + 1e-9; v += step) t.push(+v.toFixed(6)); return t; };
+{
+  const max = niceMax(Math.max(...levels.map((l) => S[l].any_conflict), 0.05), 0.1);
+  bars("c1", "c1tip", "c1box", levels.map((l) => ({ label: `${l} · ${SHORT[l]}`, value: S[l].any_conflict, muted: l === "L4-strict",
+    tip: `${l}: ${pct(S[l].any_conflict, 1)} of task-runs with a conflict; ${S[l].duplicates.toFixed(2)} duplicates and ${S[l].collisions.toFixed(2)} collisions per task-run` })),
+    { max, ticks: ticksTo(max, max > 0.5 ? 0.2 : 0.1), tick: (t) => pct(t), fmt: (v) => pct(v, 1) });
+  $("conftable").innerHTML = `<thead><tr><th>Level</th><th class="n">Duplicates<br>per task-run</th><th class="n">Collisions<br>per task-run</th><th class="n">Writes<br>per task-run</th><th class="n">Agents that wrote<br>per task-run</th></tr></thead><tbody>` +
+    levels.map((l) => `<tr${l === "L4-strict" ? ' class="ref"' : ""}><td><span class="lvl">${l}</span> ${NAME[l]}</td><td class="n">${S[l].duplicates.toFixed(2)}</td><td class="n">${S[l].collisions.toFixed(2)}</td><td class="n">${S[l].writes.toFixed(1)}</td><td class="n">${S[l].writers.toFixed(2)}</td></tr>`).join("") + "</tbody>";
+}
+{
+  const per = D.per_rep_accuracy;
+  const max = niceMax(Math.max(...levels.map((l) => Math.max(S[l].accuracy, ...Object.values(per[l] || {}))), single ? single.accuracy : 0), 0.1);
+  bars("c2", "c2tip", "c2box", levels.map((l) => ({ label: `${l} · ${SHORT[l]}`, value: S[l].accuracy, muted: l === "L4-strict", dots: Object.values(per[l] || {}),
+    tip: `${l}: ${pct(S[l].accuracy, 1)} solved; runs ${Object.entries(per[l] || {}).map(([r, v]) => `${r} ${pct(v)}`).join(", ")}` })),
+    { max, ticks: ticksTo(max, 0.1), tick: (t) => pct(t), fmt: (v) => pct(v, 1), ref: single ? single.accuracy : null });
+  $("c2cap").textContent = `Share of task-runs solved; dots are the individual runs${single ? `, and the dashed line the single agent (${pct(single.accuracy, 1)}, ${single.task_runs} task-runs)` : ""}.`;
+  const diffs = [...new Set(levels.flatMap((l) => Object.keys(S[l].by_difficulty)))].sort();
+  $("difftable").innerHTML = `<thead><tr><th>Level</th>${diffs.map((d) => `<th class="n">Difficulty ${d}</th>`).join("")}<th class="n">Scenarios fully solved</th><th class="n">Task marked complete</th></tr></thead><tbody>` +
+    levels.map((l) => `<tr${l === "L4-strict" ? ' class="ref"' : ""}><td><span class="lvl">${l}</span> ${NAME[l]}</td>${diffs.map((d) => { const b = S[l].by_difficulty[d]; return `<td class="n">${b ? pct(b.accuracy) : "–"}<br><span class="delta">${b ? b.n : 0} task-runs</span></td>`; }).join("")}` +
+      `<td class="n">${S[l].scenarios == null ? "–" : pct(S[l].scenarios)}</td><td class="n">${pct(S[l].completed)}</td></tr>`).join("") + "</tbody>";
+}
+{
+  const max = niceMax(Math.max(...levels.map((l) => S[l].seconds), single ? single.seconds : 0), 20);
+  bars("c3", "c3tip", "c3box", levels.map((l) => ({ label: `${l} · ${SHORT[l]}`, value: S[l].seconds, muted: l === "L4-strict",
+    tip: `${l}: ${S[l].seconds.toFixed(1)} s per task; ${S[l].turns.toFixed(0)} model calls, ${k(S[l].tokens)} tokens` })),
+    { max, ticks: ticksTo(max, max > 120 ? 40 : 20), tick: (t) => `${t} s`, fmt: (v) => `${v.toFixed(0)} s`, ref: single ? single.seconds : null });
+  $("costtable").innerHTML = `<thead><tr><th>Level</th><th class="n">Seconds<br>per task</th><th class="n">Model calls<br>per task</th><th class="n">Tokens<br>per task</th><th class="n">Overlap</th><th class="n">Parallelism</th><th class="n">Agents out<br>of calls</th></tr></thead><tbody>` +
+    (single ? `<tr class="ref"><td>Single agent</td><td class="n">${single.seconds.toFixed(1)}</td><td class="n">${single.turns.toFixed(0)}</td><td class="n">${k(single.tokens)}</td><td class="n">–</td><td class="n">1</td><td class="n">–</td></tr>` : "") +
+    levels.map((l) => `<tr${l === "L4-strict" ? ' class="ref"' : ""}><td><span class="lvl">${l}</span> ${NAME[l]}</td><td class="n">${S[l].seconds.toFixed(1)}</td><td class="n">${S[l].turns.toFixed(0)}</td><td class="n">${k(S[l].tokens)}</td><td class="n">${pct(S[l].overlap)}</td><td class="n">${S[l].parallelism.toFixed(2)}</td><td class="n">${pct(S[l].out_of_calls, 1)}</td></tr>`).join("") + "</tbody>";
+}
+
+// ---- how agents used the log ----
+{
+  const L = levels.filter((l) => l !== "L0");
+  const f2 = (v) => v.toFixed(2);
+  const rows = [
+    ["Intents posted", (s) => f2(s.intents)], ["Log reads", (s) => f2(s.reads)],
+    ["Refused: write not claimed", (s) => f2(s.refused_intent)],
+    ["Refused: posting with unread entries", (s) => f2(s.refused_read_before_post)],
+    ["Refused: writing with unread entries", (s) => f2(s.refused_read_before_write)],
+    ["Refused: unread entries about the same records (L4)", (s) => f2(s.refused_relevant_read)],
+    ["Refused: conflicts with a teammate", (s) => f2(s.refused_no_conflict)],
+    ["Unread entries delivered without blocking (L4)", (s) => f2(s.delivered)],
+    ["Claims released: agent stopped", (s) => f2(s.released_stopped)], ["Claims released: expired", (s) => f2(s.released_expired)],
+    ["Refusal chains of 3 or more", (s) => f2(s.refusal_chains_3plus)], ["Longest refusal chain", (s) => String(s.refusal_chain_max)],
+    ["Agents whose last log event was a refusal", (s) => f2(s.stopped_after_refusal)],
+    ["Agents reminded to complete the task", (s) => pct(s.reminded, 1)],
+  ];
+  $("usagetable").innerHTML = `<thead><tr><th>Per task-run</th>${L.map((l) => `<th class="n">${l}</th>`).join("")}</tr></thead><tbody>` +
+    rows.map(([label, f]) => `<tr><td>${label}</td>${L.map((l) => `<td class="n">${f(S[l])}</td>`).join("")}</tr>`).join("") + "</tbody>";
+}
+
+// ---- paired comparisons ----
+{
+  const LABEL = { "L0->L1": "Adding the log (L0 → L1)", "L1->L2": "Requiring claims (L1 → L2)", "L2->L3": "Catching up on everything (L2 → L3)",
+    "L3->L4": "Relevant catch-up and conflict refusal (L3 → L4)", "L4-strict->L4": "Relevant instead of full catch-up (L4-strict → L4)",
+    "L0->L4": "No log → L4", "L0->L3": "No log → L3" };
+  const cell = (d, f, goodUp) => d ? `<td class="n">${f(d.diff)}<br>${d.p < 0.05 ? chip((d.diff > 0) === goodUp ? "good" : "bad", pv(d.p)) : `<span class="delta">${pv(d.p)}</span>`}</td>` : `<td class="n">–</td>`;
+  const ptsF = (x) => `${sg(x)}${Math.abs(100 * x).toFixed(1)} pts`;
+  let h = `<thead><tr><th>Comparison</th><th class="n">Pairs</th><th class="n">Accuracy</th><th class="n">Task-runs with<br>a conflict</th><th class="n">Refusals<br>per task-run</th><th class="n">Seconds per task<br>(95% interval)</th><th class="n">Tokens<br>per task</th></tr></thead><tbody>`;
+  for (const [key, label] of Object.entries(LABEL)) {
+    const c = ST[key]; if (!c) continue;
+    const [m, lo, hi] = c.seconds, sig = hi < 0 || lo > 0;
+    h += `<tr><td>${label}</td><td class="n">${c.pairs}</td>${cell(c.correct, ptsF, true)}${cell(c.any_conflict, ptsF, false)}` +
+      `${cell(c.refusals, (x) => `${sg(x)}${Math.abs(x).toFixed(2)}`, false)}` +
+      `<td class="n">${sg(m)}${Math.abs(m).toFixed(1)} s<br>${sig ? chip(m < 0 ? "good" : "bad", `${lo.toFixed(1)} to ${hi.toFixed(1)}`) : `<span class="delta">${lo.toFixed(1)} to ${hi.toFixed(1)}</span>`}</td>` +
+      `<td class="n">${sg(c.tokens.diff)}${k(Math.abs(c.tokens.diff))}</td></tr>`;
+  }
+  $("pairedtable").innerHTML = h + "</tbody>";
+}
+
+// ---- definitions ----
+$("methodpoints").innerHTML = [
+  `<b>Task-run</b>: one AppWorld task done by one team in one run. ${tasks} tasks from the ${D.dataset} split, ${runs} run${runs === 1 ? "" : "s"} of each level (${D.reps.join(", ")}), gpt-oss-20b, 3 agents, up to 100 model calls each.`,
+  `<b>Same job, same load</b>: each run is one job that ran every level side by side on one GPU, so every level is compared with the others task by task under the same load.`,
+  `<b>Solved</b>: AppWorld's own state-based tests all pass. The single-agent reference is the same tasks with one agent, run separately.`,
+  `<b>Conflict</b>: a write by one agent to a record (or of a new item, with the same arguments) that a teammate had already written; a duplicate if it went through, a collision if it failed.`,
+  `<b>No task contents</b> appear on this page: AppWorld's data may only be redistributed encrypted. Scripts: <code>wal2.py</code> (the log), <code>appworld_team.py</code> (the teams), <code>analysis/aw_ladder.py</code> (these numbers).`,
+].map((x) => `<li>${x}</li>`).join("");
+</script>
