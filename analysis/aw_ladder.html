@@ -342,7 +342,7 @@ function bars(svgId, tipId, boxId, rows, opts) {
     s += `<rect x="${left}" y="${y - 7}" width="${Math.max(w, 0.5)}" height="14" rx="4" fill="var(--bar)" opacity="${r.muted ? 0.45 : 1}"><title>${esc(r.tip)}</title></rect>`;
     s += `<rect x="${left}" y="${y - rowH / 2}" width="${W - left - right}" height="${rowH}" fill="transparent" data-tip="${esc(r.tip)}" tabindex="0"/>`;
     for (const d of r.dots || []) s += `<circle cx="${x(d)}" cy="${y}" r="4" fill="var(--ink-2)" stroke="var(--surface)" stroke-width="2" pointer-events="none"/>`;
-    s += `<text class="val" x="${x(r.value) + 8}" y="${y + 4}">${opts.fmt(r.value)}</text>`;
+    s += `<text class="val" x="${opts.valueColumn ? W - right + 16 : x(r.value) + 8}" y="${y + 4}">${opts.fmt(r.value)}</text>`;
   });
   if (opts.ref != null) s += `<line x1="${x(opts.ref)}" x2="${x(opts.ref)}" y1="${top}" y2="${H - 24}" stroke="var(--ref)" stroke-width="2" stroke-dasharray="5 4"/>`;
   svg.innerHTML = svg.querySelector("title").outerHTML + s;
@@ -371,7 +371,7 @@ const ticksTo = (max, step) => { const t = []; for (let v = 0; v <= max + 1e-9; 
   const max = niceMax(Math.max(...levels.map((l) => Math.max(S[l].accuracy, ...Object.values(per[l] || {}))), single ? single.accuracy : 0), 0.1);
   bars("c2", "c2tip", "c2box", levels.map((l) => ({ label: `${l} · ${SHORT[l]}`, value: S[l].accuracy, muted: l === "L4-strict", dots: Object.values(per[l] || {}),
     tip: `${l}: ${pct(S[l].accuracy, 1)} solved; runs ${Object.entries(per[l] || {}).map(([r, v]) => `${r} ${pct(v)}`).join(", ")}` })),
-    { max, ticks: ticksTo(max, 0.1), tick: (t) => pct(t), fmt: (v) => pct(v, 1), ref: single ? single.accuracy : null });
+    { max, ticks: ticksTo(max, 0.1), tick: (t) => pct(t), fmt: (v) => pct(v, 1), ref: single ? single.accuracy : null, valueColumn: true });
   $("c2cap").textContent = `Share of task-runs solved; dots are the individual runs${single ? `, and the dashed line the single agent (${pct(single.accuracy, 1)}, ${single.task_runs} task-runs)` : ""}.`;
   const diffs = [...new Set(levels.flatMap((l) => Object.keys(S[l].by_difficulty)))].sort();
   $("difftable").innerHTML = `<thead><tr><th>Level</th>${diffs.map((d) => `<th class="n">Difficulty ${d}</th>`).join("")}<th class="n">Scenarios fully solved</th><th class="n">Task marked complete</th></tr></thead><tbody>` +
@@ -400,7 +400,7 @@ const ticksTo = (max, step) => { const t = []; for (let v = 0; v <= max + 1e-9; 
     ["Refused: unread entries about the same records (L4)", (s) => f2(s.refused_relevant_read)],
     ["Refused: conflicts with a teammate", (s) => f2(s.refused_no_conflict)],
     ["Unread entries delivered without blocking (L4)", (s) => f2(s.delivered)],
-    ["Claims released: agent stopped", (s) => f2(s.released_stopped)], ["Claims released: expired", (s) => f2(s.released_expired)],
+    ["Claims still open when the agent stopped (claimed, never done)", (s) => f2(s.released_stopped)], ["Claims expired", (s) => f2(s.released_expired)],
     ["Refusal chains of 3 or more", (s) => f2(s.refusal_chains_3plus)], ["Longest refusal chain", (s) => String(s.refusal_chain_max)],
     ["Agents whose last log event was a refusal", (s) => f2(s.stopped_after_refusal)],
     ["Agents reminded to complete the task", (s) => pct(s.reminded, 1)],
