@@ -47,6 +47,17 @@ REMINDER = ("The task is not marked complete: nobody on the team has called apis
             "task is done, call it now (once for the team), with answer=... if the task asks for information. If it "
             "isn't done, continue.")
 OVER = "The task is complete (it has been marked complete). Stop: reply with a short summary, without calling a tool."
+# With the log, completing waits for teammates' open claims: they may finish those changes (nothing else), then it ends.
+COMPLETION_WAL = ("If teammates still hold claims in the write-ahead log when one of you calls complete_task, the call is "
+                  "recorded and the task is marked complete once they have finished those claimed changes. Meanwhile "
+                  "they may only finish what they claimed: no new intents, no other changes.")
+DEFERRED = ("Recorded: the task will be marked complete once your teammates finish the changes they claimed ({claims}). "
+            "Stop now: reply with a short summary, without calling a tool.")
+ALREADY = ("The task has already been marked complete; it ends once teammates finish their claimed changes. Stop: reply "
+           "with a short summary, without calling a tool.")
+FINISHING = ("[Note] A teammate has marked the task complete. You still hold claims in the write-ahead log ({claims}): "
+             "finish those changes, then stop and reply with a short summary. New intents are not accepted now, and "
+             "only changes you claimed are allowed.")
 
 
 class Adapter:
@@ -108,6 +119,7 @@ class Team:
         self.lock = threading.RLock()       # the log's lock (writes are committed under it)
         self.jobs = queue.Queue()           # code cells waiting for the main thread
         self.done_agents, self.over, self.expired = set(), False, False
+        self.finishing, self.notified = None, set()  # a recorded complete_task waiting for teammates' open claims
         self.reminded, self.waits = Counter(), []
         work = Path(os.environ.get("WORK", f"/scratch/{getpass.getuser()}"))
         self.wal_path = work / "wal" / run_dir.name / f"{task_id}.jsonl"
@@ -127,7 +139,8 @@ class Team:
             self.shells[me] = shell
         self.base_shell = base
         sup = self.world.task.supervisor
-        channels = NO_CHANNELS if not level else NO_CHANNELS_WAL + "\n\n" + wal2.text(level, claim_ttl)
+        channels = (NO_CHANNELS if not level
+                    else NO_CHANNELS_WAL + "\n\n" + wal2.text(level, claim_ttl) + "\n" + COMPLETION_WAL)
         self.agents = {}
         for me in self.ids:
             tools = {"execute_python": (lambda code, me=me: self.execute(me, code), aw._schema(
@@ -177,15 +190,70 @@ class Team:
             if not self.log:
                 return execute()
             with self.lock:
+                if (app, api) == ("supervisor", "complete_task"):
+                    reply = self._complete(me, action, execute)
+                    if reply is not None:
+                        return reply
                 return self.log.commit(me, action, execute)
         call.__name__ = api
         return call
 
+    # ---- completing, with the log: wait for teammates' open claims ----------------------------------------------
+    def _held(self, me):
+        """Teammates' open claims, {agent: [claim text]} (the caller holds the lock)."""
+        self.log._expire()
+        return {a: [c.show() for c in cs] for a, cs in self.log.claims.items() if a != me and cs}
+
+    def _complete(self, me, action, execute):
+        """complete_task with the log. If teammates hold open claims, record the call (it runs once those claims are
+        done, released or expired) and return the caller's reply; otherwise return None, to complete now."""
+        if self.finishing:
+            print(ALREADY)
+            return {"message": ALREADY}
+        held = self._held(me)
+        if not held:
+            return None
+        t = round(wal2.now() - self.t0, 2)
+        self.finishing = {"agent": me, "action": action, "execute": execute, "t": t, "held": held,
+                          "seq": len(self.events)}
+        self.log.finishing = True
+        self.log._write({"kind": "complete_requested", "agent": me, "t": t, "waiting_for": held})
+        self.event(me, "complete_deferred", waiting_for=held)
+        msg = DEFERRED.format(claims="; ".join(f"{a}: {', '.join(cs)}" for a, cs in held.items()))
+        print(msg)
+        return {"message": msg}
+
+    def _maybe_finish(self, force=False):
+        """On the main thread: run the recorded complete_task once no teammate holds an open claim (force: at the end,
+        whatever is left)."""
+        if not self.finishing or self.over or "ended" in self.finishing:
+            return
+        with self.lock:
+            me = self.finishing["agent"]
+            if self._held(me) and not force:
+                return
+            self.finishing["ended"] = round(wal2.now() - self.t0, 2)
+            try:
+                self.log.commit(me, self.finishing["action"], self.finishing["execute"])
+            except Exception as ex:  # logged as a failed change by commit
+                self.event(me, "complete_failed", error=str(ex).strip()[:200])
+        if self.world.task_completed():
+            self.over = True
+
+    def _blocked(self, me):
+        """The reply instead of running an agent's cell, or None to run it."""
+        if self.over:
+            return OVER
+        if self.finishing and (me == self.finishing["agent"] or not self.log.claims.get(me)):
+            return OVER
+        return None
+
     # ---- code execution, on the main thread ---------------------------------------------------------------------
     def execute(self, me, code):
         """Called from an agent's thread: queue the cell for the main thread and wait for its output."""
-        if self.over:
-            return OVER
+        blocked = self._blocked(me)
+        if blocked:
+            return blocked
         if self.expired:
             return "The team's time for this task is up. Stop: reply with a short summary, without calling a tool."
         box = {"queued": wal2.now()}
@@ -197,9 +265,16 @@ class Team:
     def _run_cell(self, me, code, box):
         box["waited"] = wal2.now() - box["queued"]
         self.waits.append(box["waited"])
-        if self.over:
-            box["out"] = OVER
+        if self.finishing:
+            with self.lock:
+                self.log._expire()
+        blocked = self._blocked(me)
+        if blocked:
+            box["out"] = blocked
             return
+        # an agent still finishing its claims hears once that a teammate marked the task complete
+        notice = (FINISHING.format(claims=", ".join(c.show() for c in self.log.claims.get(me, [])))
+                  if self.finishing and me not in self.notified else None)
         self.world.shell = self.shells[me]
         try:
             out = self.world.execute(code)
@@ -209,6 +284,9 @@ class Team:
             self.world.shell = self.base_shell
         if self.world.task_completed():
             self.over = True
+        if notice:
+            self.notified.add(me)
+            out = notice + "\n\n" + out
         self.event(me, "tool", tool="execute_python", code=code[:1500], out=out[:600], waited=round(box["waited"], 3))
         box["out"] = out
 
@@ -219,7 +297,7 @@ class Team:
         try:
             r = agent.run(prompt)
             left = self.max_turns - agent.stats["turns"]
-            if r["stop"] == "final" and not self.over and not self.expired and left > 0:
+            if r["stop"] == "final" and not self.over and not self.finishing and not self.expired and left > 0:
                 self.reminded[me] += 1
                 agent.max_turns = left
                 r = agent.send(REMINDER)
@@ -246,11 +324,13 @@ class Team:
             try:
                 job = self.jobs.get(timeout=1)
             except queue.Empty:
-                continue
+                job = None
             if job is not None:
                 me, code, box, done = job
                 self._run_cell(me, code, box)
                 done.set()
+            self._maybe_finish()
+        self._maybe_finish(force=True)  # everyone stopped: their claims are released, so a recorded completion runs
         while not self.jobs.empty():  # release anyone still waiting (only possible after a crash)
             job = self.jobs.get()
             if job is not None:
@@ -321,6 +401,12 @@ class Team:
                 "cell_wait_mean": round(sum(self.waits) / len(self.waits), 3) if self.waits else 0,
                 "cell_wait_max": round(max(self.waits), 3) if self.waits else 0}
         comm.update(self._concurrency())
+        f = self.finishing or {}
+        comm.update({"completion_deferred": int(bool(f)),
+                     "finish_wait": round(f.get("ended", f["t"]) - f["t"], 2) if f else 0.0,
+                     "finish_held": sum(len(v) for v in f.get("held", {}).values()),
+                     "finish_writes": sum(e["ok"] and e["api"] != "complete_task" and e["seq"] > f["seq"]
+                                          for e in writes) if f else 0})
         if self.log:
             comm.update(self.log.counts(self.events))
             self.log.close(copy_to=self.wal_copy)

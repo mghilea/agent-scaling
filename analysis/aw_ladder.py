@@ -28,7 +28,7 @@ LEVELS = [("L0", "No log"), ("L1", "Log, nothing enforced"), ("L2", "Claims requ
           ("L4v0-strict", "Earlier L4 with catch-up on every entry")]
 STEPS = [("L0", "L1"), ("L1", "L2"), ("L2", "L3"), ("L3", "L4"), ("L0", "L4"), ("L0", "L3"),
          ("L3", "L4v0"), ("L4v0-strict", "L4v0")]
-RULES = ["intent", "read_before_post", "read_before_write", "relevant_read", "no_conflict", "no_redo"]
+RULES = ["intent", "read_before_post", "read_before_write", "relevant_read", "no_conflict", "no_redo", "finishing"]
 
 
 def run_dirs(level, dataset, tag):
@@ -87,6 +87,8 @@ def summary(rows):
            "delivered": mean("wal_delivered"), "refusal_chains_3plus": mean("refusal_chains_3plus"),
            "refusal_chain_max": max((m(r, "refusal_chain_max") for r in rows), default=0),
            "stopped_after_refusal": mean("stopped_after_refusal"),
+           "completion_deferred": mean("completion_deferred"), "finish_wait": mean("finish_wait"),
+           "finish_writes": mean("finish_writes"),
            "by_difficulty": {str(dif): {"n": len(g), "accuracy": st.mean(int(bool(r["correct"])) for r in g)}
                              for dif in sorted({r.get("difficulty") for r in rows if r.get("difficulty")})
                              for g in [[r for r in rows if r.get("difficulty") == dif]]}}

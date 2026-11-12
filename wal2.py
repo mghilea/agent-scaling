@@ -121,6 +121,8 @@ class Log:
         self.intent = {}               # agent -> id of its current intent
         self.claims = {}               # agent -> open claims of its current intent
         self.done = {}                 # Action.key -> (agent, entry id) of writes that went through
+        self.finishing = False         # the task was marked complete while teammates held claims: no new intents,
+                                       # and only writes an agent has claimed (set by the team, see appworld_team.py)
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._file = open(self.path, "a", encoding="utf-8")
@@ -288,6 +290,10 @@ class Log:
             return error
         with self.lock:
             self._expire()
+            if self.finishing:
+                self.event(me, "wal_refused", rule="finishing", at="post")
+                return ("[WAL] Not posted: a teammate has marked the task complete. No new intents now: finish the "
+                        "changes you already claimed, then stop.")
             if "read_before_post" in self.rules:
                 unseen, n = self.catch_up(me)
                 if n:
@@ -356,6 +362,10 @@ class Log:
         if not action.exempt:
             mine = self.claims.get(me, [])
             claim = next((c for c in mine if self._matches(c, action)), None)
+            if self.finishing and claim is None:
+                self.event(me, "wal_refused", rule="finishing", call=action.call)
+                raise Refused("[WAL] Refused: a teammate has marked the task complete; only changes you had already "
+                              "claimed are allowed now. Nothing was changed.")
             if "intent" in self.rules and claim is None:
                 rule = "intent"
                 self.event(me, "wal_refused", rule=rule, call=action.call)
@@ -434,7 +444,7 @@ class Log:
         return {"wal_level": self.level, "wal_intents": kinds["wal_intend"], "wal_reads": kinds["wal_read"],
                 "wal_changes": sum(e["kind"] == "change" for e in self.entries),
                 **{f"wal_refused_{r}": refused[r] for r in ("intent", "read_before_post", "read_before_write",
-                                                            "relevant_read", "no_conflict", "no_redo")},
+                                                            "relevant_read", "no_conflict", "no_redo", "finishing")},
                 "wal_delivered": kinds["wal_delivered"],
                 **{f"wal_released_{r}": releases[r] for r in ("stopped", "expired")}}
 
