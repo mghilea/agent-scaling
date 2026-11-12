@@ -134,6 +134,7 @@ def main():
            "steps": {f"{a}->{b}": compare(data[a], data[b]) for a, b in STEPS}}
     single = [json.loads(line) for d in glob.glob(str(ROOT / "runs" / f"*-sas-rc-appworld-{dataset}-*-base02"))
               for line in open(Path(d, "results.jsonl"))]
+    single = [r for r in single if r["id"] in {k[1] for k in common}]  # the same tasks as the teams
     if single:
         out["single"] = {"task_runs": len(single), "accuracy": st.mean(int(bool(r["correct"])) for r in single),
                          "seconds": st.mean(r["seconds"] for r in single),
