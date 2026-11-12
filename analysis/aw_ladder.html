@@ -115,9 +115,14 @@ a { color: var(--accent); }
     <div class="cards" id="cards"></div>
   </header>
 
+  <section id="findings-sec">
+    <div class="sectionhead"><h2>Key findings so far</h2></div>
+    <ul class="points" id="findings"></ul>
+  </section>
+
   <section id="levels">
     <div class="sectionhead">
-      <h2>Five levels of enforcement</h2>
+      <h2>Levels of enforcement</h2>
       <p>Each level keeps what the previous one enforces and adds one rule. How the log works is on the <a href="https://claude.ai/artifact/DF9Rz6mCMTTUx49jBS5Y4h">design page</a>.</p>
     </div>
     <div class="tablewrap"><table class="wide">
@@ -127,7 +132,7 @@ a { color: var(--accent); }
         <tr><td><span class="lvl">L1</span> Log, agents aware of it</td><td><span class="pill ask">Asked, not checked</span></td><td><span class="pill ask">Asked, not checked</span></td><td>–</td></tr>
         <tr><td><span class="lvl">L2</span> Intent required</td><td><span class="pill on">Enforced</span></td><td>–</td><td>–</td></tr>
         <tr><td><span class="lvl">L3</span> + Catch-up</td><td><span class="pill on">Enforced</span></td><td><span class="pill on">Enforced</span></td><td>–</td></tr>
-        <tr><td><span class="lvl">L4</span> + Conflicts refused</td><td><span class="pill on">Enforced</span></td><td><span class="pill on">Enforced</span></td><td><span class="pill on">Enforced</span></td></tr>
+        <tr><td><span class="lvl">L4</span> + Conflicts refused<br><span class="pill rel">Proposed</span></td><td><span class="pill on">Enforced</span></td><td><span class="pill on">Enforced</span></td><td><span class="pill on">Enforced</span></td></tr>
       </tbody>
     </table></div>
   </section>
@@ -238,7 +243,7 @@ if (S.L0 && S[topLvl]) {
   $("lede").textContent = `Without a log, ${pct(c0)} of task-runs had agents redo or collide with a teammate's work. ` +
     `With intents required and catch-up enforced (${topLvl}), ${pct(c1)} did. ` +
     `Accuracy went from ${pct(a0)} to ${pct(a1)}, against ${single ? pct(single.accuracy) : "–"} for a single agent on the same tasks.` +
-    (topLvl === "L3" ? " L4 is being rerun and will be added here." : "");
+    (topLvl === "L3" ? " L4 is proposed and hasn't been run yet." : "");
   const cards = [
     ["Task-runs with a conflict", `${pct(c0)}<span class="arrow">→</span>${pct(c1)}`, `no log → ${topLvl}`],
     ["Accuracy", `${pct(a0)}<span class="arrow">→</span>${pct(a1)}`, `no log → ${topLvl}; single agent ${single ? pct(single.accuracy) : "–"}`],
@@ -246,6 +251,18 @@ if (S.L0 && S[topLvl]) {
     ["Refusals per task-run", `${S[topLvl].refusals.toFixed(1)}`, `at ${topLvl} (L2: ${S.L2 ? S.L2.refusals.toFixed(1) : "–"})`],
   ];
   $("cards").innerHTML = cards.map(([a, b, c]) => `<div class="card"><span class="k">${a}</span><span class="v">${b}</span><p>${c}</p></div>`).join("");
+}
+
+// ---- key findings (computed, so they follow the data) ----
+{
+  const out = [], f1 = (x) => Math.abs(100 * x).toFixed(1);
+  const a12 = step("L1", "L2"), a23 = step("L2", "L3"), a03 = step("L0", "L3");
+  if (S.L1 && S.L2 && S.L3 && a23) out.push(`<b>Catch-up is what removes conflicts.</b> Requiring intents alone takes task-runs with a conflict from ${pct(S.L1.any_conflict, 1)} (L1) to ${pct(S.L2.any_conflict, 1)} (L2); adding catch-up takes them to ${pct(S.L3.any_conflict, 1)} (L3, ${pv(a23.any_conflict.p)}).`);
+  if (a12 && a23) out.push(`<b>Requiring intents costs accuracy.</b> ${sg(a12.correct.diff)}${f1(a12.correct.diff)} points from L1 to L2 (${pv(a12.correct.p)}), and catch-up doesn't win it back (${sg(a23.correct.diff)}${f1(a23.correct.diff)} points, ${a23.correct.p < 0.05 ? pv(a23.correct.p) : "not significant"}).`);
+  if (a03) out.push(`<b>Enforcement costs time and tokens.</b> From no log to L3: ${sg(a03.seconds[0])}${Math.abs(a03.seconds[0]).toFixed(0)} s per task (${sg(a03.seconds[0])}${(100 * Math.abs(a03.seconds[0]) / S.L0.seconds).toFixed(0)}%) and ${sg(a03.tokens.diff)}${k(Math.abs(a03.tokens.diff))} tokens.`);
+  if (S.L0 && S.L2) out.push(`<b>A likely reason for the accuracy loss, still to be checked: agents do less.</b> Writes fall from ${S.L0.writes.toFixed(1)} to ${S.L2.writes.toFixed(1)} per task-run once intents are required, and at L2 about ${S.L2.released_stopped.toFixed(0)} claims per task-run are still open when their agent stops.`);
+  if (single && S.L0) out.push(`<b>Team vs one agent.</b> A three-agent team without the log solves ${pct(S.L0.accuracy, 1)} of tasks, against ${pct(single.accuracy, 1)} for a single agent, using ${(S.L0.tokens / single.tokens).toFixed(1)}× the tokens.`);
+  $("findings").innerHTML = out.map((x) => `<li>${x}</li>`).join("");
 }
 
 // ---- results by level ----
