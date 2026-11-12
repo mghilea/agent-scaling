@@ -16,6 +16,9 @@
 # VLLM_GPU_UTIL (share of GPU memory for the model, default 0.9, or 0.7 with BROWSECOMP).
 # BROWSECOMP=1 also sets up BrowseComp-Plus (agent.py --benchmark browsecomp): its documents, search index and
 # questions in /scratch/$USER/browsecomp, and its query embedder as a second vLLM on port PORT+1 (EMBED_PORT).
+# APPWORLD=1 also sets up AppWorld (agent.py --benchmark appworld): its own venv ($APPWORLD_PYTHON; its pinned
+# dependencies would clash with vLLM's, so run agent.py with that Python) and its data in /scratch/$USER/appworld
+# ($APPWORLD_ROOT). The data must not be redistributed unencrypted: keep it out of git and off artifact pages.
 # For unattended runs, use run.sbatch instead, which sources this for you.
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
@@ -94,6 +97,9 @@ _agent_setup() {
     fi
     if [[ -n "$BROWSECOMP" ]]; then
         _browsecomp_data || { exec {lock}>&-; return 1; }
+    fi
+    if [[ -n "$APPWORLD" ]]; then
+        _appworld || { exec {lock}>&-; return 1; }
     fi
     exec {lock}>&-  # closing the file releases the lock
 
@@ -228,6 +234,27 @@ _browsecomp_embedder() {
             sleep 5
         done
         echo "    embedder ready ($(( SECONDS - start ))s)"
+    fi
+}
+
+# AppWorld: its package in a venv of its own, the encrypted part of its code unpacked (`appworld install`), and its
+# data. The venv is rebuilt if appworld or openai no longer imports (e.g. after the /scratch purge).
+_appworld() {
+    export APPWORLD_ROOT="$WORK/appworld" APPWORLD_PYTHON="$WORK/appworld-venv/bin/python"
+    local version="${APPWORLD_VERSION:-0.1.3.post1}"
+    if ! "$APPWORLD_PYTHON" -c "import appworld, openai" >/dev/null 2>&1 || [[ ! -f "$WORK/appworld-venv/.unpacked" ]]; then
+        echo "==> Installing AppWorld $version"
+        rm -rf "$WORK/appworld-venv"
+        uv venv --python 3.11 "$WORK/appworld-venv" || return 1
+        uv pip install --python "$APPWORLD_PYTHON" "appworld==$version" openai || return 1
+        (cd "$WORK" && "$WORK/appworld-venv/bin/appworld" install) || return 1
+        touch "$WORK/appworld-venv/.unpacked"
+    fi
+    mkdir -p "$APPWORLD_ROOT" || return 1
+    if ! _intact "$APPWORLD_ROOT/data"; then
+        echo "==> Downloading AppWorld data"
+        (cd "$APPWORLD_ROOT" && "$WORK/appworld-venv/bin/appworld" download data --root "$APPWORLD_ROOT") || return 1
+        _mark_intact "$APPWORLD_ROOT/data"
     fi
 }
 

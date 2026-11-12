@@ -104,18 +104,30 @@ TOOLS = {
 }
 
 
-def call_tool(name: str, arguments: str, tools=TOOLS) -> str:
+def call_tool(name: str, arguments: str, tools=TOOLS, repair=False, max_output=None) -> str:
     if name not in tools:
         return f"[error] unknown tool: {name}"
     try:
         args = json.loads(arguments or "{}")
     except json.JSONDecodeError:
         args = None
+    required = tools[name][1]["function"]["parameters"].get("required", [])
+    if repair and not isinstance(args, dict):
+        # --repair-calls: gpt-oss sometimes writes the arguments as a Python dict, e.g. {"code": """..."""}, which
+        # isn't JSON. Read it as Python instead of running the whole text as code (that "runs" a dict literal).
+        try:
+            args = ast.literal_eval((arguments or "").strip())
+        except (ValueError, SyntaxError, MemoryError, RecursionError):
+            args = None
+    if repair and isinstance(args, dict) and len(required) == 1 and required[0] not in args and len(args) == 1:
+        # ... or garbles the argument's name, e.g. "analysis to=functions.execute_python code" for "code".
+        key = next(iter(args))
+        if key.split()[-1:] == [required[0]] or key.endswith(required[0]):
+            args = {required[0]: args[key]}
     if not isinstance(args, dict):
         # gpt-oss was trained with a built-in python tool that takes raw code, so it
         # often sends the script itself instead of {"code": ...}. For single-argument
         # tools, treat the raw text as that argument rather than burning a turn.
-        required = tools[name][1]["function"]["parameters"].get("required", [])
         if len(required) != 1:
             return "[error] arguments must be a JSON object"
         args = {required[0]: arguments}
@@ -123,8 +135,9 @@ def call_tool(name: str, arguments: str, tools=TOOLS) -> str:
         out = tools[name][0](**args)
     except Exception as e:
         return f"[error] {type(e).__name__}: {e}"
-    if len(out) > MAX_TOOL_OUTPUT:
-        out = out[:MAX_TOOL_OUTPUT] + f"\n[truncated {len(out) - MAX_TOOL_OUTPUT} chars]"
+    limit = max_output or MAX_TOOL_OUTPUT
+    if len(out) > limit:
+        out = out[:limit] + f"\n[truncated {len(out) - limit} chars]"
     return out
 
 
@@ -188,7 +201,7 @@ class Agent:
 
     def __init__(self, client, model, tools=TOOLS, system_prompt=SYSTEM_PROMPT, max_turns=12,
                  reasoning_effort="medium", verbose=True, show_reasoning=False, name="", retry_malformed=False,
-                 repair_calls=False):
+                 repair_calls=False, max_tool_output=None):
         self.client = client
         self.model = model
         self.tools = tools
@@ -204,6 +217,7 @@ class Agent:
         # --repair-calls (WorkBench): also retry an empty reply, which is almost always a call the parser dropped
         # (its reasoning ends "Let's do wal_append."), and strip stray characters from tool names.
         self.repair_calls = repair_calls
+        self.max_tool_output = max_tool_output  # characters of a tool result the model sees (default MAX_TOOL_OUTPUT)
         self.messages = [{"role": "system", "content": system_prompt}]
         self.stats = new_stats()
         self.limit_hits = 0  # times a send() stopped at max_turns
@@ -261,7 +275,8 @@ class Agent:
             self.messages.append(entry)
             for tc in msg.tool_calls:
                 self.log(_block(tc.function.name, _show_args(tc.function.arguments), CYAN, limit=3000))
-                out = call_tool(tc.function.name, tc.function.arguments, self.tools)
+                out = call_tool(tc.function.name, tc.function.arguments, self.tools, repair=self.repair_calls,
+                                max_output=self.max_tool_output)
                 failed = out.startswith("[error]") or "[exit code" in out
                 with self._stats_lock:
                     self.stats["tool_calls"] += 1
@@ -359,9 +374,12 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--base-url", default="http://localhost:8000/v1")
     ap.add_argument("--model", help="vLLM's --served-model-name (default: whatever the server is running)")
-    ap.add_argument("--benchmark", default="toy", choices=["toy", "workbench", "browsecomp"],
+    ap.add_argument("--benchmark", default="toy", choices=["toy", "workbench", "browsecomp", "appworld"],
                     help="toy: the task file (--tasks); workbench: WorkBench tasks, scored by its evaluator; "
-                         "browsecomp: BrowseComp-Plus questions (the paper's 100), graded by an LLM judge")
+                         "browsecomp: BrowseComp-Plus questions (the paper's 100), graded by an LLM judge; "
+                         "appworld: AppWorld tasks (run with $APPWORLD_PYTHON), scored by its evaluator")
+    ap.add_argument("--dataset", default="dev", choices=["train", "dev", "test_normal", "test_challenge"],
+                    help="appworld: which split")
     ap.add_argument("--tasks", default=str(ROOT / "tasks.jsonl"))
     ap.add_argument("--only", help="run just the task with this id")
     ap.add_argument("--limit", type=int, help="workbench: run a random sample of this many tasks; "
@@ -371,7 +389,7 @@ def main():
                     help="browsecomp, multi-agent: split the document collection into this many parts, one per agent "
                          "(strict: an agent can only search and open its own part)")
     ap.add_argument("--offset", type=int, default=0,
-                    help="browsecomp: skip this many questions first (to split a run across jobs with --limit)")
+                    help="browsecomp, appworld: skip this many tasks first (to split a run across jobs with --limit)")
     ap.add_argument("--domain", action="append", help="workbench: only this domain (repeatable), e.g. email")
     ap.add_argument("--min-changes", type=int, default=0,
                     help="workbench: only tasks whose correct answer makes at least this many changes")
@@ -420,7 +438,7 @@ def main():
     ap.add_argument("--tag", help="suffix for the run directory, e.g. rep03, so parallel repeats get distinct names")
     args = ap.parse_args()
 
-    wb = bc = None
+    wb = bc = aw = None
     if args.ask:
         tasks = [{"id": "ask", "question": args.ask}]
     elif args.benchmark == "workbench":
@@ -429,6 +447,9 @@ def main():
     elif args.benchmark == "browsecomp":
         import browsecomp as bc
         tasks = bc.load_tasks(args.limit, offset=args.offset)
+    elif args.benchmark == "appworld":
+        import appworld_bench as aw
+        tasks = aw.load_tasks(args.dataset, args.limit, args.offset, args.seed)
     else:
         tasks = [json.loads(line) for line in open(args.tasks) if line.strip()]
     if args.only:
@@ -437,7 +458,7 @@ def main():
         sys.exit("no tasks to run")
     multi = args.topology != "single"
     if multi and not (wb or bc):
-        sys.exit("the multi-agent topologies need --benchmark workbench or browsecomp")
+        sys.exit("the multi-agent topologies need --benchmark workbench or browsecomp (appworld: single agent so far)")
     if args.wal and not (wb and multi):
         sys.exit("--wal needs --benchmark workbench and a multi-agent topology")
     if (args.wal_piggyback or args.wal_drafts or args.wal_mode != "full") and not (args.wal and args.topology == "agent-driven"):
@@ -453,7 +474,7 @@ def main():
     if not args.model:
         args.model = client.models.list().data[0].id
 
-    args.max_turns = args.max_turns or (20 if wb else 30 if bc else 12)
+    args.max_turns = args.max_turns or (20 if wb else 30 if bc else 50 if aw else 12)
     driven = args.topology == "agent-driven"
     if multi and not driven:
         import mas
@@ -467,7 +488,7 @@ def main():
     topo_name += "-np" if args.no_pause else ""
     topo_name += f"-tb{args.turn_budget}" if args.turn_budget else ""
     kind = "ask" if args.ask else ("sas" if not multi else topo_name) + ("-rc" if args.repair_calls else "") + \
-        ("-workbench" if wb else "-browsecomp" if bc else "")
+        ("-workbench" if wb else "-browsecomp" if bc else f"-appworld-{args.dataset}" if aw else "")
     run_dir = ROOT / "runs" / f"{datetime.now():%Y%m%d-%H%M%S}-{kind}-{args.model}{'-' + args.tag if args.tag else ''}"
     (run_dir / "traces").mkdir(parents=True)
     (run_dir / "config.json").write_text(json.dumps({"git_commit": git_commit(), **vars(args)}, indent=2))
@@ -475,7 +496,8 @@ def main():
     def make_agent(**kwargs):
         return Agent(client, args.model, max_turns=args.max_turns, reasoning_effort=args.reasoning_effort,
                      verbose=not args.quiet, show_reasoning=args.show_reasoning,
-                     retry_malformed=bool(bc) or args.repair_calls, repair_calls=args.repair_calls, **kwargs)
+                     retry_malformed=bool(bc) or args.repair_calls, repair_calls=args.repair_calls,
+                     max_tool_output=aw.MAX_TOOL_OUTPUT if aw else None, **kwargs)
 
     def log_message(label, text):  # messages between agents, in multi-agent runs
         if not args.quiet:
@@ -505,6 +527,9 @@ def main():
                 sandbox = wb.Sandbox()
                 r = make_agent(tools=sandbox.tools, system_prompt=wb.SYSTEM_PROMPT).run(t["question"])
                 actions = sandbox.actions
+            elif aw:
+                session = aw.Session(t["id"], experiment_name=run_dir.name)
+                r = make_agent(tools=session.tools, system_prompt=session.system_prompt()).run(session.task_prompt())
             elif bc:
                 session = bc.Session()
                 agent = make_agent(tools=session.tools, system_prompt=bc.system_prompt())
@@ -527,6 +552,14 @@ def main():
             verdict = {"judgment": judgment, "answer_in_response": bc.answer_in_response(response, t["answer"]),
                        **bc.retrieval_stats(r.pop("sessions", None) or ([session] if session else []), t)}
             answer, expected = response, t["answer"]
+        elif aw:
+            # Scored on the final state of the task's databases (and the answer given to complete_task).
+            if session is None:  # the world never opened
+                verdict = {"correct": False, "tests_passed": 0, "tests": None, "difficulty": None, "completed": False}
+            else:
+                verdict = session.score()
+                session.close()
+            correct, answer, expected = verdict["correct"], r["final"], None
         elif wb:
             # Scored on what the agents did (their tool calls), not on what they said.
             verdict = wb.score(actions, t["outcome"], error=r["stop"] != "final")
@@ -559,6 +592,9 @@ def main():
                      f"reads={verdict['reads']} evidence_found={verdict['evidence_found']}")
         elif wb:
             shown = f"actions={answer}  expected={expected}  side_effects={verdict['side_effects']}"
+        elif aw:
+            shown = (f"tests={verdict['tests_passed']}/{verdict['tests']} completed={verdict['completed']} "
+                     f"difficulty={verdict['difficulty']}")
         else:
             shown = f"answer={answer!r}" + (f" expected={expected!r}" if "answer" in t else "")
         extra = f"agents={row['agents']} rounds={row['rounds']} messages={row['agent_messages']} " if multi else ""
@@ -575,6 +611,7 @@ def main():
         "tasks": n,
         "accuracy": round(sum(r["correct"] for r in scored) / len(scored), 3) if scored else None,
         **({"side_effect_rate": round(sum(r["side_effects"] for r in rows) / n, 3)} if wb else {}),
+        **({"scenario_goal_completion": round(aw.scenario_completion(rows), 3)} if aw else {}),
         "mean_turns": round(sum(r["turns"] for r in rows) / n, 2),
         "mean_tool_calls": round(sum(r["tool_calls"] for r in rows) / n, 2),
         "total_tool_errors": sum(r["tool_errors"] for r in rows),

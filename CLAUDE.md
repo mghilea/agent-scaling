@@ -21,6 +21,10 @@ Qwen3-Embedding-4B index, graded by the local model with the paper's grader prom
 `source setup.sh` (or `sbatch --export=ALL,BROWSECOMP=1 run.sbatch ...`) downloads it into `/scratch/$USER/browsecomp`
 and serves the query embedder as a second vLLM on PORT+1; `browsecomp_check.py` checks search. The decrypted
 questions must never leave `/scratch`: not in git, not on artifact pages.
+Third benchmark, started 2026-11-11: AppWorld (`appworld_bench.py`, `agent.py --benchmark appworld --dataset dev|test_normal|test_challenge`,
+single agent so far): 9 apps driven by Python code through 457 APIs, scored by AppWorld's own state-based tests. It runs in its own
+venv (`$APPWORLD_PYTHON`, built by `APPWORLD=1 source setup.sh`; `run.sbatch` does this for `--benchmark appworld`), with data in
+`/scratch/$USER/appworld`. Its license requires encrypted redistribution, so task contents stay out of git and off artifact pages.
 
 ## Cluster: Princeton CS Neuronic (Slurm)
 - Nodes: 8x NVIDIA L40 (46 GB each, PCIe, no NVLink), 512 GB RAM, 3.5 TB local SSD at `/scratch`,
