@@ -27,7 +27,7 @@ LEVELS = [("L0", "No log"), ("L1", "Log, nothing enforced"), ("L2", "Claims requ
           ("L4v0", "Earlier L4: relevant catch-up, open claims and done work refused"),
           ("L4v0-strict", "Earlier L4 with catch-up on every entry")]
 STEPS = [("L0", "L1"), ("L1", "L2"), ("L2", "L3"), ("L3", "L4"), ("L0", "L4"), ("L0", "L3"),
-         ("L3", "L4v0"), ("L4v0-strict", "L4v0")]
+         ("L3", "L4v0-strict"), ("L0", "L4v0-strict"), ("L3", "L4v0"), ("L4v0-strict", "L4v0")]
 RULES = ["intent", "read_before_post", "read_before_write", "relevant_read", "no_conflict", "no_redo", "finishing"]
 
 

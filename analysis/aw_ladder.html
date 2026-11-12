@@ -118,55 +118,51 @@ a { color: var(--accent); }
   <section id="design">
     <div class="sectionhead">
       <h2>The write-ahead log</h2>
-      <p>Three agents get the same AppWorld task and work on the same apps and accounts. They cannot message each other. From level 1 on, they share a write-ahead log: an append-only record of what each agent intends to change and of every change made.</p>
-    </div>
-    <div class="diagram" role="img" aria-label="Agents read and post to the log service; every write to the apps passes through it; the service appends to a log file">
-      <div class="dg">
-        <div class="box"><b>Agents 1–3</b><span>Each writes Python in its own shell and calls the apps through <code>apis</code>. Log tools: <code>wal_read</code>, <code>wal_intend</code>.</span></div>
-        <div class="arrow">→</div>
-        <div class="box core"><b>Log service</b>
-          <ul>
-            <li>the level's rules, checked before every post and every write</li>
-            <li>one lock: check, write and log entry happen as one step</li>
-            <li>each agent's read position, current intent and open claims</li>
-          </ul>
-        </div>
-        <div class="arrow">→</div>
-        <div class="box"><b>AppWorld apps</b><span>One shared world: the same databases for all three agents, graded once at the end by AppWorld's tests.</span></div>
-        <div class="down">↓</div>
-        <div class="file">wal/&lt;task&gt;.jsonl · one JSON entry per line, forced to disk</div>
-      </div>
-    </div>
-    <div class="steps">
-      <div class="step"><b>Intent</b><span>Posted by an agent: a plan and one claim per change, naming the app, the API and its target (a record's id, or a description of something new).</span></div>
-      <div class="step"><b>Change</b><span>Recorded by the harness for every write, with its outcome. A pending line goes to disk before the write runs.</span></div>
-      <div class="step"><b>Release</b><span>Recorded by the harness when an agent's claims close because it stopped or the claims expired (90 s).</span></div>
+      <p>Three agents get the same AppWorld task and work on the same apps and accounts. They cannot message each other. From level 1 on, they share a write-ahead log. Figures of the design are on the <a href="https://claude.ai/artifact/DF9Rz6mCMTTUx49jBS5Y4h">design page</a>.</p>
     </div>
     <ul class="points">
-      <li>Reads go straight to the apps. Writes (any API call that changes something, apart from logging in and out) pass through the log service, which checks the level's rules, records the pending line, runs the write and records the change under one lock. A refused write raises an error in the agent's code that says why, and nothing changes.</li>
-      <li>Agents' code runs one cell at a time; their model calls run in parallel. Agents can only append intents; the harness writes every other entry, and no entry is ever edited.</li>
-      <li>The first <code>complete_task</code> call finishes the task for the team. It is logged, and no rule applies to it.</li>
+      <li><b>An append-only file</b> of JSON entries, forced to disk after each append. Entries are <code>INTENT</code> (an agent's plan and its claims) or <code>CHANGE</code> (a write, recorded by the harness with its result).</li>
+      <li><b>A log service between the agents and the tools.</b> Every write passes through it, which is what lets it enforce the rules. It keeps an in-memory index with each agent's read position (its cursor).</li>
+      <li><b>Claims</b> are posted inside an intent with <code>wal_intend(plan, claims)</code>, each of the form <code>{app, api, target}</code>: fine-grained locks on the records an agent will change.</li>
+      <li><b>The first <code>complete_task</code> call ends the run.</b> This stops stragglers, but an agent can end the task while teammates are still partway through their work.</li>
+      <li><b>Piggybacking</b> (a flag, planned): send unread log entries back with every <code>execute_python</code> result, so that agents are caught up before they act and catch-up rules rarely refuse them. It should change latency, not accuracy.</li>
     </ul>
-    <figure>
-      <figcaption>An illustration of the log's format (made-up records, not from an AppWorld task):</figcaption>
-      <div class="log">
-<div class="intent">#1 agent_1 INTENT: tidy the shared notes | claims: simple_note.update_note 41, 42</div>
-<div class="intent">#2 agent_3 INTENT: archive last year's notes | claims: simple_note.delete_note 17</div>
-<div>#3 agent_1 CHANGE (intent #1): simple_note.update_note(note_id=41, ...) -> done</div>
-<div class="side">   agent_2 posts a claim on note 41 → refused at L4: agent_1 claimed it (intent #1)</div>
-<div>#4 agent_1 CHANGE (intent #1): simple_note.update_note(note_id=42, ...) -> done</div>
-<div class="rel">#5 RELEASE agent_3's claim simple_note.delete_note 17 (stopped)</div>
-      </div>
-    </figure>
   </section>
 
   <section id="levels">
     <div class="sectionhead">
       <h2>Five levels of enforcement</h2>
-      <p>Each level keeps what the previous one enforces and adds one rule, except level 4, which changes how catching up works. L4-strict is run alongside as a comparison.</p>
+      <p>Each level keeps what the previous one enforces and adds one rule.</p>
     </div>
-    <div class="tablewrap"><table class="wide" id="levelstable"></table></div>
-    <p class="note">Catching up means reading every log entry the agent hasn't seen. A refusal for unread entries shows the agent what it missed, then it may retry. At L4, only unread entries about the same records (or, for new items, the same API) block a post or write; the rest are shown with the result. A conflict is a record a teammate has claimed or already changed, or a new item a teammate has claimed or already created.</p>
+    <div class="tablewrap"><table class="wide">
+      <thead><tr><th>Level</th><th>Declare an intent before acting</th><th>Catch up on the log before posting or writing</th><th>Refuse a conflict with an open claim</th></tr></thead>
+      <tbody>
+        <tr><td><span class="lvl">L0</span> No log</td><td>–</td><td>–</td><td>–</td></tr>
+        <tr><td><span class="lvl">L1</span> Log, agents aware of it</td><td><span class="pill ask">Asked, not checked</span></td><td><span class="pill ask">Asked, not checked</span></td><td>–</td></tr>
+        <tr><td><span class="lvl">L2</span> Intent required</td><td><span class="pill on">Enforced</span></td><td>–</td><td>–</td></tr>
+        <tr><td><span class="lvl">L3</span> + Catch-up</td><td><span class="pill on">Enforced</span></td><td><span class="pill on">Enforced</span></td><td>–</td></tr>
+        <tr><td><span class="lvl">L4</span> + Conflicts refused</td><td><span class="pill on">Enforced</span></td><td><span class="pill on">Enforced</span></td><td><span class="pill on">Enforced</span></td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="validity">
+    <div class="sectionhead">
+      <h2>Are the 2026-11-11 runs still valid?</h2>
+      <p>The five runs of 2026-11-11 (lad02–lad06, all on the same log code) checked against the intended design above.</p>
+    </div>
+    <div class="tablewrap"><table class="wide">
+      <thead><tr><th>Part of the design</th><th>What the runs did</th><th>Verdict</th></tr></thead>
+      <tbody>
+        <tr><td><span class="lvl">L0</span> <span class="lvl">L1</span> <span class="lvl">L2</span> <span class="lvl">L3</span></td><td>As intended.</td><td><span class="pill on">Valid</span></td></tr>
+        <tr><td><span class="lvl">L4</span></td><td>Not run as intended. Two earlier variants ran instead, both also refusing work a teammate had already done. <b>L4v0-strict</b> (full catch-up) is L4 plus that check, which refused 5 times, in 2 of 285 task-runs; its instructions told agents about the check. <b>L4v0</b> also caught up only on entries about the same records.</td><td><span class="pill rel">L4v0-strict is close to L4</span><br><span class="pill ask">Rerun L4</span></td></tr>
+        <tr><td>Entries: intent and change</td><td>The runs also wrote release entries (claims closed when an agent stopped). They came after the task had ended in all but 1 of 1,710 task-runs, so no agent acted on one.</td><td><span class="pill on">No effect</span></td></tr>
+        <tr><td>First <code>complete_task</code> ends the run</td><td>As intended.</td><td><span class="pill on">Valid</span></td></tr>
+        <tr><td>Claims (no expiry in the design)</td><td>Claims had a 90 s expiry, but it never fired: AppWorld freezes the clock while a task runs, and the log read the frozen clock (fixed since). The team's 30-minute limit never fired either; the longest task-run took 463 s.</td><td><span class="pill on">No effect</span></td></tr>
+        <tr><td>Piggybacking flag</td><td>Not built yet; all runs are without it.</td><td><span class="pill on">Valid as flag off</span></td></tr>
+      </tbody>
+    </table></div>
+    <p class="note">Tables and charts below show L4v0-strict and L4v0 under their own names, set apart from L0–L3. The single-agent reference runs don't use the log and are unaffected.</p>
   </section>
 
   <section id="glance">
@@ -252,11 +248,12 @@ const sg = (x) => (x > 0 ? "+" : x < 0 ? "−" : "±");
 const chip = (cls, text) => `<span class="chip ${cls}">${text}</span>`;
 const pv = (p) => (p < 0.001 ? "p < 0.001" : `p = ${p.toFixed(p < 0.01 ? 3 : 2)}`);
 const S = D.summary, ST = D.steps, single = D.single;
-const ORDER = ["L0", "L1", "L2", "L3", "L4", "L4-strict"];
-const NAME = { L0: "No log", L1: "Log, nothing enforced", L2: "Claims required", L3: "Catch up on everything",
-               L4: "Relevant catch-up, conflicts refused", "L4-strict": "L4 with full catch-up" };
-const SHORT = { L0: "No log", L1: "Log only", L2: "Claims", L3: "Full catch-up", L4: "Relevant catch-up", "L4-strict": "L4, full catch-up" };
-const PREV = { L1: "L0", L2: "L1", L3: "L2", L4: "L3" };  // the step each level adds to
+const ORDER = ["L0", "L1", "L2", "L3", "L4", "L4v0-strict", "L4v0"];
+const LEGACY = new Set(["L4v0-strict", "L4v0"]);  // earlier definitions of L4, run 2026-11-11
+const NAME = { L0: "No log", L1: "Log, agents aware of it", L2: "Intent required", L3: "+ Catch-up",
+               L4: "+ Conflicts refused", "L4v0-strict": "Earlier L4, close to the intended one", L4v0: "Earlier L4, relevant catch-up only" };
+const SHORT = { L0: "No log", L1: "Log only", L2: "Intent required", L3: "+ Catch-up", L4: "+ Conflicts refused", "L4v0-strict": "≈ L4 (earlier)", L4v0: "Earlier variant" };
+const PREV = { L1: "L0", L2: "L1", L3: "L2", L4: "L3", "L4v0-strict": "L3", L4v0: "L3" };  // the step each level adds to
 const levels = ORDER.filter((l) => S[l] && S[l].task_runs);
 const runs = D.reps.length, tasks = D.tasks, n = levels.length ? S[levels[0]].task_runs : 0;
 const step = (a, b) => ST[`${a}->${b}`];
@@ -268,34 +265,20 @@ if (D.total_tasks && (D.tasks < D.total_tasks || runs < D.expected_runs)) {
   $("status").hidden = false;
 }
 $("eyebrow").textContent = `AppWorld ${D.dataset} split · ${tasks} tasks × ${runs} run${runs === 1 ? "" : "s"} · gpt-oss-20b · 3-agent teams`;
-if (S.L0 && S.L4) {
-  const c0 = S.L0.any_conflict, c4 = S.L4.any_conflict, a0 = S.L0.accuracy, a4 = S.L4.accuracy;
+const topLvl = S.L4 && S.L4.task_runs ? "L4" : "L3";  // the highest level run as intended
+if (S.L0 && S[topLvl]) {
+  const c0 = S.L0.any_conflict, c1 = S[topLvl].any_conflict, a0 = S.L0.accuracy, a1 = S[topLvl].accuracy;
   $("lede").textContent = `Without a log, ${pct(c0)} of task-runs had agents redo or collide with a teammate's work. ` +
-    `With claims, catching up on relevant entries and conflicts refused (L4), ${pct(c4)} did. ` +
-    `Accuracy went from ${pct(a0)} to ${pct(a4)}, against ${single ? pct(single.accuracy) : "–"} for a single agent on the same tasks.`;
+    `With intents required and catch-up enforced (${topLvl}), ${pct(c1)} did. ` +
+    `Accuracy went from ${pct(a0)} to ${pct(a1)}, against ${single ? pct(single.accuracy) : "–"} for a single agent on the same tasks.` +
+    (topLvl === "L3" ? " L4 as intended hasn't been run yet; its closest earlier variant is shown separately." : "");
   const cards = [
-    ["Task-runs with a conflict", `${pct(c0)}<span class="arrow">→</span>${pct(c4)}`, "no log → L4"],
-    ["Accuracy", `${pct(a0)}<span class="arrow">→</span>${pct(a4)}`, `no log → L4; single agent ${single ? pct(single.accuracy) : "–"}`],
-    ["Seconds per task", `${S.L0.seconds.toFixed(0)}<span class="arrow">→</span>${S.L4.seconds.toFixed(0)}`, "no log → L4, team wall time"],
-    ["Refusals per task-run", `${S.L4.refusals.toFixed(1)}`, `at L4 (L3: ${S.L3 ? S.L3.refusals.toFixed(1) : "–"})`],
+    ["Task-runs with a conflict", `${pct(c0)}<span class="arrow">→</span>${pct(c1)}`, `no log → ${topLvl}`],
+    ["Accuracy", `${pct(a0)}<span class="arrow">→</span>${pct(a1)}`, `no log → ${topLvl}; single agent ${single ? pct(single.accuracy) : "–"}`],
+    ["Seconds per task", `${S.L0.seconds.toFixed(0)}<span class="arrow">→</span>${S[topLvl].seconds.toFixed(0)}`, `no log → ${topLvl}, team wall time`],
+    ["Refusals per task-run", `${S[topLvl].refusals.toFixed(1)}`, `at ${topLvl} (L2: ${S.L2 ? S.L2.refusals.toFixed(1) : "–"})`],
   ];
   $("cards").innerHTML = cards.map(([a, b, c]) => `<div class="card"><span class="k">${a}</span><span class="v">${b}</span><p>${c}</p></div>`).join("");
-}
-
-// ---- the levels ----
-{
-  const on = (t) => `<span class="pill on">${t}</span>`, ask = `<span class="pill ask">Asked, not checked</span>`, no = `<span class="delta">–</span>`;
-  const rel = `<span class="pill rel">Relevant entries only</span>`;
-  const rows = [
-    ["L0", "No log", no, no, no],
-    ["L1", "Log, nothing enforced", ask, ask, no],
-    ["L2", "Claims required", on("Enforced"), no, no],
-    ["L3", "Catch up on everything", on("Enforced"), on("Before posting and writing"), no],
-    ["L4", "Relevant catch-up, conflicts refused", on("Enforced"), rel, on("Enforced")],
-    ["L4-strict", "Comparison: L4 with full catch-up", on("Enforced"), on("Before posting and writing"), on("Enforced")],
-  ];
-  $("levelstable").innerHTML = `<thead><tr><th>Level</th><th>Setup</th><th>A write needs a claim in the agent's intent</th><th>Catch up on unread entries</th><th>Conflicts with a teammate refused</th></tr></thead><tbody>` +
-    rows.map((r) => `<tr${r[0] === "L4-strict" ? ' class="ref"' : ""}><td><span class="lvl">${r[0]}</span></td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td>${r[4]}</td></tr>`).join("") + "</tbody>";
 }
 
 // ---- results by level ----
@@ -316,8 +299,8 @@ if (S.L0 && S.L4) {
     h += `<tr class="ref"><td><span class="lvl">1 agent</span><br>Single agent, same tasks</td><td class="n">${pct(single.accuracy, 1)}</td><td class="n">–</td><td class="n">–</td><td class="n">–</td><td class="n">${single.seconds.toFixed(0)}</td><td class="n">${k(single.tokens)}</td><td class="n">–</td></tr>`;
   }
   for (const l of levels) {
-    const s = S[l], st = l === "L4-strict" ? null : PREV[l] ? step(PREV[l], l) : null;
-    h += `<tr${l === "L4-strict" ? ' class="ref"' : ""}><td><span class="lvl">${l}</span><br>${NAME[l]}</td>` +
+    const s = S[l], st = LEGACY.has(l) ? null : PREV[l] ? step(PREV[l], l) : null;
+    h += `<tr${LEGACY.has(l) ? ' class="ref"' : ""}><td><span class="lvl">${l}</span><br>${NAME[l]}</td>` +
       `<td class="n">${pct(s.accuracy, 1)}${sigChip(st, "correct", ptsF, true)}</td>` +
       `<td class="n">${pct(s.any_conflict, 1)}${sigChip(st, "any_conflict", ptsF, false)}</td>` +
       `<td class="n">${s.conflicts.toFixed(2)}</td><td class="n">${l === "L0" ? "–" : s.refusals.toFixed(2)}</td>` +
@@ -326,7 +309,7 @@ if (S.L0 && S.L4) {
   $("glancetable").innerHTML = h + "</tbody>";
   $("glanceintro").textContent = `${tasks} tasks, ${runs} run${runs === 1 ? "" : "s"} of each level: ${n} task-runs per level. ` +
     `Under each value is the change from the level before it, colored when it is statistically significant (green better, red worse).`;
-  $("glancenote").textContent = `L4-strict is compared with L4 below, not stepped from it. Tokens are prompt plus completion tokens for the whole team.`;
+  $("glancenote").textContent = `The earlier L4 variants (in grey) are compared with L3 in the paired table at the end. Tokens are prompt plus completion tokens for the whole team.`;
 }
 
 // ---- charts: horizontal bars, one row per level ----
@@ -360,32 +343,32 @@ const niceMax = (v, step) => Math.max(step, Math.ceil(v / step) * step);
 const ticksTo = (max, step) => { const t = []; for (let v = 0; v <= max + 1e-9; v += step) t.push(+v.toFixed(6)); return t; };
 {
   const max = niceMax(Math.max(...levels.map((l) => S[l].any_conflict), 0.05), 0.1);
-  bars("c1", "c1tip", "c1box", levels.map((l) => ({ label: `${l} · ${SHORT[l]}`, value: S[l].any_conflict, muted: l === "L4-strict",
+  bars("c1", "c1tip", "c1box", levels.map((l) => ({ label: `${l} · ${SHORT[l]}`, value: S[l].any_conflict, muted: LEGACY.has(l),
     tip: `${l}: ${pct(S[l].any_conflict, 1)} of task-runs with a conflict; ${S[l].duplicates.toFixed(2)} duplicates and ${S[l].collisions.toFixed(2)} collisions per task-run` })),
     { max, ticks: ticksTo(max, max > 0.5 ? 0.2 : 0.1), tick: (t) => pct(t), fmt: (v) => pct(v, 1) });
   $("conftable").innerHTML = `<thead><tr><th>Level</th><th class="n">Duplicates<br>per task-run</th><th class="n">Collisions<br>per task-run</th><th class="n">Writes<br>per task-run</th><th class="n">Agents that wrote<br>per task-run</th></tr></thead><tbody>` +
-    levels.map((l) => `<tr${l === "L4-strict" ? ' class="ref"' : ""}><td><span class="lvl">${l}</span> ${NAME[l]}</td><td class="n">${S[l].duplicates.toFixed(2)}</td><td class="n">${S[l].collisions.toFixed(2)}</td><td class="n">${S[l].writes.toFixed(1)}</td><td class="n">${S[l].writers.toFixed(2)}</td></tr>`).join("") + "</tbody>";
+    levels.map((l) => `<tr${LEGACY.has(l) ? ' class="ref"' : ""}><td><span class="lvl">${l}</span> ${NAME[l]}</td><td class="n">${S[l].duplicates.toFixed(2)}</td><td class="n">${S[l].collisions.toFixed(2)}</td><td class="n">${S[l].writes.toFixed(1)}</td><td class="n">${S[l].writers.toFixed(2)}</td></tr>`).join("") + "</tbody>";
 }
 {
   const per = D.per_rep_accuracy;
   const max = niceMax(Math.max(...levels.map((l) => Math.max(S[l].accuracy, ...Object.values(per[l] || {}))), single ? single.accuracy : 0), 0.1);
-  bars("c2", "c2tip", "c2box", levels.map((l) => ({ label: `${l} · ${SHORT[l]}`, value: S[l].accuracy, muted: l === "L4-strict", dots: Object.values(per[l] || {}),
+  bars("c2", "c2tip", "c2box", levels.map((l) => ({ label: `${l} · ${SHORT[l]}`, value: S[l].accuracy, muted: LEGACY.has(l), dots: Object.values(per[l] || {}),
     tip: `${l}: ${pct(S[l].accuracy, 1)} solved; runs ${Object.entries(per[l] || {}).map(([r, v]) => `${r} ${pct(v)}`).join(", ")}` })),
     { max, ticks: ticksTo(max, 0.1), tick: (t) => pct(t), fmt: (v) => pct(v, 1), ref: single ? single.accuracy : null, valueColumn: true });
   $("c2cap").textContent = `Share of task-runs solved; dots are the individual runs${single ? `, and the dashed line the single agent (${pct(single.accuracy, 1)}, ${single.task_runs} task-runs)` : ""}.`;
   const diffs = [...new Set(levels.flatMap((l) => Object.keys(S[l].by_difficulty)))].sort();
   $("difftable").innerHTML = `<thead><tr><th>Level</th>${diffs.map((d) => `<th class="n">Difficulty ${d}</th>`).join("")}<th class="n">Scenarios fully solved</th><th class="n">Task marked complete</th></tr></thead><tbody>` +
-    levels.map((l) => `<tr${l === "L4-strict" ? ' class="ref"' : ""}><td><span class="lvl">${l}</span> ${NAME[l]}</td>${diffs.map((d) => { const b = S[l].by_difficulty[d]; return `<td class="n">${b ? pct(b.accuracy) : "–"}<br><span class="delta">${b ? b.n : 0} task-runs</span></td>`; }).join("")}` +
+    levels.map((l) => `<tr${LEGACY.has(l) ? ' class="ref"' : ""}><td><span class="lvl">${l}</span> ${NAME[l]}</td>${diffs.map((d) => { const b = S[l].by_difficulty[d]; return `<td class="n">${b ? pct(b.accuracy) : "–"}<br><span class="delta">${b ? b.n : 0} task-runs</span></td>`; }).join("")}` +
       `<td class="n">${S[l].scenarios == null ? "–" : pct(S[l].scenarios)}</td><td class="n">${pct(S[l].completed)}</td></tr>`).join("") + "</tbody>";
 }
 {
   const max = niceMax(Math.max(...levels.map((l) => S[l].seconds), single ? single.seconds : 0), 20);
-  bars("c3", "c3tip", "c3box", levels.map((l) => ({ label: `${l} · ${SHORT[l]}`, value: S[l].seconds, muted: l === "L4-strict",
+  bars("c3", "c3tip", "c3box", levels.map((l) => ({ label: `${l} · ${SHORT[l]}`, value: S[l].seconds, muted: LEGACY.has(l),
     tip: `${l}: ${S[l].seconds.toFixed(1)} s per task; ${S[l].turns.toFixed(0)} model calls, ${k(S[l].tokens)} tokens` })),
     { max, ticks: ticksTo(max, max > 120 ? 40 : 20), tick: (t) => `${t} s`, fmt: (v) => `${v.toFixed(0)} s`, ref: single ? single.seconds : null });
   $("costtable").innerHTML = `<thead><tr><th>Level</th><th class="n">Seconds<br>per task</th><th class="n">Model calls<br>per task</th><th class="n">Tokens<br>per task</th><th class="n">Overlap</th><th class="n">Parallelism</th><th class="n">Agents out<br>of calls</th></tr></thead><tbody>` +
     (single ? `<tr class="ref"><td>Single agent</td><td class="n">${single.seconds.toFixed(1)}</td><td class="n">${single.turns.toFixed(0)}</td><td class="n">${k(single.tokens)}</td><td class="n">–</td><td class="n">1</td><td class="n">–</td></tr>` : "") +
-    levels.map((l) => `<tr${l === "L4-strict" ? ' class="ref"' : ""}><td><span class="lvl">${l}</span> ${NAME[l]}</td><td class="n">${S[l].seconds.toFixed(1)}</td><td class="n">${S[l].turns.toFixed(0)}</td><td class="n">${k(S[l].tokens)}</td><td class="n">${pct(S[l].overlap)}</td><td class="n">${S[l].parallelism.toFixed(2)}</td><td class="n">${pct(S[l].out_of_calls, 1)}</td></tr>`).join("") + "</tbody>";
+    levels.map((l) => `<tr${LEGACY.has(l) ? ' class="ref"' : ""}><td><span class="lvl">${l}</span> ${NAME[l]}</td><td class="n">${S[l].seconds.toFixed(1)}</td><td class="n">${S[l].turns.toFixed(0)}</td><td class="n">${k(S[l].tokens)}</td><td class="n">${pct(S[l].overlap)}</td><td class="n">${S[l].parallelism.toFixed(2)}</td><td class="n">${pct(S[l].out_of_calls, 1)}</td></tr>`).join("") + "</tbody>";
 }
 
 // ---- how agents used the log ----
@@ -411,9 +394,10 @@ const ticksTo = (max, step) => { const t = []; for (let v = 0; v <= max + 1e-9; 
 
 // ---- paired comparisons ----
 {
-  const LABEL = { "L0->L1": "Adding the log (L0 → L1)", "L1->L2": "Requiring claims (L1 → L2)", "L2->L3": "Catching up on everything (L2 → L3)",
-    "L3->L4": "Relevant catch-up and conflict refusal (L3 → L4)", "L4-strict->L4": "Relevant instead of full catch-up (L4-strict → L4)",
-    "L0->L4": "No log → L4", "L0->L3": "No log → L3" };
+  const LABEL = { "L0->L1": "Adding the log (L0 → L1)", "L1->L2": "Requiring intents (L1 → L2)", "L2->L3": "Requiring catch-up (L2 → L3)",
+    "L3->L4": "Refusing conflicts (L3 → L4)", "L0->L3": "No log → L3", "L0->L4": "No log → L4",
+    "L3->L4v0-strict": "Earlier L4, close to intended (L3 → L4v0-strict)", "L0->L4v0-strict": "No log → L4v0-strict",
+    "L4v0-strict->L4v0": "Relevant-only catch-up (L4v0-strict → L4v0)" };
   const cell = (d, f, goodUp) => d ? `<td class="n">${f(d.diff)}<br>${d.p < 0.05 ? chip((d.diff > 0) === goodUp ? "good" : "bad", pv(d.p)) : `<span class="delta">${pv(d.p)}</span>`}</td>` : `<td class="n">–</td>`;
   const ptsF = (x) => `${sg(x)}${Math.abs(100 * x).toFixed(1)} pts`;
   let h = `<thead><tr><th>Comparison</th><th class="n">Pairs</th><th class="n">Accuracy</th><th class="n">Task-runs with<br>a conflict</th><th class="n">Refusals<br>per task-run</th><th class="n">Seconds per task<br>(95% interval)</th><th class="n">Tokens<br>per task</th></tr></thead><tbody>`;
