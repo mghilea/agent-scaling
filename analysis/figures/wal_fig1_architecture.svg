@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1140 580" role="img" aria-label="Agents send code cells to a main thread that runs them one at a time in the shared AppWorld world. Reads go straight to the apps; writes pass through the log service's gate, which checks the level's rules, runs allowed writes and appends each entry to a log file. Agents read and post to the log with two tools.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 500" role="img" aria-label="Three agents never message each other. Each one posts intents to and reads the shared write-ahead log, and sends code cells to one code runner. The code runner sends reads straight to the AppWorld apps; every write goes through the gate, which checks the log, logs the change and either lets the write through or refuses it. The log is appended to a file on disk.">
 <style>svg { background: #fbfcfd; }
 /* SVG text and shapes */
 .t-title { font: 600 16px "IBM Plex Sans Condensed", "IBM Plex Sans", "Arial Narrow", Arial, sans-serif; fill: #16202e; }
@@ -21,101 +21,77 @@
 .dot-on { fill: #2a78d6; }
 .dot-part { fill: #fbfcfd; stroke: #2a78d6; stroke-width: 1.8; }
 .dot-off { fill: #c9d1dc; }
+.t-name { font: 600 14px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; fill: #16202e; }
+.t-chip { font: 500 12px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; fill: #16202e; }
+.t-glyph { font: 600 9px "IBM Plex Mono", ui-monospace, Menlo, Consolas, "Courier New", monospace; fill: #3e4a5c; }
+.ic { fill: none; stroke: #3e4a5c; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.ic-body { fill: #e7ebf1; stroke: #3e4a5c; stroke-width: 1.6; }
+.ic-solid { fill: #3e4a5c; }
+.ic-acc { fill: #e2edfb; stroke: #2a78d6; stroke-width: 1.8; }
+.ic-acc-line { fill: none; stroke: #2a78d6; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.ic-ok { fill: none; stroke: #22784a; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.ic-ref { fill: none; stroke: #b3261e; stroke-width: 2; stroke-linecap: round; }
+.chip { fill: #fbfcfd; stroke: #c9d1dc; stroke-width: 1.2; }
+.chip-ref { fill: #fbe2df; stroke: none; }
+.badge-ref { fill: #fbe2df; stroke: #b3261e; stroke-width: 1.2; }
+.edge-none { fill: none; stroke: #5d6879; stroke-width: 1.3; stroke-dasharray: 3 4; }
+.arrowhead { fill: #3e4a5c; }
+.arrowhead-ref { fill: #b3261e; }
 </style>
-          <defs>
-            <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3e4a5c"/></marker>
-            <marker id="a1r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b3261e"/></marker>
-          </defs>
-
-          <!-- agents -->
-          <rect class="box" x="20" y="60" width="220" height="480" rx="10"/>
-          <text class="t-title" x="38" y="90">Agents 1–3</text>
-          <text class="t-small" x="38" y="110">one thread each, same task</text>
-          <rect class="card" x="36" y="128" width="188" height="56" rx="7"/>
-          <text class="t-mono" x="50" y="151">agent_1</text><text class="t-small" x="50" y="170">model + Python shell</text>
-          <rect class="card" x="36" y="196" width="188" height="56" rx="7"/>
-          <text class="t-mono" x="50" y="219">agent_2</text><text class="t-small" x="50" y="238">model + Python shell</text>
-          <rect class="card" x="36" y="264" width="188" height="56" rx="7"/>
-          <text class="t-mono" x="50" y="287">agent_3</text><text class="t-small" x="50" y="306">model + Python shell</text>
-          <text class="t-cap" x="38" y="356">TOOLS</text>
-          <text class="t-lmono" x="38" y="378">execute_python</text>
-          <text class="t-lmono" x="38" y="398">wal_read</text>
-          <text class="t-lmono" x="38" y="418">wal_intend</text>
-          <text class="t-cap" x="38" y="462">BETWEEN AGENTS</text>
-          <text class="t-small" x="38" y="482">no messages: only the log</text>
-          <text class="t-small" x="38" y="500">and the world's state</text>
-
-          <!-- log service -->
-          <rect class="box-key" x="390" y="30" width="420" height="270" rx="10"/>
-          <text class="t-title" x="408" y="58">Log service</text>
-          <text class="t-small" x="408" y="78">one per team · every check, write and entry under one lock</text>
-          <text class="t-cap" x="408" y="106">STATE</text>
-          <text class="t-body" x="408" y="128">entries, append-only: intent · change · release</text>
-          <text class="t-body" x="408" y="149">each agent's read position (what it has seen)</text>
-          <text class="t-body" x="408" y="170">each agent's current intent and its open claims</text>
-          <text class="t-body" x="408" y="191">records changed and items created, and by whom</text>
-          <rect class="gate" x="406" y="210" width="388" height="76" rx="8"/>
-          <text class="t-title t-acc" x="422" y="235">Gate: commit()</text>
-          <text class="t-body" x="422" y="256">checks the level's rules, writes a pending line,</text>
-          <text class="t-body" x="422" y="275">runs the write, appends the change entry</text>
-
-          <!-- main thread -->
-          <rect class="box" x="390" y="380" width="420" height="160" rx="10"/>
-          <text class="t-title" x="408" y="408">Main thread</text>
-          <text class="t-small" x="408" y="428">holds the one shared AppWorld world</text>
-          <text class="t-body" x="408" y="458">queue: code cells from all agents, in arrival order;</text>
-          <text class="t-body" x="408" y="479">each runs in its agent's own shell, one at a time</text>
-          <text class="t-body" x="408" y="508">its <tspan class="t-lmono">apis.&lt;app&gt;.&lt;api&gt;(…)</tspan> calls go out from here</text>
-
-          <!-- log file -->
-          <rect class="box" x="920" y="40" width="200" height="118" rx="10"/>
-          <text class="t-mono" x="938" y="68">wal/&lt;task&gt;.jsonl</text>
-          <text class="t-body" x="938" y="92">one JSON line per entry,</text>
-          <text class="t-body" x="938" y="112">forced to disk (fsync);</text>
-          <text class="t-body" x="938" y="132">a pending line goes first</text>
-          <text class="t-body" x="938" y="150">for every write</text>
-
-          <!-- apps -->
-          <rect class="box" x="920" y="220" width="200" height="250" rx="10"/>
-          <text class="t-title" x="938" y="248">AppWorld apps</text>
-          <text class="t-small" x="938" y="268">the same data for all three</text>
-          <text class="t-body" x="938" y="298">spotify, venmo, gmail,</text>
-          <text class="t-body" x="938" y="318">phone, amazon, todoist,</text>
-          <text class="t-body" x="938" y="338">simple_note, splitwise,</text>
-          <text class="t-body" x="938" y="358">file_system</text>
-          <text class="t-small" x="938" y="400">graded once, at the end,</text>
-          <text class="t-small" x="938" y="418">by AppWorld's own tests</text>
-
-          <!-- agents <-> log -->
-          <line class="edge" x1="240" y1="134" x2="386" y2="134" marker-end="url(#a1)"/>
-          <text class="t-lmono" x="314" y="110" text-anchor="middle">wal_read</text>
-          <text class="t-lmono" x="314" y="126" text-anchor="middle">wal_intend</text>
-          <line class="edge" x1="390" y1="168" x2="244" y2="168" marker-end="url(#a1)"/>
-          <text class="t-lbl" x="314" y="188" text-anchor="middle">unread entries;</text>
-          <text class="t-lbl" x="314" y="204" text-anchor="middle">posted, or refused</text>
-
-          <!-- agents <-> main thread -->
-          <line class="edge" x1="240" y1="436" x2="386" y2="436" marker-end="url(#a1)"/>
-          <text class="t-lbl" x="314" y="410" text-anchor="middle">code cell</text>
-          <text class="t-lmono" x="314" y="428" text-anchor="middle">execute_python</text>
-          <line class="edge" x1="390" y1="470" x2="244" y2="470" marker-end="url(#a1)"/>
-          <text class="t-lbl" x="314" y="490" text-anchor="middle">output, or the</text>
-          <text class="t-lbl" x="314" y="506" text-anchor="middle">refusal's message</text>
-
-          <!-- writes up to the gate, refusals back down -->
-          <line class="edge" x1="560" y1="380" x2="560" y2="290" marker-end="url(#a1)"/>
-          <text class="t-lbl" x="550" y="330" text-anchor="end" font-weight="600">writes</text>
-          <text class="t-lbl" x="550" y="346" text-anchor="end">POST · PUT · PATCH · DELETE</text>
-          <line class="edge-ref" x1="660" y1="288" x2="660" y2="376" marker-end="url(#a1r)"/>
-          <text class="t-lbl t-ref" x="670" y="330">refused:</text>
-          <text class="t-lbl t-ref" x="670" y="346">nothing changed</text>
-
-          <!-- to the file and the apps -->
-          <line class="edge" x1="810" y1="96" x2="916" y2="96" marker-end="url(#a1)"/>
-          <text class="t-lbl" x="864" y="86" text-anchor="middle">appends</text>
-          <line class="edge" x1="810" y1="252" x2="916" y2="252" marker-end="url(#a1)"/>
-          <text class="t-lbl" x="864" y="242" text-anchor="middle">allowed write</text>
-          <line class="edge" x1="810" y1="446" x2="916" y2="446" marker-end="url(#a1)"/>
-          <text class="t-lbl" x="864" y="422" text-anchor="middle">reads go</text>
-          <text class="t-lbl" x="864" y="436" text-anchor="middle">straight</text>
-        </svg>
+<defs><marker id="m1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="arrowhead"/></marker><marker id="m1r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="arrowhead-ref"/></marker></defs>
+<rect class="box" x="20" y="40" width="150" height="420" rx="12"/>
+<text class="t-cap" x="95" y="66" text-anchor="middle">AGENTS</text>
+<line class="ic" x1="95" y1="110" x2="95" y2="103"/><circle class="ic-solid" cx="95" cy="100" r="3"/><rect class="ic-body" x="75" y="110" width="40" height="30" rx="9"/><circle class="ic-solid" cx="87" cy="123" r="3.2"/><circle class="ic-solid" cx="103" cy="123" r="3.2"/><line class="ic" x1="88" y1="133" x2="102" y2="133"/>
+<text class="t-lbl" x="95" y="165" text-anchor="middle">agent 1</text>
+<line class="ic" x1="95" y1="230" x2="95" y2="223"/><circle class="ic-solid" cx="95" cy="220" r="3"/><rect class="ic-body" x="75" y="230" width="40" height="30" rx="9"/><circle class="ic-solid" cx="87" cy="243" r="3.2"/><circle class="ic-solid" cx="103" cy="243" r="3.2"/><line class="ic" x1="88" y1="253" x2="102" y2="253"/>
+<text class="t-lbl" x="95" y="285" text-anchor="middle">agent 2</text>
+<line class="ic" x1="95" y1="350" x2="95" y2="343"/><circle class="ic-solid" cx="95" cy="340" r="3"/><rect class="ic-body" x="75" y="350" width="40" height="30" rx="9"/><circle class="ic-solid" cx="87" cy="363" r="3.2"/><circle class="ic-solid" cx="103" cy="363" r="3.2"/><line class="ic" x1="88" y1="373" x2="102" y2="373"/>
+<text class="t-lbl" x="95" y="405" text-anchor="middle">agent 3</text>
+<path class="edge-none" d="M119,125 C150,125 150,245 119,245"/>
+<circle class="badge-ref" cx="142.5" cy="185.0" r="10"/>
+<line class="ic-ref" x1="138.0" y1="180.5" x2="147.0" y2="189.5"/><line class="ic-ref" x1="138.0" y1="189.5" x2="147.0" y2="180.5"/>
+<path class="edge-none" d="M119,245 C150,245 150,365 119,365"/>
+<circle class="badge-ref" cx="142.5" cy="305.0" r="10"/>
+<line class="ic-ref" x1="138.0" y1="300.5" x2="147.0" y2="309.5"/><line class="ic-ref" x1="138.0" y1="309.5" x2="147.0" y2="300.5"/>
+<line class="ic-ref" x1="28.5" y1="432.5" x2="37.5" y2="441.5"/><line class="ic-ref" x1="28.5" y1="441.5" x2="37.5" y2="432.5"/>
+<text class="t-small" x="44" y="441" text-anchor="start">no direct messages</text>
+<rect class="box-key" x="350" y="40" width="170" height="140" rx="12"/>
+<rect class="ic-body" x="413" y="64" width="44" height="56" rx="5"/><line class="ic" x1="422" y1="76" x2="448" y2="76"/><line class="ic" x1="422" y1="86" x2="448" y2="86"/><line class="ic" x1="422" y1="96" x2="448" y2="96"/><line class="ic-acc-line" x1="422" y1="106" x2="438" y2="106"/>
+<text class="t-name" x="435" y="145" text-anchor="middle">Write-ahead log</text>
+<text class="t-small" x="435" y="162" text-anchor="middle">intents · changes · releases</text>
+<rect class="box" x="350" y="222" width="170" height="100" rx="12"/>
+<path class="ic-acc" d="M435,232 L457,240 V259 C457,273 446,281 435,286 C424,281 413,273 413,259 V240 Z"/><polyline class="ic-acc-line" points="426,259 433,266 445,252"/>
+<text class="t-name" x="435" y="307" text-anchor="middle">Gate</text>
+<rect class="box" x="350" y="372" width="170" height="100" rx="12"/>
+<rect class="ic-body" x="405" y="388" width="60" height="13" rx="4"/><text class="t-glyph" x="435" y="398" text-anchor="middle">&lt;/&gt;</text><rect class="ic-body" x="405" y="404" width="60" height="13" rx="4"/><text class="t-glyph" x="435" y="414" text-anchor="middle">&lt;/&gt;</text><rect class="ic-body" x="405" y="420" width="60" height="13" rx="4"/><text class="t-glyph" x="435" y="430" text-anchor="middle">&lt;/&gt;</text>
+<text class="t-name" x="435" y="450" text-anchor="middle">Code runner</text>
+<text class="t-small" x="435" y="465" text-anchor="middle">one cell at a time</text>
+<rect class="box" x="770" y="40" width="210" height="140" rx="12"/>
+<path class="ic-body" d="M853,74 V106 A22,7 0 0,0 897,106 V74"/><ellipse class="ic-body" cx="875" cy="74" rx="22" ry="7"/><path class="ic" d="M853,90 A22,7 0 0,0 897,90"/>
+<text class="t-mono" x="875" y="145" text-anchor="middle">wal/&lt;task&gt;.jsonl</text>
+<text class="t-small" x="875" y="162" text-anchor="middle">one line per entry</text>
+<rect class="box" x="770" y="250" width="210" height="222" rx="12"/>
+<rect class="ic-body" x="849" y="304" width="14" height="14" rx="3.5"/><rect class="ic-body" x="868" y="304" width="14" height="14" rx="3.5"/><rect class="ic-body" x="887" y="304" width="14" height="14" rx="3.5"/><rect class="ic-body" x="849" y="323" width="14" height="14" rx="3.5"/><rect class="ic-body" x="868" y="323" width="14" height="14" rx="3.5"/><rect class="ic-body" x="887" y="323" width="14" height="14" rx="3.5"/><rect class="ic-body" x="849" y="342" width="14" height="14" rx="3.5"/><rect class="ic-body" x="868" y="342" width="14" height="14" rx="3.5"/><rect class="ic-body" x="887" y="342" width="14" height="14" rx="3.5"/>
+<text class="t-name" x="875" y="395" text-anchor="middle">AppWorld apps</text>
+<text class="t-small" x="875" y="412" text-anchor="middle">shared by all three</text>
+<line class="edge" x1="170" y1="92" x2="346" y2="92" marker-end="url(#m1)"/>
+<g><rect class="chip" x="205.5" y="80" width="107" height="24" rx="12"/><line class="ic" x1="216.5" y1="85" x2="216.5" y2="99"/><path class="ic-solid" d="M216.5,85 L227.5,88 L216.5,91.5 Z"/><text class="t-chip" x="234.5" y="96">post intent</text></g>
+<line class="edge" x1="350" y1="138" x2="174" y2="138" marker-end="url(#m1)"/>
+<g><rect class="chip" x="218.5" y="126" width="87" height="24" rx="12"/><path class="ic" d="M227.5,138 Q234.5,131.5 241.5,138 Q234.5,144.5 227.5,138 Z"/><circle class="ic-solid" cx="234.5" cy="138" r="2.3"/><text class="t-chip" x="247.5" y="142">read log</text></g>
+<line class="edge" x1="170" y1="400" x2="346" y2="400" marker-end="url(#m1)"/>
+<g><rect class="chip" x="212.0" y="388" width="94" height="24" rx="12"/><text class="t-glyph" x="228.0" y="404" text-anchor="middle">&lt;/&gt;</text><text class="t-chip" x="241.0" y="404">code cell</text></g>
+<line class="edge" x1="350" y1="444" x2="174" y2="444" marker-end="url(#m1)"/>
+<g><rect class="chip" x="225.0" y="432" width="74" height="24" rx="12"/><path class="ic" d="M247.0,439 V445 H236.0 M239.0,442 L236.0,445 L239.0,448"/><text class="t-chip" x="254.0" y="448">output</text></g>
+<line class="edge" x1="405" y1="372" x2="405" y2="326" marker-end="url(#m1)"/>
+<g><rect class="chip" x="371.5" y="336" width="67" height="24" rx="12"/><path class="ic" d="M381.5,354 L382.5,349 L390.5,341 L394.5,345 L386.5,353 Z"/><line class="ic" x1="388.5" y1="343" x2="392.5" y2="347"/><text class="t-chip" x="400.5" y="352">write</text></g>
+<line class="edge-ref" x1="478" y1="324" x2="478" y2="368" marker-end="url(#m1r)"/>
+<g><rect class="chip-ref" x="498.0" y="336" width="80" height="24" rx="12"/><line class="ic-ref" x1="509.5" y1="343.5" x2="518.5" y2="352.5"/><line class="ic-ref" x1="509.5" y1="352.5" x2="518.5" y2="343.5"/><text class="t-chip t-ref" x="527.0" y="352">refused</text></g>
+<line class="edge" x1="435" y1="220" x2="435" y2="184" marker-end="url(#m1)" marker-start="url(#m1)"/>
+<text class="t-small" x="445" y="206" text-anchor="start">checks claims, logs the change</text>
+<line class="edge" x1="520" y1="92" x2="766" y2="92" marker-end="url(#m1)"/>
+<g><rect class="chip" x="611.5" y="80" width="67" height="24" rx="12"/><path class="ic" d="M621.5,86 H631.5 L633.5,88 V98 H621.5 Z"/><rect class="ic-solid" x="624.5" y="86" width="6" height="4"/><text class="t-chip" x="640.5" y="96">fsync</text></g>
+<line class="edge" x1="520" y1="272" x2="766" y2="272" marker-end="url(#m1)"/>
+<g><rect class="chip" x="584.5" y="260" width="121" height="24" rx="12"/><polyline class="ic-ok" points="594.5,272 598.5,276 606.5,267"/><text class="t-chip" x="613.5" y="276">allowed write</text></g>
+<line class="edge" x1="520" y1="440" x2="766" y2="440" marker-end="url(#m1)"/>
+<g><rect class="chip" x="615.0" y="428" width="60" height="24" rx="12"/><path class="ic" d="M624.0,440 Q631.0,433.5 638.0,440 Q631.0,446.5 624.0,440 Z"/><circle class="ic-solid" cx="631.0" cy="440" r="2.3"/><text class="t-chip" x="644.0" y="444">read</text></g>
+</svg>

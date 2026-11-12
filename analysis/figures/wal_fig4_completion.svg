@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 250" role="img" aria-label="When an agent calls complete_task and no teammate holds an open claim, the task is complete at once. If teammates hold open claims, the call is recorded; the caller and agents without claims stop; claim holders may only finish their claimed changes, with no new intents; once no open claims remain, the task is marked complete and graded. Without the log, the first call ends the task.">
+<style>svg { background: #fbfcfd; }
+/* SVG text and shapes */
+.t-title { font: 600 16px "IBM Plex Sans Condensed", "IBM Plex Sans", "Arial Narrow", Arial, sans-serif; fill: #16202e; }
+.t-body { font: 13px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; fill: #3e4a5c; }
+.t-small { font: 12px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; fill: #5d6879; }
+.t-mono { font: 500 13px "IBM Plex Mono", ui-monospace, Menlo, Consolas, "Courier New", monospace; fill: #16202e; }
+.t-lbl { font: 12px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; fill: #3e4a5c; }
+.t-lmono { font: 12px "IBM Plex Mono", ui-monospace, Menlo, Consolas, "Courier New", monospace; fill: #3e4a5c; }
+.t-cap { font: 600 10.5px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; letter-spacing: .07em; fill: #5d6879; }
+.t-acc { fill: #2a78d6; }
+.t-ref { fill: #b3261e; }
+.box { fill: #fbfcfd; stroke: #c9d1dc; stroke-width: 1.2; }
+.box-key { fill: #fbfcfd; stroke: #2a78d6; stroke-width: 2; }
+.gate { fill: #e2edfb; stroke: #2a78d6; stroke-width: 1.5; }
+.card { fill: #e7ebf1; stroke: none; }
+.refbar { fill: #fbe2df; stroke: none; }
+.edge { stroke: #3e4a5c; stroke-width: 1.5; fill: none; }
+.edge-ref { stroke: #b3261e; stroke-width: 1.5; stroke-dasharray: 5 4; fill: none; }
+.dot-on { fill: #2a78d6; }
+.dot-part { fill: #fbfcfd; stroke: #2a78d6; stroke-width: 1.8; }
+.dot-off { fill: #c9d1dc; }
+.t-name { font: 600 14px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; fill: #16202e; }
+.t-chip { font: 500 12px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; fill: #16202e; }
+.t-glyph { font: 600 9px "IBM Plex Mono", ui-monospace, Menlo, Consolas, "Courier New", monospace; fill: #3e4a5c; }
+.ic { fill: none; stroke: #3e4a5c; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.ic-body { fill: #e7ebf1; stroke: #3e4a5c; stroke-width: 1.6; }
+.ic-solid { fill: #3e4a5c; }
+.ic-acc { fill: #e2edfb; stroke: #2a78d6; stroke-width: 1.8; }
+.ic-acc-line { fill: none; stroke: #2a78d6; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.ic-ok { fill: none; stroke: #22784a; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.ic-ref { fill: none; stroke: #b3261e; stroke-width: 2; stroke-linecap: round; }
+.chip { fill: #fbfcfd; stroke: #c9d1dc; stroke-width: 1.2; }
+.chip-ref { fill: #fbe2df; stroke: none; }
+.badge-ref { fill: #fbe2df; stroke: #b3261e; stroke-width: 1.2; }
+.edge-none { fill: none; stroke: #5d6879; stroke-width: 1.3; stroke-dasharray: 3 4; }
+.arrowhead { fill: #3e4a5c; }
+.arrowhead-ref { fill: #b3261e; }
+</style>
+<defs><marker id="m4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="arrowhead"/></marker></defs>
+<rect class="box" x="10" y="92" width="160" height="66" rx="12"/>
+<line class="ic" x1="27" y1="110" x2="27" y2="124"/><path class="ic-solid" d="M27,110 L38,113 L27,116.5 Z"/>
+<text class="t-mono" x="46" y="121" text-anchor="start">complete_task</text>
+<text class="t-small" x="90" y="143" text-anchor="middle">an agent calls it</text>
+<path class="box" d="M300,70 L380,125 L300,180 L220,125 Z"/>
+<text class="t-lbl" x="300" y="121" text-anchor="middle">teammates'</text>
+<text class="t-lbl" x="300" y="137" text-anchor="middle">open claims?</text>
+<line class="edge" x1="170" y1="125" x2="216" y2="125" marker-end="url(#m4)"/>
+<path class="edge" d="M300,70 V30 H866" marker-end="url(#m4)"/>
+<text class="t-small" x="310" y="52" text-anchor="start">none</text>
+<line class="edge" x1="380" y1="125" x2="426" y2="125" marker-end="url(#m4)"/>
+<text class="t-small" x="386" y="116" text-anchor="start">some</text>
+<rect class="box" x="430" y="82" width="190" height="86" rx="12"/>
+<path class="ic" d="M447,99 H457 M447,113 H457 M448,99 L456,113 M456,99 L448,113"/>
+<text class="t-name" x="466" y="110" text-anchor="start">Recorded</text>
+<text class="t-small" x="446" y="134" text-anchor="start">the caller and agents</text>
+<text class="t-small" x="446" y="150" text-anchor="start">without claims stop</text>
+<line class="edge" x1="620" y1="125" x2="666" y2="125" marker-end="url(#m4)"/>
+<rect class="box" x="670" y="82" width="190" height="86" rx="12"/>
+<path class="ic" d="M686,112 L687,107 L695,99 L699,103 L691,111 Z"/><line class="ic" x1="693" y1="101" x2="697" y2="105"/>
+<text class="t-name" x="706" y="110" text-anchor="start">Finishing</text>
+<text class="t-small" x="686" y="134" text-anchor="start">claimed changes only,</text>
+<text class="t-small" x="686" y="150" text-anchor="start">no new intents</text>
+<path class="edge" d="M860,125 H900 V60" marker-end="url(#m4)"/>
+<text class="t-small" x="908" y="100" text-anchor="start">no open</text>
+<text class="t-small" x="908" y="114" text-anchor="start">claims left</text>
+<rect class="box-key" x="870" y="6" width="120" height="50" rx="12"/>
+<polyline class="ic-ok" points="884,31 888,35 896,26"/>
+<text class="t-name" x="902" y="35" text-anchor="start">Complete</text>
+<text class="t-small" x="10" y="215" text-anchor="start">Without the log (L0), the first call ends the task at once. Claims close when done, are released when their agent stops, or expire after 90 s.</text>
+</svg>

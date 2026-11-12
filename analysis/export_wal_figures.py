@@ -1,6 +1,6 @@
 """Export the three figures of analysis/wal_design.html as standalone SVG files (light theme), for the thesis.
 
-    python analysis/export_wal_figures.py   # writes analysis/figures/wal_fig1_architecture.svg, ..._checks.svg, ..._claims.svg
+    python analysis/export_wal_figures.py   # writes analysis/figures/wal_fig1_architecture.svg ... wal_fig4_completion.svg
 
 The page styles its inline SVGs with CSS classes and theme tokens; each file here gets the light values and the class
 rules embedded. Convert to PDF elsewhere if needed (e.g. rsvg-convert -f pdf, or Inkscape).
@@ -21,7 +21,7 @@ def resolve(text):
     return text
 
 
-names = ["architecture", "checks", "claims"]
+names = ["architecture", "checks", "claims", "completion"]
 out = HERE / "figures"
 out.mkdir(exist_ok=True)
 for i, svg in enumerate(re.findall(r"<svg .*?</svg>", page, re.S), 1):
