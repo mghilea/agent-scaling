@@ -120,6 +120,14 @@ a { color: var(--accent); }
     <ul class="points" id="findings"></ul>
   </section>
 
+  <section id="why-sec">
+    <div class="sectionhead">
+      <h2>Why is L3 less accurate than no log?</h2>
+      <p id="whylede">L3 removes almost every conflict, yet solves fewer tasks than L0. Three findings explain the gap.</p>
+    </div>
+    <ul class="points" id="why"></ul>
+  </section>
+
   <section id="levels">
     <div class="sectionhead">
       <h2>Levels of enforcement</h2>
@@ -264,18 +272,21 @@ if (S.L0 && S[topLvl]) {
 
 // ---- key findings (computed, so they follow the data) ----
 {
-  const out = [], f1 = (x) => Math.abs(100 * x).toFixed(1);
+  const out = [], why = [], f1 = (x) => Math.abs(100 * x).toFixed(1);
   const a12 = step("L1", "L2"), a23 = step("L2", "L3"), a03 = step("L0", "L3");
   if (S.L1 && S.L2 && S.L3 && a23) out.push(`<b>Catch-up is what removes conflicts.</b> Requiring intents alone takes task-runs with a conflict from ${pct(S.L1.any_conflict, 1)} (L1) to ${pct(S.L2.any_conflict, 1)} (L2); adding catch-up takes them to ${pct(S.L3.any_conflict, 1)} (L3, ${pv(a23.any_conflict.p)}).`);
   if (a12 && a23) out.push(`<b>Requiring intents costs accuracy.</b> ${sg(a12.correct.diff)}${f1(a12.correct.diff)} points from L1 to L2 (${pv(a12.correct.p)}), and catch-up doesn't win it back (${sg(a23.correct.diff)}${f1(a23.correct.diff)} points, ${a23.correct.p < 0.05 ? pv(a23.correct.p) : "not significant"}).`);
   if (a03) out.push(`<b>Enforcement costs time and tokens.</b> From no log to L3: ${sg(a03.seconds[0])}${Math.abs(a03.seconds[0]).toFixed(0)} s per task (${sg(a03.seconds[0])}${(100 * Math.abs(a03.seconds[0]) / S.L0.seconds).toFixed(0)}%) and ${sg(a03.tokens.diff)}${k(Math.abs(a03.tokens.diff))} tokens.`);
-  if (S.L0 && S.L0.acc_no_conflict != null) out.push(`<b>Fewer conflicts didn't buy accuracy, because most conflicts were harmless.</b> At L0, ${pct(S.L0.coll_only_share)} of task-runs had only collisions (a repeat that failed, nothing changed); they were solved ${S.L0.acc_coll_only == null ? "–" : pct(S.L0.acc_coll_only)} of the time, against ${pct(S.L0.acc_no_conflict)} with no conflict. Harmful duplicates (the world changed twice) were rarer: ${pct(S.L0.dup_share)} of task-runs, solved ${S.L0.acc_dup == null ? "–" : pct(S.L0.acc_dup)}. Even if every duplicate had been avoided and those task-runs solved as often as conflict-free ones, L0's accuracy would rise by at most about ${Math.max(0, 100 * S.L0.dup_share * (S.L0.acc_no_conflict - (S.L0.acc_dup ?? S.L0.acc_no_conflict))).toFixed(1)} points.`);
+  if (S.L0 && S.L0.acc_no_conflict != null) why.push(`<b>Fewer conflicts didn't buy accuracy, because most conflicts were harmless.</b> At L0, ${pct(S.L0.coll_only_share)} of task-runs had only collisions (a repeat that failed, nothing changed); they were solved ${S.L0.acc_coll_only == null ? "–" : pct(S.L0.acc_coll_only)} of the time, against ${pct(S.L0.acc_no_conflict)} with no conflict. Harmful duplicates (the world changed twice) were rarer: ${pct(S.L0.dup_share)} of task-runs, solved ${S.L0.acc_dup == null ? "–" : pct(S.L0.acc_dup)}. Even if every duplicate had been avoided and those task-runs solved as often as conflict-free ones, L0's accuracy would rise by at most about ${Math.max(0, 100 * S.L0.dup_share * (S.L0.acc_no_conflict - (S.L0.acc_dup ?? S.L0.acc_no_conflict))).toFixed(1)} points.`);
   const v3 = D.vs_L0 && D.vs_L0.L3;
-  if (v3 && v3.lost) out.push(`<b>What enforcement adds is work left undone.</b> On the ${v3.lost} task-runs that L0 solved and L3 failed (same task, same run; ${v3.won} went the other way), the L3 team made ${v3.writes_lost.toFixed(0)} writes against ${v3.writes_L0_lost.toFixed(0)} for L0.`);
+  if (v3 && v3.lost) why.push(`<b>What enforcement adds is work left undone.</b> On the ${v3.lost} task-runs that L0 solved and L3 failed (same task, same run; ${v3.won} went the other way), the L3 team made ${v3.writes_lost.toFixed(0)} writes against ${v3.writes_L0_lost.toFixed(0)} for L0.`);
   const v2 = D.vs_L0 && D.vs_L0.L2;
-  if (v2 && v3 && S.L2.acc_ended_open != null) out.push(`<b>One cause: a teammate's plan read as finished work.</b> An agent posts an intent; a teammate, refused for not having caught up, is shown that intent and calls <code>complete_task</code> at once. The task ends before the work is done, and every agent reports success (in one task-run, nothing at all was changed). The task ended while a teammate still held open claims in ${pct(S.L2.ended_open)} of L2 task-runs (solved ${pct(S.L2.acc_ended_open)} vs ${pct(S.L2.acc_not_ended_open)} otherwise) and ${pct(S.L3.ended_open)} of L3 task-runs (${pct(S.L3.acc_ended_open)} vs ${pct(S.L3.acc_not_ended_open)}). It accounts for ${v2.lost_ended_open} of L2's ${v2.lost} losses against L0, and ${v3.lost_ended_open} of L3's ${v3.lost}. The deferred-completion rule (built, not yet run) targets this; the rest of L3's losses are still being looked into.`);
+  if (v2 && v3 && S.L2.acc_ended_open != null) why.push(`<b>One cause: a teammate's plan read as finished work.</b> An agent posts an intent; a teammate, refused for not having caught up, is shown that intent and calls <code>complete_task</code> at once. The task ends before the work is done, and every agent reports success (in one task-run, nothing at all was changed). The task ended while a teammate still held open claims in ${pct(S.L2.ended_open)} of L2 task-runs (solved ${pct(S.L2.acc_ended_open)} vs ${pct(S.L2.acc_not_ended_open)} otherwise) and ${pct(S.L3.ended_open)} of L3 task-runs (${pct(S.L3.acc_ended_open)} vs ${pct(S.L3.acc_not_ended_open)}). It accounts for ${v2.lost_ended_open} of L2's ${v2.lost} losses against L0, and ${v3.lost_ended_open} of L3's ${v3.lost}. The deferred-completion rule (built, not yet run) targets this; the rest of L3's losses are still being looked into.`);
   if (single && S.L0) out.push(`<b>Team vs one agent.</b> A three-agent team without the log solves ${pct(S.L0.accuracy, 1)} of tasks, against ${pct(single.accuracy, 1)} for a single agent, using ${(S.L0.tokens / single.tokens).toFixed(1)}× the tokens. Neither the team's lead nor L3's deficit against the single agent is significant task by task, and the single agent has one run so far.`);
   $("findings").innerHTML = out.map((x) => `<li>${x}</li>`).join("");
+  const s03 = step("L0", "L3");
+  if (s03) $("whylede").textContent = `L3 removes almost every conflict, yet solves ${f1(s03.correct.diff)} points fewer tasks than L0 (${pv(s03.correct.p)}). Three findings explain the gap.`;
+  $("why").innerHTML = why.map((x) => `<li>${x}</li>`).join("");
 }
 
 // ---- results by level ----
