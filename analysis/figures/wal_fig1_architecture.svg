@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 500" role="img" aria-label="Three agents never message each other. Each one posts intents to and reads the shared write-ahead log, and sends code cells to one code runner. The code runner sends reads straight to the AppWorld apps; every write goes through the gate, which checks the log, logs the change and either lets the write through or refuses it. The log is appended to a file on disk.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 560" role="img" aria-label="Architecture of the write-ahead log. Three agent threads have no channel to each other; each calls wal_intend and wal_read on the log and execute_python on the code runner. In the harness process, the code runner sends reads straight to the AppWorld app databases and every write to the gate, commit, which checks the level rules under the log mutex, records a pending line, applies the write and appends a change entry, all forced to the log file on disk.">
 <style>svg { background: #fbfcfd; }
 /* SVG text and shapes */
 .t-title { font: 600 16px "IBM Plex Sans Condensed", "IBM Plex Sans", "Arial Narrow", Arial, sans-serif; fill: #16202e; }
@@ -37,61 +37,131 @@
 .edge-none { fill: none; stroke: #5d6879; stroke-width: 1.3; stroke-dasharray: 3 4; }
 .arrowhead { fill: #3e4a5c; }
 .arrowhead-ref { fill: #b3261e; }
+.p-box { fill: #fbfcfd; stroke: #3e4a5c; stroke-width: 1.1; }
+.p-key { fill: #fbfcfd; stroke: #2a78d6; stroke-width: 1.6; }
+.p-fill { fill: #e7ebf1; stroke: #3e4a5c; stroke-width: 1; }
+.p-bound { fill: none; stroke: #5d6879; stroke-width: 1; stroke-dasharray: 5 4; }
+.p-edge { fill: none; stroke: #3e4a5c; stroke-width: 1.2; }
+.p-edge-ref { fill: none; stroke: #b3261e; stroke-width: 1.2; stroke-dasharray: 4 3; }
+.p-none { fill: none; stroke: #5d6879; stroke-width: 1; stroke-dasharray: 2 3; }
+.p-num { fill: #16202e; }
+.p-mask { fill: #fbfcfd; stroke: none; }
+.p-num-ref { fill: #b3261e; }
+.t-num { font: 700 10px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; fill: #fbfcfd; }
+.t-h { font: 600 13px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; fill: #16202e; }
+.t-api { font: 10.5px "IBM Plex Mono", ui-monospace, Menlo, Consolas, "Courier New", monospace; fill: #16202e; }
+.t-vref { font: 11.5px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; fill: #b3261e; }
+.t-k { font: 11px "IBM Plex Mono", ui-monospace, Menlo, Consolas, "Courier New", monospace; fill: #3e4a5c; }
+.t-v { font: 11.5px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; fill: #3e4a5c; }
+.t-bound { font: italic 11.5px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; fill: #5d6879; }
+.t-x { font: 700 15px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; fill: #b3261e; }
 </style>
-<defs><marker id="m1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="arrowhead"/></marker><marker id="m1r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="arrowhead-ref"/></marker></defs>
-<rect class="box" x="20" y="40" width="150" height="420" rx="12"/>
-<text class="t-cap" x="95" y="66" text-anchor="middle">AGENTS</text>
-<line class="ic" x1="95" y1="110" x2="95" y2="103"/><circle class="ic-solid" cx="95" cy="100" r="3"/><rect class="ic-body" x="75" y="110" width="40" height="30" rx="9"/><circle class="ic-solid" cx="87" cy="123" r="3.2"/><circle class="ic-solid" cx="103" cy="123" r="3.2"/><line class="ic" x1="88" y1="133" x2="102" y2="133"/>
-<text class="t-lbl" x="95" y="165" text-anchor="middle">agent 1</text>
-<line class="ic" x1="95" y1="230" x2="95" y2="223"/><circle class="ic-solid" cx="95" cy="220" r="3"/><rect class="ic-body" x="75" y="230" width="40" height="30" rx="9"/><circle class="ic-solid" cx="87" cy="243" r="3.2"/><circle class="ic-solid" cx="103" cy="243" r="3.2"/><line class="ic" x1="88" y1="253" x2="102" y2="253"/>
-<text class="t-lbl" x="95" y="285" text-anchor="middle">agent 2</text>
-<line class="ic" x1="95" y1="350" x2="95" y2="343"/><circle class="ic-solid" cx="95" cy="340" r="3"/><rect class="ic-body" x="75" y="350" width="40" height="30" rx="9"/><circle class="ic-solid" cx="87" cy="363" r="3.2"/><circle class="ic-solid" cx="103" cy="363" r="3.2"/><line class="ic" x1="88" y1="373" x2="102" y2="373"/>
-<text class="t-lbl" x="95" y="405" text-anchor="middle">agent 3</text>
-<path class="edge-none" d="M119,125 C150,125 150,245 119,245"/>
-<circle class="badge-ref" cx="142.5" cy="185.0" r="10"/>
-<line class="ic-ref" x1="138.0" y1="180.5" x2="147.0" y2="189.5"/><line class="ic-ref" x1="138.0" y1="189.5" x2="147.0" y2="180.5"/>
-<path class="edge-none" d="M119,245 C150,245 150,365 119,365"/>
-<circle class="badge-ref" cx="142.5" cy="305.0" r="10"/>
-<line class="ic-ref" x1="138.0" y1="300.5" x2="147.0" y2="309.5"/><line class="ic-ref" x1="138.0" y1="309.5" x2="147.0" y2="300.5"/>
-<line class="ic-ref" x1="28.5" y1="432.5" x2="37.5" y2="441.5"/><line class="ic-ref" x1="28.5" y1="441.5" x2="37.5" y2="432.5"/>
-<text class="t-small" x="44" y="441" text-anchor="start">no direct messages</text>
-<rect class="box-key" x="350" y="40" width="170" height="140" rx="12"/>
-<rect class="ic-body" x="413" y="64" width="44" height="56" rx="5"/><line class="ic" x1="422" y1="76" x2="448" y2="76"/><line class="ic" x1="422" y1="86" x2="448" y2="86"/><line class="ic" x1="422" y1="96" x2="448" y2="96"/><line class="ic-acc-line" x1="422" y1="106" x2="438" y2="106"/>
-<text class="t-name" x="435" y="145" text-anchor="middle">Write-ahead log</text>
-<text class="t-small" x="435" y="162" text-anchor="middle">intents · changes · releases</text>
-<rect class="box" x="350" y="222" width="170" height="100" rx="12"/>
-<path class="ic-acc" d="M435,232 L457,240 V259 C457,273 446,281 435,286 C424,281 413,273 413,259 V240 Z"/><polyline class="ic-acc-line" points="426,259 433,266 445,252"/>
-<text class="t-name" x="435" y="307" text-anchor="middle">Gate</text>
-<rect class="box" x="350" y="372" width="170" height="100" rx="12"/>
-<rect class="ic-body" x="405" y="388" width="60" height="13" rx="4"/><text class="t-glyph" x="435" y="398" text-anchor="middle">&lt;/&gt;</text><rect class="ic-body" x="405" y="404" width="60" height="13" rx="4"/><text class="t-glyph" x="435" y="414" text-anchor="middle">&lt;/&gt;</text><rect class="ic-body" x="405" y="420" width="60" height="13" rx="4"/><text class="t-glyph" x="435" y="430" text-anchor="middle">&lt;/&gt;</text>
-<text class="t-name" x="435" y="450" text-anchor="middle">Code runner</text>
-<text class="t-small" x="435" y="465" text-anchor="middle">one cell at a time</text>
-<rect class="box" x="770" y="40" width="210" height="140" rx="12"/>
-<path class="ic-body" d="M853,74 V106 A22,7 0 0,0 897,106 V74"/><ellipse class="ic-body" cx="875" cy="74" rx="22" ry="7"/><path class="ic" d="M853,90 A22,7 0 0,0 897,90"/>
-<text class="t-mono" x="875" y="145" text-anchor="middle">wal/&lt;task&gt;.jsonl</text>
-<text class="t-small" x="875" y="162" text-anchor="middle">one line per entry</text>
-<rect class="box" x="770" y="250" width="210" height="222" rx="12"/>
-<rect class="ic-body" x="849" y="304" width="14" height="14" rx="3.5"/><rect class="ic-body" x="868" y="304" width="14" height="14" rx="3.5"/><rect class="ic-body" x="887" y="304" width="14" height="14" rx="3.5"/><rect class="ic-body" x="849" y="323" width="14" height="14" rx="3.5"/><rect class="ic-body" x="868" y="323" width="14" height="14" rx="3.5"/><rect class="ic-body" x="887" y="323" width="14" height="14" rx="3.5"/><rect class="ic-body" x="849" y="342" width="14" height="14" rx="3.5"/><rect class="ic-body" x="868" y="342" width="14" height="14" rx="3.5"/><rect class="ic-body" x="887" y="342" width="14" height="14" rx="3.5"/>
-<text class="t-name" x="875" y="395" text-anchor="middle">AppWorld apps</text>
-<text class="t-small" x="875" y="412" text-anchor="middle">shared by all three</text>
-<line class="edge" x1="170" y1="92" x2="346" y2="92" marker-end="url(#m1)"/>
-<g><rect class="chip" x="205.5" y="80" width="107" height="24" rx="12"/><line class="ic" x1="216.5" y1="85" x2="216.5" y2="99"/><path class="ic-solid" d="M216.5,85 L227.5,88 L216.5,91.5 Z"/><text class="t-chip" x="234.5" y="96">post intent</text></g>
-<line class="edge" x1="350" y1="138" x2="174" y2="138" marker-end="url(#m1)"/>
-<g><rect class="chip" x="218.5" y="126" width="87" height="24" rx="12"/><path class="ic" d="M227.5,138 Q234.5,131.5 241.5,138 Q234.5,144.5 227.5,138 Z"/><circle class="ic-solid" cx="234.5" cy="138" r="2.3"/><text class="t-chip" x="247.5" y="142">read log</text></g>
-<line class="edge" x1="170" y1="400" x2="346" y2="400" marker-end="url(#m1)"/>
-<g><rect class="chip" x="212.0" y="388" width="94" height="24" rx="12"/><text class="t-glyph" x="228.0" y="404" text-anchor="middle">&lt;/&gt;</text><text class="t-chip" x="241.0" y="404">code cell</text></g>
-<line class="edge" x1="350" y1="444" x2="174" y2="444" marker-end="url(#m1)"/>
-<g><rect class="chip" x="225.0" y="432" width="74" height="24" rx="12"/><path class="ic" d="M247.0,439 V445 H236.0 M239.0,442 L236.0,445 L239.0,448"/><text class="t-chip" x="254.0" y="448">output</text></g>
-<line class="edge" x1="405" y1="372" x2="405" y2="326" marker-end="url(#m1)"/>
-<g><rect class="chip" x="371.5" y="336" width="67" height="24" rx="12"/><path class="ic" d="M381.5,354 L382.5,349 L390.5,341 L394.5,345 L386.5,353 Z"/><line class="ic" x1="388.5" y1="343" x2="392.5" y2="347"/><text class="t-chip" x="400.5" y="352">write</text></g>
-<line class="edge-ref" x1="478" y1="324" x2="478" y2="368" marker-end="url(#m1r)"/>
-<g><rect class="chip-ref" x="498.0" y="336" width="80" height="24" rx="12"/><line class="ic-ref" x1="509.5" y1="343.5" x2="518.5" y2="352.5"/><line class="ic-ref" x1="509.5" y1="352.5" x2="518.5" y2="343.5"/><text class="t-chip t-ref" x="527.0" y="352">refused</text></g>
-<line class="edge" x1="435" y1="220" x2="435" y2="184" marker-end="url(#m1)" marker-start="url(#m1)"/>
-<text class="t-small" x="445" y="206" text-anchor="start">checks claims, logs the change</text>
-<line class="edge" x1="520" y1="92" x2="766" y2="92" marker-end="url(#m1)"/>
-<g><rect class="chip" x="611.5" y="80" width="67" height="24" rx="12"/><path class="ic" d="M621.5,86 H631.5 L633.5,88 V98 H621.5 Z"/><rect class="ic-solid" x="624.5" y="86" width="6" height="4"/><text class="t-chip" x="640.5" y="96">fsync</text></g>
-<line class="edge" x1="520" y1="272" x2="766" y2="272" marker-end="url(#m1)"/>
-<g><rect class="chip" x="584.5" y="260" width="121" height="24" rx="12"/><polyline class="ic-ok" points="594.5,272 598.5,276 606.5,267"/><text class="t-chip" x="613.5" y="276">allowed write</text></g>
-<line class="edge" x1="520" y1="440" x2="766" y2="440" marker-end="url(#m1)"/>
-<g><rect class="chip" x="615.0" y="428" width="60" height="24" rx="12"/><path class="ic" d="M624.0,440 Q631.0,433.5 638.0,440 Q631.0,446.5 624.0,440 Z"/><circle class="ic-solid" cx="631.0" cy="440" r="2.3"/><text class="t-chip" x="644.0" y="444">read</text></g>
+<defs><marker id="pa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="arrowhead"/></marker><marker id="pr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="arrowhead-ref"/></marker></defs>
+<rect class="p-bound" x="16" y="44" width="144" height="470" rx="6"/>
+<text class="t-bound" x="28" y="64" text-anchor="start">Agent threads</text>
+<rect class="p-box" x="36" y="100" width="104" height="56" rx="3"/>
+<text class="t-h" x="88" y="126" text-anchor="middle">Agent 1</text>
+<text class="t-k" x="88" y="143" text-anchor="middle">a1</text>
+<rect class="p-box" x="36" y="250" width="104" height="56" rx="3"/>
+<text class="t-h" x="88" y="276" text-anchor="middle">Agent 2</text>
+<text class="t-k" x="88" y="293" text-anchor="middle">a2</text>
+<rect class="p-box" x="36" y="400" width="104" height="56" rx="3"/>
+<text class="t-h" x="88" y="426" text-anchor="middle">Agent 3</text>
+<text class="t-k" x="88" y="443" text-anchor="middle">a3</text>
+<line class="p-none" x1="88" y1="156" x2="88" y2="250"/>
+<rect class="p-mask" x="56" y="191.0" width="64" height="30" rx="0"/>
+<text class="t-x" x="88" y="204.0" text-anchor="middle">×</text>
+<text class="t-v" x="88" y="218.0" text-anchor="middle">no channel</text>
+<line class="p-none" x1="88" y1="306" x2="88" y2="400"/>
+<rect class="p-mask" x="56" y="341.0" width="64" height="30" rx="0"/>
+<text class="t-x" x="88" y="354.0" text-anchor="middle">×</text>
+<text class="t-v" x="88" y="368.0" text-anchor="middle">no channel</text>
+<rect class="p-bound" x="318" y="20" width="538" height="520" rx="6"/>
+<text class="t-bound" x="330" y="40" text-anchor="start">Harness process (one per task)</text>
+<rect class="p-key" x="330" y="60" width="300" height="150" rx="3"/>
+<text class="t-h" x="344" y="82" text-anchor="start">Write-ahead log</text>
+<text class="t-bound" x="470" y="82" text-anchor="start">append-only</text>
+<text class="t-k" x="344" y="108" text-anchor="start">entries</text>
+<text class="t-v" x="420" y="108" text-anchor="start">intent · change · release</text>
+<text class="t-k" x="344" y="132" text-anchor="start">cursor[a]</text>
+<text class="t-v" x="420" y="132" text-anchor="start">last entry agent a has read</text>
+<text class="t-k" x="344" y="156" text-anchor="start">claims[a]</text>
+<text class="t-v" x="420" y="156" text-anchor="start">open claims {app, api, target}</text>
+<text class="t-k" x="344" y="180" text-anchor="start">mutex</text>
+<text class="t-v" x="420" y="180" text-anchor="start">one lock: reads, posts, commits</text>
+<rect class="p-key" x="330" y="258" width="300" height="92" rx="3"/>
+<text class="t-h" x="344" y="280" text-anchor="start">Gate</text>
+<text class="t-api" x="384" y="280" text-anchor="start">commit(a, op)</text>
+<text class="t-v" x="344" y="304" text-anchor="start">level rules: claim · catch-up · conflict</text>
+<text class="t-v" x="344" y="324" text-anchor="start">pending line → apply op → change entry</text>
+<text class="t-v" x="344" y="342" text-anchor="start">complete_task: logged, never checked</text>
+<rect class="p-box" x="330" y="410" width="300" height="108" rx="3"/>
+<text class="t-h" x="344" y="432" text-anchor="start">Code runner</text>
+<text class="t-bound" x="446" y="432" text-anchor="start">(main thread)</text>
+<rect class="p-fill" x="344" y="446" width="24" height="18" rx="2"/>
+<rect class="p-fill" x="374" y="446" width="24" height="18" rx="2"/>
+<rect class="p-fill" x="404" y="446" width="24" height="18" rx="2"/>
+<rect class="p-fill" x="434" y="446" width="24" height="18" rx="2"/>
+<text class="t-v" x="470" y="459" text-anchor="start">FIFO, one cell at a time</text>
+<text class="t-v" x="344" y="486" text-anchor="start">each cell runs in its agent's shell;</text>
+<text class="t-v" x="344" y="504" text-anchor="start">API calls dispatched by HTTP method</text>
+<rect class="p-box" x="696" y="150" width="144" height="368" rx="3"/>
+<text class="t-h" x="710" y="172" text-anchor="start">AppWorld world</text>
+<path class="p-fill" d="M711.0,199.0 V229.0 A17.0,5 0 0,0 745.0,229.0 V199.0"/><ellipse class="p-fill" cx="728" cy="199.0" rx="17.0" ry="5"/>
+<text class="t-k" x="756" y="218" text-anchor="start">spotify</text>
+<path class="p-fill" d="M711.0,261.0 V291.0 A17.0,5 0 0,0 745.0,291.0 V261.0"/><ellipse class="p-fill" cx="728" cy="261.0" rx="17.0" ry="5"/>
+<text class="t-k" x="756" y="280" text-anchor="start">venmo</text>
+<path class="p-fill" d="M711.0,323.0 V353.0 A17.0,5 0 0,0 745.0,353.0 V323.0"/><ellipse class="p-fill" cx="728" cy="323.0" rx="17.0" ry="5"/>
+<text class="t-k" x="756" y="342" text-anchor="start">gmail</text>
+<path class="p-fill" d="M711.0,385.0 V415.0 A17.0,5 0 0,0 745.0,415.0 V385.0"/><ellipse class="p-fill" cx="728" cy="385.0" rx="17.0" ry="5"/>
+<text class="t-k" x="756" y="404" text-anchor="start">…</text>
+<text class="t-v" x="710" y="476" text-anchor="start">9 app databases</text>
+<text class="t-v" x="710" y="494" text-anchor="start">457 APIs, in-process</text>
+<path class="p-fill" d="M928.0,86.0 V138.0 A32.0,5 0 0,0 992.0,138.0 V86.0"/><ellipse class="p-fill" cx="960" cy="86.0" rx="32.0" ry="5"/>
+<text class="t-k" x="960" y="160" text-anchor="middle">wal/&lt;task&gt;.jsonl</text>
+<text class="t-v" x="960" y="177" text-anchor="middle">JSON Lines, fsync per line</text>
+<line class="p-edge" x1="160" y1="108" x2="326" y2="108" marker-end="url(#pa)"/>
+<text class="t-api" x="238" y="100" text-anchor="middle">wal_intend(plan, claims)</text>
+<line class="p-edge" x1="330" y1="146" x2="164" y2="146" marker-end="url(#pa)"/>
+<text class="t-api" x="240" y="162" text-anchor="middle">wal_read() → entries</text>
+<line class="p-edge" x1="160" y1="446" x2="326" y2="446" marker-end="url(#pa)"/>
+<text class="t-api" x="228" y="436" text-anchor="middle">execute_python(code)</text>
+<circle class="p-num" cx="300" cy="446" r="8.5"/><text class="t-num" x="300" y="449.6" text-anchor="middle">1</text>
+<line class="p-edge" x1="330" y1="486" x2="164" y2="486" marker-end="url(#pa)"/>
+<text class="t-api" x="228" y="504" text-anchor="middle">stdout | Refused</text>
+<circle class="p-num" cx="300" cy="486" r="8.5"/><text class="t-num" x="300" y="489.6" text-anchor="middle">7</text>
+<line class="p-edge" x1="364" y1="410" x2="364" y2="354" marker-end="url(#pa)"/>
+<circle class="p-num" cx="364" cy="381" r="8.5"/><text class="t-num" x="364" y="384.6" text-anchor="middle">2</text>
+<text class="t-api" x="378" y="385" text-anchor="start">POST · PUT · PATCH · DELETE</text>
+<line class="p-edge-ref" x1="604" y1="352" x2="604" y2="406" marker-end="url(#pr)"/>
+<text class="t-vref" x="612" y="385" text-anchor="start">Refused</text>
+<line class="p-edge" x1="480" y1="256" x2="480" y2="214" marker-end="url(#pa)" marker-start="url(#pa)"/>
+<circle class="p-num" cx="480" cy="235" r="8.5"/><text class="t-num" x="480" y="238.6" text-anchor="middle">3</text>
+<text class="t-v" x="494" y="239" text-anchor="start">check · append</text>
+<line class="p-edge" x1="630" y1="300" x2="692" y2="300" marker-end="url(#pa)"/>
+<circle class="p-num" cx="661" cy="300" r="8.5"/><text class="t-num" x="661" y="303.6" text-anchor="middle">5</text>
+<line class="p-edge" x1="630" y1="470" x2="692" y2="470" marker-end="url(#pa)"/>
+<text class="t-api" x="661" y="462" text-anchor="middle">GET</text>
+<line class="p-edge" x1="630" y1="112" x2="924" y2="112" marker-end="url(#pa)"/>
+<circle class="p-num" cx="700" cy="112" r="8.5"/><text class="t-num" x="700" y="115.6" text-anchor="middle">4</text>
+<circle class="p-num" cx="722" cy="112" r="8.5"/><text class="t-num" x="722" y="115.6" text-anchor="middle">6</text>
+<text class="t-v" x="800" y="104" text-anchor="middle">append + fsync</text>
+<text class="t-h" x="872" y="250" text-anchor="start">Write path</text>
+<circle class="p-num" cx="882" cy="274" r="8.5"/><text class="t-num" x="882" y="277.6" text-anchor="middle">1</text>
+<text class="t-v" x="898" y="278" text-anchor="start">cell queued</text>
+<circle class="p-num" cx="882" cy="300" r="8.5"/><text class="t-num" x="882" y="303.6" text-anchor="middle">2</text>
+<text class="t-v" x="898" y="304" text-anchor="start">write → commit(a, op)</text>
+<circle class="p-num" cx="882" cy="326" r="8.5"/><text class="t-num" x="882" y="329.6" text-anchor="middle">3</text>
+<text class="t-v" x="898" y="330" text-anchor="start">rules checked, under mutex</text>
+<circle class="p-num" cx="882" cy="352" r="8.5"/><text class="t-num" x="882" y="355.6" text-anchor="middle">4</text>
+<text class="t-v" x="898" y="356" text-anchor="start">pending line, fsync</text>
+<circle class="p-num" cx="882" cy="378" r="8.5"/><text class="t-num" x="882" y="381.6" text-anchor="middle">5</text>
+<text class="t-v" x="898" y="382" text-anchor="start">op applied to the app DB</text>
+<circle class="p-num" cx="882" cy="404" r="8.5"/><text class="t-num" x="882" y="407.6" text-anchor="middle">6</text>
+<text class="t-v" x="898" y="408" text-anchor="start">change entry, fsync</text>
+<circle class="p-num" cx="882" cy="430" r="8.5"/><text class="t-num" x="882" y="433.6" text-anchor="middle">7</text>
+<text class="t-v" x="898" y="434" text-anchor="start">result, or Refused</text>
+<text class="t-v" x="872" y="466" text-anchor="start">Reads (GET) go from the</text>
+<text class="t-v" x="872" y="482" text-anchor="start">code runner straight to</text>
+<text class="t-v" x="872" y="498" text-anchor="start">the app DB: no ②–⑥.</text>
 </svg>

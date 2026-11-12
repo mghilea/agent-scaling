@@ -37,6 +37,24 @@
 .edge-none { fill: none; stroke: #5d6879; stroke-width: 1.3; stroke-dasharray: 3 4; }
 .arrowhead { fill: #3e4a5c; }
 .arrowhead-ref { fill: #b3261e; }
+.p-box { fill: #fbfcfd; stroke: #3e4a5c; stroke-width: 1.1; }
+.p-key { fill: #fbfcfd; stroke: #2a78d6; stroke-width: 1.6; }
+.p-fill { fill: #e7ebf1; stroke: #3e4a5c; stroke-width: 1; }
+.p-bound { fill: none; stroke: #5d6879; stroke-width: 1; stroke-dasharray: 5 4; }
+.p-edge { fill: none; stroke: #3e4a5c; stroke-width: 1.2; }
+.p-edge-ref { fill: none; stroke: #b3261e; stroke-width: 1.2; stroke-dasharray: 4 3; }
+.p-none { fill: none; stroke: #5d6879; stroke-width: 1; stroke-dasharray: 2 3; }
+.p-num { fill: #16202e; }
+.p-mask { fill: #fbfcfd; stroke: none; }
+.p-num-ref { fill: #b3261e; }
+.t-num { font: 700 10px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; fill: #fbfcfd; }
+.t-h { font: 600 13px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; fill: #16202e; }
+.t-api { font: 10.5px "IBM Plex Mono", ui-monospace, Menlo, Consolas, "Courier New", monospace; fill: #16202e; }
+.t-vref { font: 11.5px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; fill: #b3261e; }
+.t-k { font: 11px "IBM Plex Mono", ui-monospace, Menlo, Consolas, "Courier New", monospace; fill: #3e4a5c; }
+.t-v { font: 11.5px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; fill: #3e4a5c; }
+.t-bound { font: italic 11.5px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; fill: #5d6879; }
+.t-x { font: 700 15px "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif; fill: #b3261e; }
 </style>
           <defs>
             <marker id="b1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3e4a5c"/></marker>
