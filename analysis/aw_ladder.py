@@ -46,8 +46,19 @@ def load(level, dataset, tag):
             continue
         for line in open(Path(d, "results.jsonl")):
             r = json.loads(line)
+            r["_ended_open"] = ended_with_open_claims(Path(d, "traces", f"{r['id']}.json")) if level != "L0" else False
             out[(rep, r["id"])] = r
     return out
+
+
+def ended_with_open_claims(trace):
+    """Whether the task ended (first complete_task) while a teammate of the completer still held open claims: claims
+    released because their agent stopped, after the complete_task change, for an agent other than the completer."""
+    if not trace.exists():
+        return False
+    log = json.load(open(trace)).get("wal_log") or []
+    i = next((j for j, e in enumerate(log) if e["kind"] == "change" and "complete_task" in e.get("call", "")), None)
+    return i is not None and any(e["kind"] == "release" and e.get("owner") != log[i]["agent"] for e in log[i + 1:])
 
 
 def m(r, key):
@@ -87,6 +98,11 @@ def summary(rows):
            "delivered": mean("wal_delivered"), "refusal_chains_3plus": mean("refusal_chains_3plus"),
            "refusal_chain_max": max((m(r, "refusal_chain_max") for r in rows), default=0),
            "stopped_after_refusal": mean("stopped_after_refusal"),
+           "ended_open": st.mean(int(r["_ended_open"]) for r in rows) if rows else 0,
+           "acc_ended_open": st.mean(int(bool(r["correct"])) for r in rows if r["_ended_open"]) if any(r["_ended_open"] for r in rows) else None,
+           "acc_not_ended_open": st.mean(int(bool(r["correct"])) for r in rows if not r["_ended_open"]) if rows else None,
+           "acc_conflict": st.mean(int(bool(r["correct"])) for r in rows if m(r, "any_conflict")) if any(m(r, "any_conflict") for r in rows) else None,
+           "acc_no_conflict": st.mean(int(bool(r["correct"])) for r in rows if not m(r, "any_conflict")) if rows else None,
            "completion_deferred": mean("completion_deferred"), "finish_wait": mean("finish_wait"),
            "finish_writes": mean("finish_writes"),
            "by_difficulty": {str(dif): {"n": len(g), "accuracy": st.mean(int(bool(r["correct"])) for r in g)}
@@ -136,7 +152,14 @@ def main():
            "summary": {lvl: summary(list(rows.values())) for lvl, rows in data.items()},
            "per_rep_accuracy": {lvl: {rep: st.mean(int(bool(r["correct"])) for k, r in rows.items() if k[0] == rep)
                                       for rep in sorted({k[0] for k in rows})} for lvl, rows in data.items()},
-           "steps": {f"{a}->{b}": compare(data[a], data[b]) for a, b in STEPS}}
+           "steps": {f"{a}->{b}": compare(data[a], data[b]) for a, b in STEPS},
+           # task-runs L0 solved and this level failed (same task, same run), and the other way round
+           "vs_L0": {lvl: {"lost": len(lost), "won": sum(1 for k in rows if not data["L0"][k]["correct"] and rows[k]["correct"]),
+                           "writes_lost": st.mean(m(rows[k], "writes") for k in lost) if lost else None,
+                           "writes_L0_lost": st.mean(m(data["L0"][k], "writes") for k in lost) if lost else None,
+                           "lost_ended_open": sum(rows[k]["_ended_open"] for k in lost)}
+                     for lvl, rows in data.items() if lvl != "L0" and rows and data["L0"]
+                     for lost in [[k for k in rows if data["L0"][k]["correct"] and not rows[k]["correct"]]]}}
     single = [json.loads(line) for d in glob.glob(str(ROOT / "runs" / f"*-sas-rc-appworld-{dataset}-*-base02"))
               for line in open(Path(d, "results.jsonl"))]
     single = [r for r in single if r["id"] in {k[1] for k in common}]  # the same tasks as the teams
