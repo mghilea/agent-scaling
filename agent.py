@@ -131,6 +131,17 @@ def call_tool(name: str, arguments: str, tools=TOOLS, repair=False, max_output=N
         if len(required) != 1:
             return "[error] arguments must be a JSON object"
         args = {required[0]: arguments}
+    params = tools[name][1]["function"]["parameters"].get("properties", {})
+    if repair and params and set(args) - set(params):
+        # --repair-calls: arguments the tool doesn't take (gpt-oss passes an API's arguments, e.g. username=...,
+        # straight to execute_python). Say what the tool takes instead of a raw TypeError.
+        wanted = ", ".join(f"{k} ({v.get('type', 'any')})" for k, v in params.items())
+        hint = ""
+        if len(required) == 1:
+            hint = f" Pass a single argument, `{required[0]}`" + (
+                " (to call an API, write the call as Python code in it)." if required[0] == "code" else ".")
+        return (f"[error] {name} takes these arguments: {wanted}. You passed: {', '.join(sorted(args))}."
+                f"{hint} Nothing ran.")
     try:
         out = tools[name][0](**args)
     except Exception as e:
@@ -474,7 +485,7 @@ def main():
     if not args.model:
         args.model = client.models.list().data[0].id
 
-    args.max_turns = args.max_turns or (20 if wb else 30 if bc else 50 if aw else 12)
+    args.max_turns = args.max_turns or (20 if wb else 30 if bc else 100 if aw else 12)
     driven = args.topology == "agent-driven"
     if multi and not driven:
         import mas
@@ -529,7 +540,15 @@ def main():
                 actions = sandbox.actions
             elif aw:
                 session = aw.Session(t["id"], experiment_name=run_dir.name)
-                r = make_agent(tools=session.tools, system_prompt=session.system_prompt()).run(session.task_prompt())
+                agent = make_agent(tools=session.tools, system_prompt=session.system_prompt())
+                r = agent.run(session.task_prompt())
+                # AppWorld's own agents can't stop before the task is marked complete; ours stop when they reply
+                # without a tool call. If that happens before complete_task, remind the agent once, with the calls left.
+                left = args.max_turns - agent.stats["turns"]
+                if r["stop"] == "final" and not session.world.task_completed() and left > 0:
+                    session.reminded = True
+                    agent.max_turns = left
+                    r = agent.send(aw.COMPLETE_REMINDER)
             elif bc:
                 session = bc.Session()
                 agent = make_agent(tools=session.tools, system_prompt=bc.system_prompt())
@@ -594,7 +613,7 @@ def main():
             shown = f"actions={answer}  expected={expected}  side_effects={verdict['side_effects']}"
         elif aw:
             shown = (f"tests={verdict['tests_passed']}/{verdict['tests']} completed={verdict['completed']} "
-                     f"difficulty={verdict['difficulty']}")
+                     f"difficulty={verdict['difficulty']}" + (" reminded" if verdict.get("reminded") else ""))
         else:
             shown = f"answer={answer!r}" + (f" expected={expected!r}" if "answer" in t else "")
         extra = f"agents={row['agents']} rounds={row['rounds']} messages={row['agent_messages']} " if multi else ""

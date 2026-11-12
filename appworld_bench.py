@@ -44,6 +44,10 @@ How to work:
 6. When you are done, call `apis.supervisor.complete_task()`. If the task asks for information, pass it as the answer, e.g. `apis.supervisor.complete_task(answer=42)`, using just the value (a number, a name, or a short phrase), not a sentence. If the task asks for no information, call it without an answer. Then reply with a short summary and no tool call."""
 
 TASK_PROMPT = "Task from your supervisor:\n{instruction}"
+# Sent once if the agent stops (replies without a tool call) before calling complete_task.
+COMPLETE_REMINDER = ("The task is not marked complete: apis.supervisor.complete_task() has not been called. If you are "
+                     "done, call it now, with answer=... if the task asks for information and without an answer "
+                     "otherwise. If you are not done, continue the task.")
 
 
 def load_tasks(dataset="dev", limit=None, offset=0, seed=0):
@@ -68,6 +72,7 @@ class Session:
         self.world = AppWorld(task_id=task_id, experiment_name=experiment_name)
         self.task = self.world.task
         self.codes = []  # every piece of code the agent ran, in order
+        self.reminded = False  # whether the agent got COMPLETE_REMINDER
         self.tools = {"execute_python": (self._execute, _schema(
             "execute_python",
             "Run Python code in the task's shell (variables persist between calls; apps are under `apis`) and "
@@ -88,7 +93,8 @@ class Session:
         """AppWorld's verdict: solved only if every test passes (the expected changes, nothing else, the answer)."""
         r = self.world.evaluate()
         return {"correct": bool(r.success), "tests_passed": r.pass_count, "tests": r.num_tests,
-                "difficulty": r.difficulty, "completed": self.world.task_completed(), "code_blocks": len(self.codes)}
+                "difficulty": r.difficulty, "completed": self.world.task_completed(), "code_blocks": len(self.codes),
+                "reminded": self.reminded}
 
     def close(self):
         self.world.close()
