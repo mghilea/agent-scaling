@@ -146,25 +146,6 @@ a { color: var(--accent); }
     </table></div>
   </section>
 
-  <section id="validity">
-    <div class="sectionhead">
-      <h2>Are the 2026-11-11 runs still valid?</h2>
-      <p>The five runs of 2026-11-11 (lad02–lad06, all on the same log code) checked against the intended design above.</p>
-    </div>
-    <div class="tablewrap"><table class="wide">
-      <thead><tr><th>Part of the design</th><th>What the runs did</th><th>Verdict</th></tr></thead>
-      <tbody>
-        <tr><td><span class="lvl">L0</span> <span class="lvl">L1</span> <span class="lvl">L2</span> <span class="lvl">L3</span></td><td>As intended.</td><td><span class="pill on">Valid</span></td></tr>
-        <tr><td><span class="lvl">L4</span></td><td>Not run as intended. Two earlier variants ran instead, both also refusing work a teammate had already done. <b>L4v0-strict</b> (full catch-up) is L4 plus that check, which refused 5 times, in 2 of 285 task-runs; its instructions told agents about the check. <b>L4v0</b> also caught up only on entries about the same records.</td><td><span class="pill rel">L4v0-strict is close to L4</span><br><span class="pill ask">Rerun L4</span></td></tr>
-        <tr><td>Entries: intent and change</td><td>The runs also wrote release entries (claims closed when an agent stopped). They came after the task had ended in all but 1 of 1,710 task-runs, so no agent acted on one.</td><td><span class="pill on">No effect</span></td></tr>
-        <tr><td>First <code>complete_task</code> ends the run</td><td>As intended.</td><td><span class="pill on">Valid</span></td></tr>
-        <tr><td>Claims (no expiry in the design)</td><td>Claims had a 90 s expiry, but it never fired: AppWorld freezes the clock while a task runs, and the log read the frozen clock (fixed since). The team's 30-minute limit never fired either; the longest task-run took 463 s.</td><td><span class="pill on">No effect</span></td></tr>
-        <tr><td>Piggybacking flag</td><td>Not built yet; all runs are without it.</td><td><span class="pill on">Valid as flag off</span></td></tr>
-      </tbody>
-    </table></div>
-    <p class="note">Tables and charts below show L4v0-strict and L4v0 under their own names, set apart from L0–L3. The single-agent reference runs don't use the log and are unaffected.</p>
-  </section>
-
   <section id="glance">
     <div class="sectionhead">
       <h2>Results by level</h2>
