@@ -1,0 +1,9 @@
+# AppWorld enforcement ladder: a 3-agent team with no channels, without the write-ahead log (L0) and with it at each
+# level (wal2.py): L1 nothing enforced, L2 claim before writing, L3a + read before posting, L3b + read before writing,
+# L4 + conflicts refused. Side by side on one GPU, so their times are comparable. Submit with --dataset ... --tag ladNN.
+--benchmark appworld --topology agent-driven --comm none --agents 3 --repair-calls
+--benchmark appworld --topology agent-driven --comm none --agents 3 --repair-calls --wal-level L1
+--benchmark appworld --topology agent-driven --comm none --agents 3 --repair-calls --wal-level L2
+--benchmark appworld --topology agent-driven --comm none --agents 3 --repair-calls --wal-level L3a
+--benchmark appworld --topology agent-driven --comm none --agents 3 --repair-calls --wal-level L3b
+--benchmark appworld --topology agent-driven --comm none --agents 3 --repair-calls --wal-level L4

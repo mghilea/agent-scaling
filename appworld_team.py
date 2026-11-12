@@ -259,6 +259,45 @@ class Team:
                 job[3].set()
         return self.result(results)
 
+    def _concurrency(self):
+        """How much the agents worked at the same time, and how the log's refusals played out.
+
+        An agent works from its 'active' event to its 'idle' one. overlap: share of the team's time with two or more
+        agents working; parallelism: their summed working time over the team's time (1 = one at a time). A refusal
+        chain is a run of refusals with no accepted post or write in between; an agent 'stopped after a refusal'
+        if a refusal was its last log event."""
+        span = {}
+        for e in self.events:
+            if e["kind"] == "active":
+                span.setdefault(e["agent"], [e["t"], e["t"]])
+            elif e["kind"] == "idle" and e["agent"] in span:
+                span[e["agent"]][1] = e["t"]
+        end = max((b for _, b in span.values()), default=0.0)
+        points = sorted({t for ab in span.values() for t in ab})
+        both = sum(b - a for a, b in zip(points, points[1:])
+                   if sum(s <= a and b <= t for s, t in span.values()) >= 2)
+        out = {"team_seconds": round(end, 1),
+               "overlap": round(both / end, 3) if end else 0.0,
+               "parallelism": round(sum(b - a for a, b in span.values()) / end, 2) if end else 0.0}
+        if self.log:
+            chains, last = [], {}
+            run = Counter()
+            for e in self.events:
+                a = e["agent"]
+                if e["kind"] == "wal_refused":
+                    run[a] += 1
+                    last[a] = "refused"
+                elif e["kind"] == "wal_intend" or (e["kind"] == "api_write" and e["ok"]):
+                    if run[a]:
+                        chains.append(run[a])
+                    run[a] = 0
+                    last[a] = "ok"
+            chains += [c for c in run.values() if c]
+            out.update({"refusal_chains": len(chains), "refusal_chain_max": max(chains, default=0),
+                        "refusal_chains_3plus": sum(c >= 3 for c in chains),
+                        "stopped_after_refusal": sum(v == "refused" for v in last.values())})
+        return out
+
     def result(self, results):
         r = self.world.evaluate()
         stats = Counter()
@@ -282,6 +321,7 @@ class Team:
                 "duplicate_writes": dup, "collisions": coll, "conflicts": dup + coll,
                 "cell_wait_mean": round(sum(self.waits) / len(self.waits), 3) if self.waits else 0,
                 "cell_wait_max": round(max(self.waits), 3) if self.waits else 0}
+        comm.update(self._concurrency())
         if self.log:
             comm.update(self.log.counts(self.events))
             self.log.close(copy_to=self.wal_copy)
