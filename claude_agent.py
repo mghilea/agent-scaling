@@ -17,11 +17,11 @@ Never commit it.
 import json
 import os
 import threading
-import time
 from pathlib import Path
 
 import anthropic
 
+from wal2 import now  # the real clock: AppWorld freezes time.time() while a task's world is open
 from agent import BOLD, CYAN, DIM, GREEN, YELLOW, _block, _c, _show_args, call_tool, new_stats
 
 # $ per million tokens: input, output, cache read. A cache write (5-minute TTL) costs 1.25x input.
@@ -166,7 +166,7 @@ class ClaudeAgent:
 
     def _call(self):
         self.budget.check()
-        started = time.time()
+        started = now()
         params = dict(model=self.model, max_tokens=MAX_TOKENS, system=self.system_prompt, tools=self.tool_defs,
                       messages=self.messages, output_config={"effort": self.effort},
                       cache_control={"type": "ephemeral"})  # cache the conversation up to its last block
@@ -193,5 +193,5 @@ class ClaudeAgent:
         who = f"{self.name} " if self.name else ""
         self.log(_c(BOLD, f"── {who}turn {turn} ──") + _c(DIM, f" {u.input_tokens} new + {read} cached + {write} cache-write "
                                                              f"in, {u.output_tokens} out, ${dollars:.3f} (run ${self.budget.spent:.2f}), "
-                                                             f"{time.time() - started:.1f}s" + (" FALLBACK" if fell_back else "")))
+                                                             f"{now() - started:.1f}s" + (" FALLBACK" if fell_back else "")))
         return resp
