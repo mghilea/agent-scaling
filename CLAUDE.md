@@ -29,6 +29,10 @@ AppWorld teams (`appworld_team.py`, `--topology agent-driven --comm none --agent
 one cell at a time on the main thread. `--wal-level L1|L2|L3|L4` (L4v0/L4v0-strict: the earlier L4s, runs lad02-lad06) adds the second-version write-ahead log (`wal2.py`: claims
 {app, api, target}, levels from nothing enforced to conflicts refused, a JSON-lines file per task); `wal.py`/`--wal` is the
 first version, WorkBench only, kept unchanged so earlier runs stay reproducible. No more WorkBench work (user, 2026-11-11).
+Fourth benchmark, started 2026-11-16: CooperBench (github.com/cooperbench/CooperBench, pinned; two coding agents on one repo).
+It assumes Docker, which Neuronic lacks: `cooperbench/apptainer.patch` adds an Apptainer backend, `COOPERBENCH=1 source setup.sh`
+installs it under /scratch, and `sbatch cooperbench.sbatch <cooperbench run args>` runs it on gpt-oss-20b through vLLM. Its dataset
+license is unknown: keep task contents out of git and off artifact pages.
 
 ## Cluster: Princeton CS Neuronic (Slurm)
 - Nodes: 8x NVIDIA L40 (46 GB each, PCIe, no NVLink), 512 GB RAM, 3.5 TB local SSD at `/scratch`,
