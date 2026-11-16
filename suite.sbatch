@@ -25,6 +25,7 @@ export PORT=$((20000 + SLURM_JOB_ID % 10000 * 2))  # even, so PORT+1 (BrowseComp
 export VLLM_LOG="$SLURM_SUBMIT_DIR/logs/vllm-$SLURM_JOB_ID.log"
 # AppWorld lines run with AppWorld's own Python (its dependencies clash with vLLM's), set up by setup.sh with APPWORLD=1.
 if grep -v "^#" "$suite" | grep -q -- "--benchmark appworld"; then export APPWORLD=1; fi
+if grep -v "^#" "$suite" | grep -q -- "--benchmark cooperbench"; then export COOPERBENCH=1; fi
 source ./setup.sh "$size" || exit 1
 
 n=0
@@ -36,6 +37,7 @@ while IFS= read -r line; do
     # each line is an argument list
     py=python
     [[ " $line " == *" --benchmark appworld "* ]] && py="$APPWORLD_PYTHON"
+    [[ " $line " == *" --benchmark cooperbench "* ]] && py="$COOPERBENCH_PYTHON"
     # shellcheck disable=SC2086
     "$py" agent.py $line "${extra[@]}" --base-url "http://localhost:$PORT/v1" --quiet \
         >| "logs/suite-$SLURM_JOB_ID-$n.log" 2>&1 &
