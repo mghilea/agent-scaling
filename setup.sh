@@ -19,6 +19,9 @@
 # APPWORLD=1 also sets up AppWorld (agent.py --benchmark appworld): its own venv ($APPWORLD_PYTHON; its pinned
 # dependencies would clash with vLLM's, so run agent.py with that Python) and its data in /scratch/$USER/appworld
 # ($APPWORLD_ROOT). The data must not be redistributed unencrypted: keep it out of git and off artifact pages.
+# COOPERBENCH=1 also sets up CooperBench (github.com/cooperbench/CooperBench, pinned, with cooperbench/apptainer.patch,
+# which runs its containers on Apptainer since the cluster has no Docker): the source in $WORK/cooperbench-src, its own
+# venv ($COOPERBENCH_BIN is its `cooperbench` command), task images unpacked on first use under $WORK/cooperbench/images.
 # APPWORLD_ONLY=1 (with APPWORLD=1) skips the GPU, vLLM and the model: just uv and AppWorld, for runs against an API
 # model (agent.py --model claude-..., see claude.sbatch), which need no GPU.
 # For unattended runs, use run.sbatch instead, which sources this for you.
@@ -102,6 +105,9 @@ _agent_setup() {
     fi
     if [[ -n "$APPWORLD" ]]; then
         _appworld || { exec {lock}>&-; return 1; }
+    fi
+    if [[ -n "$COOPERBENCH" ]]; then
+        _cooperbench || { exec {lock}>&-; return 1; }
     fi
     exec {lock}>&-  # closing the file releases the lock
 
@@ -261,6 +267,28 @@ _appworld() {
         echo "==> Downloading AppWorld data"
         (cd "$APPWORLD_ROOT" && "$WORK/appworld-venv/bin/appworld" download data --root "$APPWORLD_ROOT") || return 1
         _mark_intact "$APPWORLD_ROOT/data"
+    fi
+}
+
+# CooperBench, pinned, with our Apptainer backend (cooperbench/apptainer.patch), in a venv of its own (Python 3.12).
+_cooperbench() {
+    local commit="${COOPERBENCH_COMMIT:-63b9d44}" src="$WORK/cooperbench-src" patch="$HOME/agent-scaling/cooperbench/apptainer.patch"
+    export COOPERBENCH_SRC="$src" COOPERBENCH_BIN="$WORK/cooperbench-venv/bin/cooperbench"
+    export APPTAINER_CACHEDIR="$WORK/cooperbench/apptainer-cache" APPTAINER_TMPDIR="$WORK/cooperbench/apptainer-tmp"
+    mkdir -p "$APPTAINER_CACHEDIR" "$APPTAINER_TMPDIR" || return 1
+    if [[ ! -d "$src/.git" ]]; then
+        echo "==> Cloning CooperBench ($commit)"
+        git clone -q https://github.com/cooperbench/CooperBench.git "$src" || return 1
+        git -C "$src" checkout -q "$commit" || return 1
+    fi
+    if ! git -C "$src" apply --check -R "$patch" 2>/dev/null; then  # not applied yet
+        git -C "$src" apply "$patch" || { echo "cooperbench/apptainer.patch doesn't apply to $src" >&2; return 1; }
+    fi
+    if ! "$WORK/cooperbench-venv/bin/python" -c "import cooperbench.infra.apptainer" >/dev/null 2>&1; then
+        echo "==> Installing CooperBench"
+        rm -rf "$WORK/cooperbench-venv"
+        uv venv -q --python 3.12 "$WORK/cooperbench-venv" || return 1
+        uv pip install -q --python "$WORK/cooperbench-venv/bin/python" -e "$src" || return 1
     fi
 }
 

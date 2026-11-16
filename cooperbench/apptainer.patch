@@ -1,0 +1,253 @@
+diff --git a/src/cooperbench/agents/mini_swe_agent_v2/adapter.py b/src/cooperbench/agents/mini_swe_agent_v2/adapter.py
+index f41ca2d..d65d280 100644
+--- a/src/cooperbench/agents/mini_swe_agent_v2/adapter.py
++++ b/src/cooperbench/agents/mini_swe_agent_v2/adapter.py
+@@ -175,6 +175,10 @@ class MiniSweAgentV2Runner:
+                 run_args.extend(team_session.scratchpad_mount_args())
+                 env_kwargs["run_args"] = run_args
+             env = DockerEnvironment(**env_kwargs)
++        elif backend == "apptainer":
++            from cooperbench.agents.mini_swe_agent_v2.environments.apptainer import ApptainerEnvironment
++
++            env = ApptainerEnvironment(**env_kwargs)
+         else:
+             from cooperbench.agents.mini_swe_agent_v2.environments.modal import ModalEnvironment
+ 
+diff --git a/src/cooperbench/agents/mini_swe_agent_v2/environments/apptainer.py b/src/cooperbench/agents/mini_swe_agent_v2/environments/apptainer.py
+new file mode 100644
+index 0000000..263eccd
+--- /dev/null
++++ b/src/cooperbench/agents/mini_swe_agent_v2/environments/apptainer.py
+@@ -0,0 +1,49 @@
++"""The agent's container on Apptainer: DockerEnvironment's interface and behaviour, without Docker.
++
++Each command runs with `apptainer exec` in the agent's own writable copy of the task image
++(cooperbench.infra.apptainer.Container), so files persist between commands as with `docker exec`. The working
++directory, environment variables, interpreter (bash -lc), timeout and the submission check are DockerEnvironment's.
++Not supported here: Docker networks and run_args (coop with a shared git server), which solo runs don't use.
++"""
++
++import os
++import subprocess
++from typing import Any
++
++from cooperbench.agents.mini_swe_agent_v2.environments.docker import DockerEnvironment, DockerEnvironmentConfig
++from cooperbench.infra.apptainer import Container
++
++
++class ApptainerEnvironment(DockerEnvironment):
++    def __init__(self, **kwargs):
++        self.container: Container | None = None
++        super().__init__(config_class=DockerEnvironmentConfig, **kwargs)
++
++    def _start_container(self):
++        self.container = Container(self.config.image)
++        self.container_id = self.container.dir.name
++        self.logger.info(f"Started container {self.container_id} in {self.container.dir}")
++
++    def execute(self, action: dict, cwd: str = "", *, timeout: int | None = None) -> dict[str, Any]:
++        command = action.get("command", "")
++        cwd = cwd or self.config.cwd
++        assert self.container is not None, "Container not started"
++        env = {k: v for k in self.config.forward_env if (v := os.getenv(k)) is not None}
++        env.update(self.config.env)
++        try:
++            result = self.container.run([*self.config.interpreter, command], cwd=cwd, env=env,
++                                        timeout=timeout or self.config.timeout)
++            output = {"output": result.stdout, "returncode": result.returncode, "exception_info": ""}
++        except Exception as e:
++            raw = getattr(e, "output", None)
++            raw = raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else (raw or "")
++            output = {"output": raw, "returncode": -1,
++                      "exception_info": f"An error occurred while executing the command: {e}",
++                      "extra": {"exception_type": type(e).__name__, "exception": str(e)}}
++        self._check_finished(output)
++        return output
++
++    def cleanup(self):
++        if getattr(self, "container", None) is not None:
++            self.container.remove()
++            self.container = None
+diff --git a/src/cooperbench/cli.py b/src/cooperbench/cli.py
+index 23e73f6..d5b664e 100644
+--- a/src/cooperbench/cli.py
++++ b/src/cooperbench/cli.py
+@@ -225,7 +225,7 @@ def main():
+     )
+     run_parser.add_argument(
+         "--backend",
+-        choices=["modal", "docker", "gcp"],
++        choices=["modal", "docker", "apptainer", "gcp"],
+         default="docker",
+         help="Execution backend: modal (cloud), docker (local), or gcp (GCP VM) (default: docker)",
+     )
+@@ -310,7 +310,7 @@ def main():
+     )
+     eval_parser.add_argument(
+         "--backend",
+-        choices=["modal", "docker", "gcp"],
++        choices=["modal", "docker", "apptainer", "gcp"],
+         default="docker",
+         help="Execution backend: modal (cloud), docker (local), or gcp (GCP Batch) (default: docker)",
+     )
+diff --git a/src/cooperbench/eval/backends/__init__.py b/src/cooperbench/eval/backends/__init__.py
+index 5951e40..d70e6d1 100644
+--- a/src/cooperbench/eval/backends/__init__.py
++++ b/src/cooperbench/eval/backends/__init__.py
+@@ -31,12 +31,16 @@ def get_backend(name: str = "docker") -> EvalBackend:
+         from cooperbench.eval.backends.docker import DockerBackend
+ 
+         return DockerBackend()
++    elif name == "apptainer":
++        from cooperbench.eval.backends.apptainer import ApptainerBackend
++
++        return ApptainerBackend()
+     elif name in ("gcp", "gcp_batch"):
+         from cooperbench.eval.backends.gcp import GCPBatchBackend
+ 
+         return GCPBatchBackend()
+     else:
+-        available = "docker, modal, gcp, gcp_batch"
++        available = "docker, apptainer, modal, gcp, gcp_batch"
+         raise ValueError(f"Unknown backend: '{name}'. Available: {available}")
+ 
+ 
+diff --git a/src/cooperbench/eval/backends/apptainer.py b/src/cooperbench/eval/backends/apptainer.py
+new file mode 100644
+index 0000000..5e35322
+--- /dev/null
++++ b/src/cooperbench/eval/backends/apptainer.py
+@@ -0,0 +1,43 @@
++"""Evaluation sandboxes on Apptainer: DockerBackend's interface without Docker (cooperbench.infra.apptainer)."""
++
++import subprocess
++
++from cooperbench.eval.backends.base import Sandbox
++from cooperbench.infra.apptainer import Container
++
++
++class ApptainerExecResult:
++    def __init__(self, returncode: int, output: str) -> None:
++        self._returncode, self._output = returncode, output
++
++    @property
++    def returncode(self) -> int:
++        return self._returncode
++
++    def stdout_read(self) -> str:
++        return self._output
++
++    def stderr_read(self) -> str:
++        return ""  # combined into stdout, as DockerExecResult does
++
++
++class ApptainerSandbox:
++    def __init__(self, container: Container, workdir: str, timeout: int = 600):
++        self._container, self._workdir, self._timeout = container, workdir, timeout
++
++    def exec(self, *args: str) -> ApptainerExecResult:
++        try:
++            r = self._container.run(list(args), cwd=self._workdir, timeout=self._timeout)
++        except subprocess.TimeoutExpired:
++            return ApptainerExecResult(-1, f"Command timed out after {self._timeout} seconds")
++        return ApptainerExecResult(r.returncode, r.stdout or "")
++
++    def terminate(self) -> None:
++        self._container.remove()
++
++
++class ApptainerBackend:
++    def create_sandbox(self, image: str, timeout: int = 600, workdir: str = "/workspace") -> Sandbox:
++        sandbox = ApptainerSandbox(Container(image), workdir, timeout)
++        sandbox.exec("mkdir", "-p", "/patches")
++        return sandbox
+diff --git a/src/cooperbench/infra/apptainer.py b/src/cooperbench/infra/apptainer.py
+new file mode 100644
+index 0000000..fcbaf79
+--- /dev/null
++++ b/src/cooperbench/infra/apptainer.py
+@@ -0,0 +1,84 @@
++"""Apptainer containers for CooperBench, for clusters without Docker (added for Neuronic).
++
++A task image (a Docker Hub image) is unpacked once per node into a sandbox directory under $COOPERBENCH_IMAGES
++(default /scratch/$USER/cooperbench/images), which needs no root and leaves its files owned by the user. Each
++container is a fast copy of that directory (reflink where the filesystem supports it) under
++$COOPERBENCH_CONTAINERS, with its own /tmp and home, so its changes persist from one command to the next, as with
++`docker run -d` + `docker exec`, and disappear with remove(). Commands run with --containall: none of the host's
++directories (home included) are visible, and the environment is the image's own. They run as the user, not root
++(the cluster has no --fakeroot), which is enough to edit the repo and pip-install, since the user owns every file.
++"""
++
++from __future__ import annotations
++
++import fcntl
++import os
++import re
++import shutil
++import subprocess
++import uuid
++from pathlib import Path
++
++_USER = os.environ.get("USER", "user")
++IMAGES = Path(os.environ.get("COOPERBENCH_IMAGES", f"/scratch/{_USER}/cooperbench/images"))
++CONTAINERS = Path(os.environ.get("COOPERBENCH_CONTAINERS", f"/scratch/{_USER}/cooperbench/containers"))
++APPTAINER = os.environ.get("COOPERBENCH_APPTAINER", "apptainer")
++
++
++def _image_dir(image: str) -> Path:
++    return IMAGES / re.sub(r"[^A-Za-z0-9_.-]", "_", image)
++
++
++def ensure_image(image: str, timeout: int = 1800) -> Path:
++    """The image's sandbox directory, unpacked from docker://image if this node doesn't have it yet."""
++    target = _image_dir(image)
++    if (target / ".complete").exists():
++        return target
++    IMAGES.mkdir(parents=True, exist_ok=True)
++    env = dict(os.environ)
++    env.setdefault("APPTAINER_CACHEDIR", str(IMAGES.parent / "apptainer-cache"))
++    env.setdefault("APPTAINER_TMPDIR", str(IMAGES.parent / "apptainer-tmp"))
++    Path(env["APPTAINER_TMPDIR"]).mkdir(parents=True, exist_ok=True)
++    with open(IMAGES / f".{target.name}.lock", "w") as lock:  # concurrent runs build each image once
++        fcntl.flock(lock, fcntl.LOCK_EX)
++        if not (target / ".complete").exists():
++            shutil.rmtree(target, ignore_errors=True)
++            subprocess.run([APPTAINER, "-q", "build", "--sandbox", str(target), f"docker://{image}"],
++                           check=True, env=env, timeout=timeout, capture_output=True, text=True)
++            (target / ".complete").touch()
++    return target
++
++
++class Container:
++    """A writable copy of an image, its /tmp and its home; commands run in it with `apptainer exec`."""
++
++    def __init__(self, image: str):
++        base = ensure_image(image)
++        CONTAINERS.mkdir(parents=True, exist_ok=True)
++        self.dir = CONTAINERS / f"{base.name}-{uuid.uuid4().hex[:8]}"
++        self.root = self.dir / "root"
++        self.tmp, self.home = self.dir / "tmp", self.dir / "home"
++        self.dir.mkdir()
++        subprocess.run(["cp", "-a", "--reflink=auto", str(base), str(self.root)], check=True)
++        self.tmp.mkdir()
++        self.home.mkdir()
++
++    def command(self, argv: list[str], cwd: str | None = None, env: dict[str, str] | None = None) -> list[str]:
++        # -s: only errors, so a warning (e.g. about /etc/localtime) can't precede the command's output
++        cmd = [APPTAINER, "-s", "exec", "--writable", "--containall", "--bind", f"{self.tmp}:/tmp",
++               "--home", f"{self.home}:/root"]
++        if cwd:
++            cmd += ["--pwd", cwd]
++        for key, value in (env or {}).items():
++            cmd += ["--env", f"{key}={value}"]
++        return cmd + [str(self.root), *argv]
++
++    def run(self, argv: list[str], cwd: str | None = None, env: dict[str, str] | None = None,
++            timeout: int | None = None) -> subprocess.CompletedProcess:
++        """Run argv in the container; stdout and stderr together, as text."""
++        return subprocess.run(self.command(argv, cwd, env), text=True, encoding="utf-8", errors="replace",
++                              timeout=timeout, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
++                              stderr=subprocess.STDOUT)
++
++    def remove(self) -> None:
++        shutil.rmtree(self.dir, ignore_errors=True)

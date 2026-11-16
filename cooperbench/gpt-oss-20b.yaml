@@ -1,0 +1,6 @@
+# CooperBench's mini_swe_agent_v2 on our vLLM server (agent.py's gpt-oss-20b). Use with:
+#   cooperbench run ... -a mini_swe_agent_v2 -m hosted_vllm/gpt-oss-20b --backend apptainer --agent-config <this file>
+# The server's address comes from HOSTED_VLLM_API_BASE (e.g. http://localhost:8000/v1), which litellm reads.
+config:
+  model:
+    cost_tracking: ignore_errors   # a local model has no price
