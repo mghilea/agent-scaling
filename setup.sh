@@ -273,7 +273,7 @@ _appworld() {
 # CooperBench, pinned, with our Apptainer backend (cooperbench/apptainer.patch), in a venv of its own (Python 3.12).
 _cooperbench() {
     local commit="${COOPERBENCH_COMMIT:-63b9d44}" src="$WORK/cooperbench-src" patch="$HOME/agent-scaling/cooperbench/apptainer.patch"
-    export COOPERBENCH_SRC="$src" COOPERBENCH_BIN="$WORK/cooperbench-venv/bin/cooperbench"
+    export COOPERBENCH_SRC="$src" COOPERBENCH_BIN="$WORK/cooperbench-venv/bin/cooperbench" COOPERBENCH_PYTHON="$WORK/cooperbench-venv/bin/python"
     export APPTAINER_CACHEDIR="$WORK/cooperbench/apptainer-cache" APPTAINER_TMPDIR="$WORK/cooperbench/apptainer-tmp"
     mkdir -p "$APPTAINER_CACHEDIR" "$APPTAINER_TMPDIR" || return 1
     if [[ ! -d "$src/.git" ]]; then

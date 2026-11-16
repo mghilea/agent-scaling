@@ -105,6 +105,33 @@ TOOLS = {
 }
 
 
+_ESCAPES = {"n": "\n", "t": "\t", "r": "\r", '"': '"', "\\": "\\", "/": "/", "b": "\b", "f": "\f"}
+
+
+def _lenient_args(arguments: str):
+    """--repair-calls: arguments that aren't valid JSON but are meant as {"key": "value"}, or None.
+
+    gpt-oss often closes a string argument as if it were a list ("...\"]}", from a code tool it was trained on that
+    takes a command list), and writes code with unescaped quotes or backslashes (Regex(r"\\d")). Drop the stray "]"; if
+    the value still doesn't parse, take everything between the key and the closing quote, decoding only the valid
+    escapes."""
+    s = (arguments or "").strip()
+    try:
+        value = json.loads(re.sub(r'"\s*\]\s*\}$', '"}', s), strict=False)
+        if isinstance(value, dict):
+            return value
+    except json.JSONDecodeError:
+        pass
+    m = re.fullmatch(r'\{\s*"(\w+)"\s*:\s*"(.*)"\s*\]?\s*\}', s, re.S)
+    if not m:
+        return None
+
+    def decode(t):
+        e = t.group(1)
+        return chr(int(e[1:], 16)) if e[0] == "u" else _ESCAPES.get(e, t.group(0))
+    return {m.group(1): re.sub(r'\\(u[0-9a-fA-F]{4}|.)', decode, m.group(2), flags=re.S)}
+
+
 def call_tool(name: str, arguments: str, tools=TOOLS, repair=False, max_output=None) -> str:
     if name not in tools:
         return f"[error] unknown tool: {name}"
@@ -113,6 +140,8 @@ def call_tool(name: str, arguments: str, tools=TOOLS, repair=False, max_output=N
     except json.JSONDecodeError:
         args = None
     required = tools[name][1]["function"]["parameters"].get("required", [])
+    if repair and not isinstance(args, dict):
+        args = _lenient_args(arguments)  # a stray "]" or unescaped quotes and backslashes in a JSON object
     if repair and not isinstance(args, dict):
         # --repair-calls: gpt-oss sometimes writes the arguments as a Python dict, e.g. {"code": """..."""}, which
         # isn't JSON. Read it as Python instead of running the whole text as code (that "runs" a dict literal).
@@ -387,10 +416,12 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--base-url", default="http://localhost:8000/v1")
     ap.add_argument("--model", help="vLLM's --served-model-name (default: whatever the server is running)")
-    ap.add_argument("--benchmark", default="toy", choices=["toy", "workbench", "browsecomp", "appworld"],
+    ap.add_argument("--benchmark", default="toy", choices=["toy", "workbench", "browsecomp", "appworld", "cooperbench"],
                     help="toy: the task file (--tasks); workbench: WorkBench tasks, scored by its evaluator; "
                          "browsecomp: BrowseComp-Plus questions (the paper's 100), graded by an LLM judge; "
                          "appworld: AppWorld tasks (run with $APPWORLD_PYTHON), scored by its evaluator")
+    ap.add_argument("--subset", default="core",
+                    help="cooperbench: a subset of feature pairs from its dataset/subsets (core 10, flash 50, lite 100, all)")
     ap.add_argument("--dataset", default="dev", choices=["train", "dev", "test_normal", "test_challenge"],
                     help="appworld: which split")
     ap.add_argument("--tasks", default=str(ROOT / "tasks.jsonl"))
@@ -463,7 +494,7 @@ def main():
                     help="Claude models: if the model declines a request, stop instead of re-running it on another model")
     args = ap.parse_args()
 
-    wb = bc = aw = None
+    wb = bc = aw = cb = None
     if args.ask:
         tasks = [{"id": "ask", "question": args.ask}]
     elif args.benchmark == "workbench":
@@ -472,6 +503,9 @@ def main():
     elif args.benchmark == "browsecomp":
         import browsecomp as bc
         tasks = bc.load_tasks(args.limit, offset=args.offset)
+    elif args.benchmark == "cooperbench":
+        import cooperbench_bench as cb
+        tasks = cb.load_tasks(args.subset, args.limit, args.offset)
     elif args.benchmark == "appworld":
         import appworld_bench as aw
         tasks = aw.load_tasks(args.dataset, args.limit, args.offset, args.seed)
@@ -483,6 +517,8 @@ def main():
     if not tasks:
         sys.exit("no tasks to run")
     multi = args.topology != "single"
+    if cb and multi:
+        sys.exit("CooperBench runs the single agent for now (teams with the write-ahead log come next)")
     if multi and not (wb or bc or (aw and args.topology == "agent-driven")):
         sys.exit("the multi-agent topologies need --benchmark workbench or browsecomp (appworld: --topology agent-driven)")
     if aw and multi and args.comm != "none":
@@ -514,7 +550,7 @@ def main():
         if not args.model:
             args.model = client.models.list().data[0].id
 
-    args.max_turns = args.max_turns or (20 if wb else 30 if bc else 100 if aw else 12)
+    args.max_turns = args.max_turns or (20 if wb else 30 if bc else 100 if (aw or cb) else 12)
     driven = args.topology == "agent-driven"
     if multi and not driven:
         import mas
@@ -532,7 +568,7 @@ def main():
     topo_name += f"-tb{args.turn_budget}" if args.turn_budget else ""
     topo_name += f"-{args.wal_level}" if args.wal_level else ""
     kind = "ask" if args.ask else ("sas" if not multi else topo_name) + ("-rc" if args.repair_calls else "") + \
-        ("-workbench" if wb else "-browsecomp" if bc else f"-appworld-{args.dataset}" if aw else "")
+        ("-workbench" if wb else "-browsecomp" if bc else f"-appworld-{args.dataset}" if aw else f"-cooperbench-{args.subset}" if cb else "")
     run_dir = ROOT / "runs" / f"{datetime.now():%Y%m%d-%H%M%S}-{kind}-{args.model}{'-' + args.tag if args.tag else ''}"
     (run_dir / "traces").mkdir(parents=True)
     (run_dir / "config.json").write_text(json.dumps({"git_commit": git_commit(), **vars(args)}, indent=2))
@@ -541,11 +577,11 @@ def main():
         if claude:
             return claude_agent.ClaudeAgent(client, args.model, budget, max_turns=args.max_turns, effort=args.effort,
                                             verbose=not args.quiet, fallbacks=not args.no_fallbacks,
-                                            max_tool_output=aw.MAX_TOOL_OUTPUT if aw else None, **kwargs)
+                                            max_tool_output=aw.MAX_TOOL_OUTPUT if aw else cb.MAX_TOOL_OUTPUT if cb else None, **kwargs)
         return Agent(client, args.model, max_turns=args.max_turns, reasoning_effort=args.reasoning_effort,
                      verbose=not args.quiet, show_reasoning=args.show_reasoning,
                      retry_malformed=bool(bc) or args.repair_calls, repair_calls=args.repair_calls,
-                     max_tool_output=aw.MAX_TOOL_OUTPUT if aw else None, **kwargs)
+                     max_tool_output=aw.MAX_TOOL_OUTPUT if aw else cb.MAX_TOOL_OUTPUT if cb else None, **kwargs)
 
     def log_message(label, text):  # messages between agents, in multi-agent runs
         if not args.quiet:
@@ -578,6 +614,10 @@ def main():
                 sandbox = wb.Sandbox()
                 r = make_agent(tools=sandbox.tools, system_prompt=wb.SYSTEM_PROMPT).run(t["question"])
                 actions = sandbox.actions
+            elif cb:
+                session = cb.Session(t)
+                agent = make_agent(tools=session.tools, system_prompt=cb.SYSTEM_PROMPT)
+                r = agent.run(session.task_prompt())
             elif aw:
                 session = aw.Session(t["id"], experiment_name=run_dir.name)
                 agent = make_agent(tools=session.tools, system_prompt=session.system_prompt())
@@ -614,6 +654,16 @@ def main():
             verdict = {"judgment": judgment, "answer_in_response": bc.answer_in_response(response, t["answer"]),
                        **bc.retrieval_stats(r.pop("sessions", None) or ([session] if session else []), t)}
             answer, expected = response, t["answer"]
+        elif cb:
+            if session is None:  # the container never started
+                verdict = {"correct": False, "feature1_passed": False, "feature2_passed": False, "patch_lines": 0}
+            else:
+                verdict = session.score()
+                session.close()
+                (run_dir / "patches").mkdir(exist_ok=True)
+                (run_dir / "patches" / f"{t['id']}.patch").write_text(verdict.pop("_patch"))
+                (run_dir / "patches" / f"{t['id']}.tests.json").write_text(json.dumps(verdict.pop("_test_output"), indent=1))
+            correct, answer, expected = verdict["correct"], r["final"], None
         elif aw:
             # Scored on the final state of the task's databases (and the answer given to complete_task).
             if aw_team:
@@ -658,6 +708,9 @@ def main():
                      f"reads={verdict['reads']} evidence_found={verdict['evidence_found']}")
         elif wb:
             shown = f"actions={answer}  expected={expected}  side_effects={verdict['side_effects']}"
+        elif cb:
+            shown = (f"feature tests: {int(verdict['feature1_passed'])}+{int(verdict['feature2_passed'])} of 2, "
+                     f"patch {verdict['patch_lines']} lines" + (f", eval error {verdict['eval_error']}" if verdict.get("eval_error") else ""))
         elif aw:
             shown = (f"tests={verdict['tests_passed']}/{verdict['tests']} completed={verdict['completed']} "
                      f"difficulty={verdict['difficulty']}" + (" reminded" if verdict.get("reminded") else ""))
