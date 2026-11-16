@@ -23,7 +23,8 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from openai import NOT_GIVEN, OpenAI
+# openai is imported where the vLLM client is made and used, not here: Claude runs (claude_agent.py) don't need it, and
+# in AppWorld's venv the current openai and anthropic SDKs can't be imported into the same process.
 
 ROOT = Path(__file__).resolve().parent
 MAX_TOOL_OUTPUT = 4000
@@ -320,6 +321,7 @@ class Agent:
         return msg.content or "", entry.get("reasoning", "")
 
     def _call(self, messages, use_tools):
+        from openai import NOT_GIVEN
         started = time.time()
         schemas = [schema for _, schema in self.tools.values()] if use_tools else []
         resp = self.client.chat.completions.create(
@@ -392,7 +394,7 @@ def main():
     ap.add_argument("--dataset", default="dev", choices=["train", "dev", "test_normal", "test_challenge"],
                     help="appworld: which split")
     ap.add_argument("--tasks", default=str(ROOT / "tasks.jsonl"))
-    ap.add_argument("--only", help="run just the task with this id")
+    ap.add_argument("--only", help="run just the task with this id (several: comma-separated)")
     ap.add_argument("--limit", type=int, help="workbench: run a random sample of this many tasks; "
                                                   "browsecomp: the first this many of the paper's 100")
     ap.add_argument("--seed", type=int, default=0, help="workbench: which random sample --limit takes")
@@ -453,6 +455,12 @@ def main():
     ap.add_argument("--show-reasoning", action="store_true", help="also print the model's reasoning each turn")
     ap.add_argument("--quiet", action="store_true", help="only print one result line per task")
     ap.add_argument("--tag", help="suffix for the run directory, e.g. rep03, so parallel repeats get distinct names")
+    ap.add_argument("--max-dollars", type=float,
+                    help="Claude models (--model claude-...): stop the run once it has spent this much (required)")
+    ap.add_argument("--effort", default="high", choices=["low", "medium", "high", "xhigh", "max"],
+                    help="Claude models: thinking effort (default high)")
+    ap.add_argument("--no-fallbacks", action="store_true",
+                    help="Claude models: if the model declines a request, stop instead of re-running it on another model")
     args = ap.parse_args()
 
     wb = bc = aw = None
@@ -470,7 +478,8 @@ def main():
     else:
         tasks = [json.loads(line) for line in open(args.tasks) if line.strip()]
     if args.only:
-        tasks = [t for t in tasks if t["id"] == args.only]
+        wanted = set(args.only.split(","))
+        tasks = [t for t in tasks if t["id"] in wanted]
     if not tasks:
         sys.exit("no tasks to run")
     multi = args.topology != "single"
@@ -491,9 +500,19 @@ def main():
     if args.split and not (bc and multi and args.split == args.agents):
         sys.exit("--split needs --benchmark browsecomp, a multi-agent topology, and one part per agent (--agents)")
 
-    client = OpenAI(base_url=args.base_url, api_key="EMPTY")
-    if not args.model:
-        args.model = client.models.list().data[0].id
+    claude = (args.model or "").startswith("claude-")  # an Anthropic API model instead of the local vLLM server
+    if claude:
+        import claude_agent
+        if bc:
+            sys.exit("BrowseComp grades with the vLLM model; Claude models run AppWorld, WorkBench or tasks.jsonl")
+        if args.max_dollars is None:
+            sys.exit("Claude models cost money: set --max-dollars (the run stops once it has spent that much)")
+        client, budget = claude_agent.make_client(), claude_agent.Budget(args.max_dollars)
+    else:
+        from openai import OpenAI
+        client = OpenAI(base_url=args.base_url, api_key="EMPTY")
+        if not args.model:
+            args.model = client.models.list().data[0].id
 
     args.max_turns = args.max_turns or (20 if wb else 30 if bc else 100 if aw else 12)
     driven = args.topology == "agent-driven"
@@ -519,6 +538,10 @@ def main():
     (run_dir / "config.json").write_text(json.dumps({"git_commit": git_commit(), **vars(args)}, indent=2))
 
     def make_agent(**kwargs):
+        if claude:
+            return claude_agent.ClaudeAgent(client, args.model, budget, max_turns=args.max_turns, effort=args.effort,
+                                            verbose=not args.quiet, fallbacks=not args.no_fallbacks,
+                                            max_tool_output=aw.MAX_TOOL_OUTPUT if aw else None, **kwargs)
         return Agent(client, args.model, max_turns=args.max_turns, reasoning_effort=args.reasoning_effort,
                      verbose=not args.quiet, show_reasoning=args.show_reasoning,
                      retry_malformed=bool(bc) or args.repair_calls, repair_calls=args.repair_calls,
@@ -535,7 +558,7 @@ def main():
     for t in tasks:
         print(_c(BOLD, f"\n=== {t['id']} ===") + f"\n{t['question']}", flush=True)
         start = time.time()
-        actions, session = [], None
+        actions, session, agent = [], None, None
         try:
             if aw_team:
                 r = appworld_team.run(t["id"], make_agent, args.agents, run_dir, level=args.wal_level,
@@ -579,7 +602,10 @@ def main():
             else:
                 r = make_agent().run(t["question"])
         except Exception as e:
-            r = {"final": "", "stop": f"error: {type(e).__name__}: {e}", "messages": [], **new_stats()}
+            # Keep what the agent did and spent before the error (e.g. a Claude run stopped by --max-dollars).
+            done = getattr(agent, "stats", None) or new_stats()
+            said = agent.transcript() if hasattr(agent, "transcript") else getattr(agent, "messages", [])
+            r = {"final": "", "stop": f"error: {type(e).__name__}: {e}", "messages": said, **done}
         if bc:
             # Graded on the done() answer (or, failing that, the last reply), even if the run hit a limit:
             # running out of turns or context after answering still counts the answer.
@@ -618,6 +644,7 @@ def main():
                # in a round; single agent: --max-turns), and agent-driven pauses at 12 calls
                "out_of_calls": r.get("out_of_calls", int(r["stop"] == "max_turns")),
                **({"paused": r["paused"]} if "paused" in r else {}),
+               **{k: r[k] for k in ("dollars", "cache_read_tokens", "cache_write_tokens", "fallbacks", "refusals") if k in r},
                "seconds": round(time.time() - start, 1)}
         rows.append(row)
         # Multi-agent runs trace every agent, not one conversation.
@@ -644,6 +671,13 @@ def main():
         if row["out_of_calls"]:
             print(_c(YELLOW, f"  {row['out_of_calls']} agent(s) reached their call limit"
                              + (f" ({budget_name})" if budget_name else "")), flush=True)
+        if claude:
+            print(f"  ${row.get('dollars', 0):.2f} for this task, ${budget.spent:.2f} of ${budget.limit:.2f} so far", flush=True)
+            if budget.exhausted or r["stop"].startswith(("error: BudgetExceeded", "error: AuthenticationError",
+                                                         "error: PermissionDeniedError")):
+                print(_c(YELLOW, f"  stopping the run: {r['stop'] if r['stop'].startswith('error') else 'budget spent'}"),
+                      flush=True)
+                break
 
     n = len(rows)
     scored = [r for r in rows if r["correct"] is not None]
@@ -662,6 +696,8 @@ def main():
         # The paper's message density: messages between agents per model call (turn).
         "message_density": round(sum(r["agent_messages"] for r in rows) / max(1, sum(r["turns"] for r in rows)), 3),
         "mean_seconds": round(sum(r["seconds"] for r in rows) / n, 1),
+        **({"total_dollars": round(sum(r.get("dollars", 0) for r in rows), 4),
+            "tasks_with_fallback": sum(r.get("fallbacks", 0) > 0 for r in rows)} if claude else {}),
     }
     (run_dir / "summary.json").write_text(json.dumps(summary, indent=2))
     print(f"\n{json.dumps(summary, indent=2)}\nsaved to {run_dir}")

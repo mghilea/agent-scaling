@@ -19,6 +19,8 @@
 # APPWORLD=1 also sets up AppWorld (agent.py --benchmark appworld): its own venv ($APPWORLD_PYTHON; its pinned
 # dependencies would clash with vLLM's, so run agent.py with that Python) and its data in /scratch/$USER/appworld
 # ($APPWORLD_ROOT). The data must not be redistributed unencrypted: keep it out of git and off artifact pages.
+# APPWORLD_ONLY=1 (with APPWORLD=1) skips the GPU, vLLM and the model: just uv and AppWorld, for runs against an API
+# model (agent.py --model claude-..., see claude.sbatch), which need no GPU.
 # For unattended runs, use run.sbatch instead, which sources this for you.
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
@@ -246,9 +248,13 @@ _appworld() {
         echo "==> Installing AppWorld $version"
         rm -rf "$WORK/appworld-venv"
         uv venv --python 3.11 "$WORK/appworld-venv" || return 1
-        uv pip install --python "$APPWORLD_PYTHON" "appworld==$version" openai || return 1
+        uv pip install --python "$APPWORLD_PYTHON" "appworld==$version" openai anthropic || return 1
         (cd "$WORK" && "$WORK/appworld-venv/bin/appworld" install) || return 1
         touch "$WORK/appworld-venv/.unpacked"
+    fi
+    # The Anthropic SDK, for Claude models (claude_agent.py); venvs built before it was added get it here.
+    if ! "$APPWORLD_PYTHON" -c "import anthropic" >/dev/null 2>&1; then
+        uv pip install --python "$APPWORLD_PYTHON" anthropic || return 1
     fi
     mkdir -p "$APPWORLD_ROOT" || return 1
     if ! _intact "$APPWORLD_ROOT/data"; then
@@ -258,5 +264,32 @@ _appworld() {
     fi
 }
 
+# AppWorld only (APPWORLD_ONLY=1): no GPU or vLLM, for runs against an API model.
+_appworld_only_setup() {
+    if [[ "$(hostname -s)" == "neuronic" ]]; then
+        echo "You're on the login node. Run salloc (no GPU needed) or sbatch claude.sbatch." >&2
+        return 1
+    fi
+    export WORK="/scratch/$USER"
+    export UV_CACHE_DIR="$WORK/uv-cache"
+    [[ ":$PATH:" == *":$WORK/bin:"* ]] || export PATH="$WORK/bin:$PATH"
+    mkdir -p "$WORK" || return 1
+    local lock
+    exec {lock}>>"$WORK/.setup.lock"
+    flock "$lock"
+    if [[ ! -x "$WORK/bin/uv" ]]; then
+        echo "==> Installing uv"
+        curl -LsSf https://astral.sh/uv/install.sh \
+            | env UV_INSTALL_DIR="$WORK/bin" UV_NO_MODIFY_PATH=1 sh || { exec {lock}>&-; return 1; }
+    fi
+    _appworld || { exec {lock}>&-; return 1; }
+    exec {lock}>&-
+    echo "AppWorld ready: $APPWORLD_PYTHON (data in $APPWORLD_ROOT)"
+}
+
 # Last command, so `source setup.sh || exit 1` sees whether setup succeeded
-_agent_setup "$@"
+if [[ -n "$APPWORLD_ONLY" ]]; then
+    _appworld_only_setup
+else
+    _agent_setup "$@"
+fi
