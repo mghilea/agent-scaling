@@ -310,9 +310,14 @@ _cooperbench() {
         uv venv -q --python 3.12 "$WORK/cooperbench-venv" || return 1
         uv pip install -q --python "$WORK/cooperbench-venv/bin/python" -e "$src" || return 1
     fi
+    if ! "$WORK/cooperbench-venv/bin/python" -c "import anthropic" >/dev/null 2>&1; then  # Claude runs (claude.sbatch)
+        uv pip install -q --python "$WORK/cooperbench-venv/bin/python" anthropic || return 1
+    fi
 }
 
 # AppWorld only (APPWORLD_ONLY=1): no GPU or vLLM, for runs against an API model.
+# No GPU, vLLM or model (APPWORLD_ONLY=1, or API_ONLY=1): just uv and the benchmarks asked for with APPWORLD=1 and/or
+# COOPERBENCH=1, for runs against an API model (claude.sbatch).
 _appworld_only_setup() {
     if [[ "$(hostname -s)" == "neuronic" ]]; then
         echo "You're on the login node. Run salloc (no GPU needed) or sbatch claude.sbatch." >&2
@@ -330,13 +335,19 @@ _appworld_only_setup() {
         curl -LsSf https://astral.sh/uv/install.sh \
             | env UV_INSTALL_DIR="$WORK/bin" UV_NO_MODIFY_PATH=1 sh || { exec {lock}>&-; return 1; }
     fi
-    _appworld || { exec {lock}>&-; return 1; }
+    if [[ -n "$APPWORLD" || -n "$APPWORLD_ONLY" ]]; then
+        _appworld || { exec {lock}>&-; return 1; }
+        echo "AppWorld ready: $APPWORLD_PYTHON (data in $APPWORLD_ROOT)"
+    fi
+    if [[ -n "$COOPERBENCH" ]]; then
+        _cooperbench || { exec {lock}>&-; return 1; }
+        echo "CooperBench ready: $COOPERBENCH_PYTHON"
+    fi
     exec {lock}>&-
-    echo "AppWorld ready: $APPWORLD_PYTHON (data in $APPWORLD_ROOT)"
 }
 
 # Last command, so `source setup.sh || exit 1` sees whether setup succeeded
-if [[ -n "$APPWORLD_ONLY" ]]; then
+if [[ -n "$APPWORLD_ONLY" || -n "$API_ONLY" ]]; then
     _appworld_only_setup
 else
     _agent_setup "$@"
