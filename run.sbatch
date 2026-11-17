@@ -28,6 +28,10 @@ size="${1:-20b}"
 
 export VLLM_LOG="$SLURM_SUBMIT_DIR/logs/vllm-$SLURM_JOB_ID.log"
 export PORT=$((20000 + SLURM_JOB_ID % 10000 * 2))  # a port of its own (even, so PORT+1 is free for the BrowseComp embedder)
+# ...unless something on the node already holds it (the range overlaps the ports Linux gives outgoing connections):
+# then the next even port whose pair is free.
+_port_free() { python3 -c "import socket,sys; s=socket.socket(); s.bind(('', int(sys.argv[1])))" "$1" 2>/dev/null; }
+until _port_free "$PORT" && _port_free $((PORT + 1)); do PORT=$((PORT + 2)); done
 # AppWorld runs in its own venv (its dependencies clash with vLLM's), which setup.sh builds with APPWORLD=1.
 py=python
 if [[ " $* " == *" --benchmark appworld "* ]]; then export APPWORLD=1; fi
