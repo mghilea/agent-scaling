@@ -70,9 +70,9 @@ for t in ids:
 
 keys = ["runs", "pairs_solved", "features_passed", "at_least_one_feature", "empty_patch", "out_of_turns", "errors",
         "turns", "tool_errors", "tokens_k", "seconds", "dollars", "tasks"]
-print(f"{'':22s}" + "".join(f"{m:>22s}" for m in summary))
+print(f"{'':22s}" + "".join(f"{m:>24s}" for m in summary))
 for k in keys:
-    print(f"{k:22s}" + "".join(f"{str(summary[m][k]):>22s}" for m in summary))
+    print(f"{k:22s}" + "".join(f"{str(summary[m][k]):>24s}" for m in summary))
 print("\nper pair (features passed, f1 f2; - = not run yet):")
 cols = [f"{m} {tag}" for m, tags in RUNS.items() for tag in tags]
 short = lambda c: c.replace("gpt-oss-", "oss").replace("qwen3-coder-30b", "coder").replace("qwen3.", "q").replace("claude-sonnet-5-5", "sonnet").replace("claude-opus-5-5", "opus").split(" ")[0] \
