@@ -1,4 +1,4 @@
-"""Claude single agents against gpt-oss-20b on a set of AppWorld tasks.
+"""Claude single agents (and Qwen3-Coder-30B) against gpt-oss-20b on a set of AppWorld tasks.
 
     python analysis/aw_claude_compare.py                     # dev "big" tasks (analysis/aw_big_tasks.py), tag big01
     python analysis/aw_claude_compare.py --hard              # 50 test_challenge difficulty-3 tasks (aw_hard_tasks.py), tag hard01
@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parent.parent
 HARD = "--hard" in sys.argv
 TAG = sys.argv[sys.argv.index("--tag") + 1] if "--tag" in sys.argv else ("hard01" if HARD else "big01")
 SPLIT = "test_challenge" if HARD else "dev"
-MODELS = ["claude-sonnet-5-5", "claude-opus-5-5"]
+MODELS = ["claude-sonnet-5-5", "claude-opus-5-5", "qwen3-coder-30b"]  # qwen: run with --repair-calls, as gpt-oss
 
 
 def rows(pattern):
@@ -44,7 +44,7 @@ if HARD:
 else:
     big = sorted(t for t, w in writes.items() if st.mean(w) > 20)
 
-claude = {m: rows(f"*-sas-appworld-{SPLIT}-{m}-{TAG}") for m in MODELS}
+claude = {m: rows(f"*-sas-*appworld-{SPLIT}-{m}-{TAG}") for m in MODELS}  # -sas-appworld- or -sas-rc-appworld-
 single = rows(f"*-sas-rc-appworld-{SPLIT}-gpt-oss-20b-base02")
 ladder = {}
 for lvl in ("L0", "L1", "L2", "L3"):
