@@ -355,7 +355,8 @@ class Agent:
         schemas = [schema for _, schema in self.tools.values()] if use_tools else []
         resp = self.client.chat.completions.create(
             model=self.model, messages=messages, tools=schemas or NOT_GIVEN,
-            reasoning_effort=self.reasoning_effort)
+            # reasoning_effort is gpt-oss's (Harmony) setting; other models served by vLLM don't take it
+            **({"reasoning_effort": self.reasoning_effort} if "gpt-oss" in (self.model or "") else {}))
         used = ""
         with self._stats_lock:
             self.stats["turns"] += 1

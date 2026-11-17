@@ -6,6 +6,7 @@
 #
 #   salloc -c 16 --mem=128G --gres=gpu:2 --time=02:00:00
 #   source ~/agent-scaling/setup.sh 120b       # gpt-oss-120b split over 2 GPUs
+#   source ~/agent-scaling/setup.sh qwen3-coder-30b   # Qwen3-Coder-30B-A3B-Instruct (BF16) over 2 GPUs
 #
 # Safe to re-run: each step is skipped if it's already done on this node.
 # In a second terminal on the same node, re-sourcing it just restores the environment.
@@ -33,7 +34,15 @@ fi
 
 _agent_setup() {
     local size="${1:-20b}"
-    local name="gpt-oss-$size"
+    # The model: its served name, Hugging Face repo, vLLM tool-call parser and extra serve flags, and GPUs it needs.
+    local name repo parser min_gpus=1 extra=()
+    case "$size" in
+        20b|120b) name="gpt-oss-$size"; repo="openai/$name"; parser=openai; [[ "$size" == 120b ]] && min_gpus=2 ;;
+        qwen3-coder-30b)  # 61 GB in BF16: 2 L40s; context capped at 128k (native 256k) to leave room for several agents
+            name="$size"; repo="Qwen/Qwen3-Coder-30B-A3B-Instruct"; parser=qwen3_coder; min_gpus=2
+            extra=(--max-model-len 131072) ;;
+        *) echo "Unknown model '$size': use 20b, 120b or qwen3-coder-30b" >&2; return 1 ;;
+    esac
     local port="${PORT:-8000}"
     local vllm_version="${VLLM_VERSION:-0.30.0}"
 
@@ -49,8 +58,8 @@ _agent_setup() {
     local gpus tp
     gpus=$(nvidia-smi -L | wc -l)
     tp="${TP:-$gpus}"
-    if [[ "$size" == "120b" && "$tp" -lt 2 ]]; then
-        echo "gpt-oss-120b needs 2 L40s. Allocate with --gres=gpu:2." >&2
+    if [[ "$tp" -lt "$min_gpus" ]]; then
+        echo "$name needs $min_gpus L40s. Allocate with --gres=gpu:$min_gpus." >&2
         return 1
     fi
 
@@ -95,8 +104,8 @@ _agent_setup() {
 
     local model_dir="$WORK/models/$name"
     if ! _intact "$model_dir"; then
-        echo "==> Downloading openai/$name"
-        hf download "openai/$name" --exclude "original/*" --exclude "metal/*" \
+        echo "==> Downloading $repo"
+        hf download "$repo" --exclude "original/*" --exclude "metal/*" \
             --local-dir "$model_dir" || { exec {lock}>&-; return 1; }
         _mark_intact "$model_dir"
     fi
@@ -133,7 +142,7 @@ _agent_setup() {
             # >| overwrites the old log even with noclobber on
             nohup vllm serve "$model_dir" --served-model-name "$name" --port "$port" \
                 --tensor-parallel-size "$tp" --gpu-memory-utilization "${VLLM_GPU_UTIL:-$( [[ -n "$BROWSECOMP" ]] && echo 0.70 || echo 0.90 )}" \
-                --enable-auto-tool-choice --tool-call-parser openai >| "$log" 2>&1 &
+                --enable-auto-tool-choice --tool-call-parser "$parser" "${extra[@]}" >| "$log" 2>&1 &
             pid=$!
         fi
         local start=$SECONDS

@@ -5,6 +5,7 @@
 #   sbatch run.sbatch                                  # gpt-oss-20b, all tasks
 #   sbatch run.sbatch 20b --reasoning-effort low       # extra args go to agent.py
 #   sbatch --gres=gpu:2 -c 16 --mem=128G run.sbatch 120b
+#   sbatch --gres=gpu:2 -c 16 --mem=128G run.sbatch qwen3-coder-30b --benchmark cooperbench --subset core
 #   sbatch --export=ALL,BROWSECOMP=1 run.sbatch 20b --benchmark browsecomp   # also sets up BrowseComp-Plus
 #   sbatch run.sbatch 20b --benchmark appworld --dataset dev                 # sets up AppWorld itself
 #   sbatch run.sbatch 20b --benchmark cooperbench --subset core --repair-calls  # sets up CooperBench (Apptainer) itself
