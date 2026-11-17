@@ -4,7 +4,7 @@
 
 Two tool settings: "bash" (the original tools: bash can edit the repository; gpt-oss-20b and Qwen3-Coder-30B, 2026-11-17
 morning) and "edit" (--edit-tools: bash is read-only, files change only through the edit tools, as in the WAL teams;
-gpt-oss-120b, Qwen3.5-122B-A10B, Qwen3.8-27B). A pair counts as solved when both features' hidden tests pass. Only ids
+all five models). A pair counts as solved when both features' hidden tests pass. Only ids
 and numbers are read (CooperBench's dataset license is unknown: task contents stay off pages and out of git).
 """
 import glob
@@ -16,6 +16,8 @@ ROOT = Path(__file__).resolve().parent.parent
 # label -> (run-directory kind, model, tags)
 RUNS = {"gpt-oss-20b bash": ("sas-rc", "gpt-oss-20b", ["core01", "core02"]),
         "qwen3-coder-30b bash": ("sas-rc", "qwen3-coder-30b", ["qcore01", "qcore02"]),
+        "gpt-oss-20b edit": ("sas-et-rc", "gpt-oss-20b", ["ecore01", "ecore02"]),
+        "qwen3-coder-30b edit": ("sas-et-rc", "qwen3-coder-30b", ["ecore01", "ecore02"]),
         "gpt-oss-120b edit": ("sas-et-rc", "gpt-oss-120b", ["ecore01", "ecore02"]),
         "qwen3.5-122b edit": ("sas-et-rc", "qwen3.5-122b", ["ecore01", "ecore02"]),
         "qwen3.8-27b edit": ("sas-et-rc", "qwen3.8-27b", ["ecore01", "ecore02"])}
