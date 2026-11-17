@@ -24,7 +24,13 @@ with the result instead of blocking) plus refusing both open claims and work a t
 L4v0-strict is L4v0 with L3's catch-up on every entry.
 Claims name their targets at every level; from L2 on, a claim on an existing record must name its id.
 
-The adapter describes the environment: is_write(app, api), has_ids(app, api), the apps and their write APIs.
+The adapter describes the environment: is_write(app, api), has_ids(app, api), path(app, api). Optional hooks, for
+environments other than AppWorld's (whose adapter has none of them, so its log behaves as before):
+- ids_in(app, api, target): the ids a claim's target names (default: the numbers in it);
+- keep_claims = True: a claim stays open after its changes (default: a claim on records closes once each has been
+  changed), and every change it covers restarts its expiry clock: for files, which an agent edits many times;
+- conflict_hint: what a refused agent is told to do instead (default: leave that work to the teammate);
+- unclaimed(action): how a refusal for a missing claim names what to claim (default: the app, API and record ids).
 commit() takes an Action built by the adapter: app, api, path (the API's path template), ids (the values of the
 path's id parameters), identity (the call's identifying arguments, for new items) and call (as shown in the log).
 """
@@ -113,6 +119,8 @@ class Log:
         if level not in LEVELS:
             raise ValueError(f"unknown WAL level {level!r}")
         self.level, self.rules, self.adapter = level, LEVELS[level], adapter
+        self.keep_claims = getattr(adapter, "keep_claims", False)
+        self.conflict_hint = getattr(adapter, "conflict_hint", "Leave that work to them, or claim something else.")
         self.lock, self.event = lock, event
         self.t0 = now() if t0 is None else t0
         self.claim_ttl = claim_ttl
@@ -254,6 +262,10 @@ class Log:
             return text
         return "The WAL is empty." if not self.entries else "No new entries since you last read the WAL."
 
+    def _target_ids(self, app, api, target):
+        hook = getattr(self.adapter, "ids_in", None)
+        return set(hook(app, api, target)) if hook else _ids_in(target)
+
     def _parse_claims(self, claims):
         if isinstance(claims, str):
             try:
@@ -275,7 +287,7 @@ class Log:
                               "api: 'download_song', target: '114'}.")
             if not target:
                 return None, f"[error] the claim on {app}.{api} needs a target: the record's id, or what you will create"
-            ids = _ids_in(target) if self.adapter.has_ids(app, api) else set()
+            ids = self._target_ids(app, api, target) if self.adapter.has_ids(app, api) else set()
             if self.adapter.has_ids(app, api) and not ids and "intent" in self.rules:
                 return None, (f"[error] {app}.{api} acts on an existing record: name its id in the target "
                               f"(e.g. '{api} 114'), one claim per record or several ids in one target.")
@@ -317,7 +329,7 @@ class Log:
                 if hit:
                     self.event(me, "wal_refused", rule=hit[0], at="post", claim=c, reason=hit[1])
                     return (f"[WAL] Not posted: your claim {c['app']}.{c['api']} {c['target']} conflicts with "
-                            f"{hit[1]}. Leave that work to them, or claim something else.")
+                            f"{hit[1]}. {self.conflict_hint}")
             old = self.claims.pop(me, [])
             e = self._append(me, "intent", plan=str(plan).strip(), claims=parsed,
                              replaces=self.intent.get(me), released=[c.show() for c in old])
@@ -369,7 +381,8 @@ class Log:
             if "intent" in self.rules and claim is None:
                 rule = "intent"
                 self.event(me, "wal_refused", rule=rule, call=action.call)
-                need = (f"{action.app}.{action.api} with the record's id ({', '.join(action.ids)}) in the target"
+                need = (self.adapter.unclaimed(action) if hasattr(self.adapter, "unclaimed")
+                        else f"{action.app}.{action.api} with the record's id ({', '.join(action.ids)}) in the target"
                         if action.ids else f"{action.app}.{action.api}")
                 raise Refused(f"[WAL] Refused: your current intent doesn't claim {need}. Post an intent with "
                               "wal_intend that claims it, then make the change. Nothing was changed.")
@@ -398,7 +411,10 @@ class Log:
                 rule, why = (("no_conflict", f"{hit[0]}'s open claim {hit[1].show()} (intent #{hit[1].intent})") if hit
                              else ("no_redo", f"a change {prior[0]} already made (#{prior[1]})"))
                 self.event(me, "wal_refused", rule=rule, at="write", call=action.call, reason=why)
-                raise Refused(f"[WAL] Refused: {action.call} conflicts with {why}. Nothing was changed.")
+                raise Refused(f"[WAL] Refused: {action.call} conflicts with {why}. Nothing was changed."
+                              + (f" {self.conflict_hint}" if self.keep_claims else ""))
+        if claim is not None and self.keep_claims:
+            claim.t = now()  # the claim is in use: its expiry clock restarts
         self._write({"kind": "pending", "agent": me, "call": action.call, "intent": self.intent.get(me)})
         try:
             out = execute()
@@ -410,7 +426,7 @@ class Log:
         self._append(me, "change", intent=self.intent.get(me), call=action.call, result="done", app=action.app,
                      api=action.api, path=action.path, ids=list(action.ids))
         self.done.setdefault(action.key, (me, len(self.entries)))
-        if claim is not None and action.ids:
+        if claim is not None and action.ids and not self.keep_claims:
             claim.ids -= set(action.ids)
             if not claim.ids:
                 self.claims[me].remove(claim)
@@ -448,6 +464,45 @@ class Log:
                 "wal_delivered": kinds["wal_delivered"],
                 **{f"wal_released_{r}": releases[r] for r in ("stopped", "expired")}}
 
+
+def team_concurrency(events, logged, accepted):
+    """How much a team's agents worked at the same time, and how the log's refusals played out (from its events).
+
+    An agent works from its 'active' event to its 'idle' one. overlap: share of the team's time with two or more
+    agents working; parallelism: their summed working time over the team's time (1 = one at a time). With the log
+    (logged): a refusal chain is a run of refusals with no accepted post or write in between (accepted(e): the event
+    is a write that went through); an agent 'stopped after a refusal' if a refusal was its last log event."""
+    span = {}
+    for e in events:
+        if e["kind"] == "active":
+            span.setdefault(e["agent"], [e["t"], e["t"]])
+        elif e["kind"] == "idle" and e["agent"] in span:
+            span[e["agent"]][1] = e["t"]
+    end = max((b for _, b in span.values()), default=0.0)
+    points = sorted({t for ab in span.values() for t in ab})
+    both = sum(b - a for a, b in zip(points, points[1:])
+               if sum(s <= a and b <= t for s, t in span.values()) >= 2)
+    out = {"team_seconds": round(end, 1),
+           "overlap": round(both / end, 3) if end else 0.0,
+           "parallelism": round(sum(b - a for a, b in span.values()) / end, 2) if end else 0.0}
+    if logged:
+        chains, last = [], {}
+        run = Counter()
+        for e in events:
+            a = e["agent"]
+            if e["kind"] == "wal_refused":
+                run[a] += 1
+                last[a] = "refused"
+            elif e["kind"] == "wal_intend" or accepted(e):
+                if run[a]:
+                    chains.append(run[a])
+                run[a] = 0
+                last[a] = "ok"
+        chains += [c for c in run.values() if c]
+        out.update({"refusal_chains": len(chains), "refusal_chain_max": max(chains, default=0),
+                    "refusal_chains_3plus": sum(c >= 3 for c in chains),
+                    "stopped_after_refusal": sum(v == "refused" for v in last.values())})
+    return out
 
 # The protocol as each agent is told it, by level.
 TEXT = """The team keeps a write-ahead log (WAL): an append-only record, shared by all of you, of what each agent intends to change and of every change made through the apps' APIs. wal_read shows the entries you haven't seen (all=true shows every entry). wal_intend posts your intent: your plan, and one claim per change you will make, naming the app, the API you will call and its target: the record's id (e.g. {{"app": "spotify", "api": "download_song", "target": "114, 161"}}), or for something new a short description (e.g. {{"app": "spotify", "api": "create_playlist", "target": "playlist 'Road trip'"}}). A new intent replaces your previous one. Every change any of you makes through the APIs is added to the WAL automatically, with its result; reading data and logging in don't need the WAL.

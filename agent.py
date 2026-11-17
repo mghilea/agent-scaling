@@ -422,7 +422,11 @@ def main():
                          "browsecomp: BrowseComp-Plus questions (the paper's 100), graded by an LLM judge; "
                          "appworld: AppWorld tasks (run with $APPWORLD_PYTHON), scored by its evaluator")
     ap.add_argument("--subset", default="core",
-                    help="cooperbench: a subset of feature pairs from its dataset/subsets (core 10, flash 50, lite 100, all)")
+                    help="cooperbench: a subset of feature pairs from its dataset/subsets (core 10, flash 50, lite 100, all; "
+                         "team3_250, team3_all: groups of three features)")
+    ap.add_argument("--edit-tools", action="store_true",
+                    help="cooperbench, single agent: bash is read-only and files change only through write_file, "
+                         "replace_in_file and delete_file, as in the teams (which always have them)")
     ap.add_argument("--dataset", default="dev", choices=["train", "dev", "test_normal", "test_challenge"],
                     help="appworld: which split")
     ap.add_argument("--tasks", default=str(ROOT / "tasks.jsonl"))
@@ -472,12 +476,15 @@ def main():
                     help="agent-driven: one activation may use the agent's whole budget, instead of pausing "
                          "after 12 calls until a teammate contacts it")
     ap.add_argument("--wal-level", choices=["L1", "L2", "L3", "L4", "L4v0", "L4v0-strict"],
-                    help="appworld teams (--topology agent-driven): the write-ahead log of wal2.py at this "
+                    help="appworld and cooperbench teams (--topology agent-driven): the write-ahead log of wal2.py at this "
                          "enforcement level (L1 nothing checked, L2 claims, L3 catch-up, L4 L3 + a teammate's open claim on the "
                          "same target refused; L4v0, L4v0-strict: earlier L4 definitions); without it, no log")
-    ap.add_argument("--claim-ttl", type=int, default=90,
-                    help="with --wal-level: seconds a claim stays open without its change")
-    ap.add_argument("--agents", type=int, default=3, help="multi-agent: number of worker agents (paper: 3)")
+    ap.add_argument("--claim-ttl", type=int,
+                    help="with --wal-level: seconds a claim stays open without its change (default 90; cooperbench: "
+                         "600 seconds without an edit to the claimed file)")
+    ap.add_argument("--agents", type=int,
+                    help="multi-agent: number of worker agents (default 3, as in the paper; cooperbench teams have one "
+                         "agent per feature of the task instead)")
     ap.add_argument("--rounds", type=int,
                     help="multi-agent: max rounds (default as in the paper: 5 centralized/hybrid, 3 decentralized)")
     ap.add_argument("--max-turns", type=int,
@@ -518,14 +525,23 @@ def main():
     if not tasks:
         sys.exit("no tasks to run")
     multi = args.topology != "single"
-    if cb and multi:
-        sys.exit("CooperBench runs the single agent for now (teams with the write-ahead log come next)")
-    if multi and not (wb or bc or (aw and args.topology == "agent-driven")):
-        sys.exit("the multi-agent topologies need --benchmark workbench or browsecomp (appworld: --topology agent-driven)")
-    if aw and multi and args.comm != "none":
-        sys.exit("AppWorld teams have no channels between agents yet: add --comm none")
-    if args.wal_level and not (aw and args.topology == "agent-driven"):
-        sys.exit("--wal-level is for AppWorld teams (--benchmark appworld --topology agent-driven); WorkBench uses --wal")
+    if multi and not (wb or bc or ((aw or cb) and args.topology == "agent-driven")):
+        sys.exit("the multi-agent topologies need --benchmark workbench or browsecomp (appworld, cooperbench: "
+                 "--topology agent-driven)")
+    if (aw or cb) and multi and args.comm != "none":
+        sys.exit("AppWorld and CooperBench teams have no channels between agents yet: add --comm none")
+    if cb and multi and args.agents is not None:
+        sys.exit("CooperBench teams have one agent per feature of the task (2 for pairs, 3 in the team3 subsets): "
+                 "drop --agents")
+    if args.agents is None and not (cb and multi):  # cooperbench teams: one per feature, set by each task
+        args.agents = 3
+    if args.wal_level and not ((aw or cb) and args.topology == "agent-driven"):
+        sys.exit("--wal-level is for AppWorld and CooperBench teams (--topology agent-driven); WorkBench uses --wal")
+    if cb and args.wal_level and args.wal_level not in ("L1", "L2", "L3", "L4"):
+        sys.exit("CooperBench teams have WAL levels L1-L4 (L4v0 and L4v0-strict are AppWorld's earlier definitions)")
+    if args.edit_tools and not cb:
+        sys.exit("--edit-tools is for --benchmark cooperbench")
+    args.claim_ttl = args.claim_ttl or (600 if cb else 90)
     if args.wal and not (wb and multi):
         sys.exit("--wal needs --benchmark workbench and a multi-agent topology")
     if (args.wal_piggyback or args.wal_drafts or args.wal_mode != "full") and not (args.wal and args.topology == "agent-driven"):
@@ -557,10 +573,13 @@ def main():
         import mas
         args.rounds = args.rounds or mas.DEFAULT_ROUNDS[args.topology]
     aw_team = bool(aw) and driven
-    if driven and not aw_team:
+    cb_team = bool(cb) and driven
+    if driven and not (aw_team or cb_team):
         import agent_driven
     if aw_team:
         import appworld_team
+    if cb_team:
+        import cooperbench_team
     topo_name = f"agent-driven-{args.comm}{'-coord' if args.coordinate else ''}{'-wal' if args.wal else ''}{'-' + args.wal_mode if args.wal_mode != 'full' else ''}{'-pb' if args.wal_piggyback else ''}{'-dr' if args.wal_drafts else ''}" if driven else args.topology
     topo_name += "-wal" if args.wal and not driven else ""
     topo_name += f"-split{args.split}" if args.split else ""
@@ -568,7 +587,8 @@ def main():
     topo_name += "-np" if args.no_pause else ""
     topo_name += f"-tb{args.turn_budget}" if args.turn_budget else ""
     topo_name += f"-{args.wal_level}" if args.wal_level else ""
-    kind = "ask" if args.ask else ("sas" if not multi else topo_name) + ("-rc" if args.repair_calls else "") + \
+    kind = "ask" if args.ask else ("sas" if not multi else topo_name) + ("-et" if cb and not multi and args.edit_tools else "") + \
+        ("-rc" if args.repair_calls else "") + \
         ("-workbench" if wb else "-browsecomp" if bc else f"-appworld-{args.dataset}" if aw else f"-cooperbench-{args.subset}" if cb else "")
     run_dir = ROOT / "runs" / f"{datetime.now():%Y%m%d-%H%M%S}-{kind}-{args.model}{'-' + args.tag if args.tag else ''}"
     (run_dir / "traces").mkdir(parents=True)
@@ -589,7 +609,7 @@ def main():
             print(_block(label, text, DIM, limit=600), flush=True)
 
     budget_name = (f"--turn-budget {args.turn_budget or (agent_driven.TURN_BUDGET_BC if bc else agent_driven.TURN_BUDGET)}"
-                   if driven and not aw_team
+                   if driven and not (aw_team or cb_team)
                    else f"--max-turns {args.max_turns}" if not args.ask else "")
     rows = []
     for t in tasks:
@@ -600,6 +620,9 @@ def main():
             if aw_team:
                 r = appworld_team.run(t["id"], make_agent, args.agents, run_dir, level=args.wal_level,
                                       claim_ttl=args.claim_ttl, max_turns=args.max_turns)
+            elif cb_team:
+                r = cooperbench_team.run(t, make_agent, run_dir, level=args.wal_level, claim_ttl=args.claim_ttl,
+                                         max_turns=args.max_turns)
             elif driven:
                 r = agent_driven.run(t["question"], make_agent, args.agents, args.comm, log_message, seed=t["id"],
                                      coordinate=args.coordinate, browsecomp=bool(bc), split=args.split,
@@ -616,8 +639,8 @@ def main():
                 r = make_agent(tools=sandbox.tools, system_prompt=wb.SYSTEM_PROMPT).run(t["question"])
                 actions = sandbox.actions
             elif cb:
-                session = cb.Session(t)
-                agent = make_agent(tools=session.tools, system_prompt=cb.SYSTEM_PROMPT)
+                session = cb.EditSession(t) if args.edit_tools else cb.Session(t)
+                agent = make_agent(tools=session.tools, system_prompt=cb.EDIT_PROMPT if args.edit_tools else cb.SYSTEM_PROMPT)
                 r = agent.run(session.task_prompt())
             elif aw:
                 session = aw.Session(t["id"], experiment_name=run_dir.name)
@@ -656,14 +679,18 @@ def main():
                        **bc.retrieval_stats(r.pop("sessions", None) or ([session] if session else []), t)}
             answer, expected = response, t["answer"]
         elif cb:
-            if session is None:  # the container never started
-                verdict = {"correct": False, "feature1_passed": False, "feature2_passed": False, "patch_lines": 0}
+            if cb_team and "verdict" in r:
+                verdict = r["verdict"]
+            elif session is None:  # the container never started
+                verdict = {"correct": False, **{f"feature{i + 1}_passed": False for i in range(len(t["features"]))},
+                           "features_passed": 0, "features": len(t["features"]), "patch_lines": 0}
             else:
                 verdict = session.score()
                 session.close()
+            if "_patch" in verdict:
                 (run_dir / "patches").mkdir(exist_ok=True)
                 (run_dir / "patches" / f"{t['id']}.patch").write_text(verdict.pop("_patch"))
-                (run_dir / "patches" / f"{t['id']}.tests.json").write_text(json.dumps(verdict.pop("_test_output"), indent=1))
+                (run_dir / "patches" / f"{t['id']}.tests.json").write_text(json.dumps(verdict.pop("_test_output", {}), indent=1))
             correct, answer, expected = verdict["correct"], r["final"], None
         elif aw:
             # Scored on the final state of the task's databases (and the answer given to complete_task).
@@ -710,7 +737,8 @@ def main():
         elif wb:
             shown = f"actions={answer}  expected={expected}  side_effects={verdict['side_effects']}"
         elif cb:
-            shown = (f"feature tests: {int(verdict['feature1_passed'])}+{int(verdict['feature2_passed'])} of 2, "
+            passed = [int(verdict.get(f"feature{i + 1}_passed", False)) for i in range(len(t["features"]))]
+            shown = (f"feature tests: {'+'.join(map(str, passed))} of {len(passed)}, "
                      f"patch {verdict['patch_lines']} lines" + (f", eval error {verdict['eval_error']}" if verdict.get("eval_error") else ""))
         elif aw:
             shown = (f"tests={verdict['tests_passed']}/{verdict['tests']} completed={verdict['completed']} "

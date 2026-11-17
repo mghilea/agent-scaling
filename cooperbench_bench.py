@@ -135,6 +135,10 @@ _SCRATCH = ("__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".tox"
             "/build/", "/dist/", ".git/")
 
 
+def _lines(n):
+    return f"{n} line{'' if n == 1 else 's'}"
+
+
 def _rmtree(path):
     subprocess.run(["chmod", "-R", "u+rwX", str(path)], capture_output=True)
     shutil.rmtree(path, ignore_errors=True)
@@ -192,15 +196,24 @@ class Workspace:
             return None, f"[error] {path!r} is not a file in the repository"
         return self.repo / rel, rel
 
+    # Each edit returns "<file>: <what changed>" (or an error starting with [error]); in teams with the log, that text
+    # is also the change's entry.
     def write_file(self, path, content):
         target, rel = self._resolve(path)
         if target is None:
             return rel
         with self.lock:
-            target.parent.mkdir(parents=True, exist_ok=True)
-            existed = target.exists()
-            target.write_text(content)
-        return f"{'Replaced' if existed else 'Created'} {rel} ({len(content.splitlines())} lines)."
+            if target.is_dir():
+                return f"[error] {rel} is a directory"
+            before = target.read_text(errors="replace") if target.is_file() else None
+            try:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(content)
+            except OSError as e:
+                return f"[error] couldn't write {rel}: {e.strerror or e}"
+        n = len(content.splitlines())
+        return (f"{rel}: created ({_lines(n)})." if before is None
+                else f"{rel}: replaced the whole file ({_lines(len(before.splitlines()))}) with {_lines(n)}.")
 
     def replace_in_file(self, path, old, new):
         target, rel = self._resolve(path)
@@ -215,7 +228,10 @@ class Workspace:
                 return (f"[error] `old` occurs {n} times in {rel}; it must occur exactly once (copy it exactly from the "
                         "file, with enough surrounding lines to be unique). Nothing was changed.")
             target.write_text(text.replace(old, new, 1))
-        return f"Replaced 1 occurrence in {rel}."
+        a = text.count("\n", 0, text.index(old)) + 1
+        b = a + old.count("\n") - old.endswith("\n")
+        lines = f"line {a}" if a == b else f"lines {a}-{b}"
+        return f"{rel}: replaced {lines} ({_lines(b - a + 1)}) with {_lines(len(new.splitlines()))}."
 
     def delete_file(self, path):
         target, rel = self._resolve(path)
@@ -224,8 +240,9 @@ class Workspace:
         with self.lock:
             if not target.is_file():
                 return f"[error] no such file: {rel}"
+            n = len(target.read_text(errors="replace").splitlines())
             target.unlink()
-        return f"Deleted {rel}."
+        return f"{rel}: deleted ({_lines(n)})."
 
     def patch(self):
         """Everything changed in the repository, new files included, as a diff against the base commit."""
