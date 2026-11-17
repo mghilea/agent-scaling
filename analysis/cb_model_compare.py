@@ -1,10 +1,11 @@
-"""CooperBench core subset, single agent: gpt-oss-20b (core01, core02) against Qwen3-Coder-30B (qcore01, qcore02).
+"""CooperBench core subset, single agent: the open models, two runs of the 10 pairs each, all with --repair-calls.
 
     python analysis/cb_model_compare.py          # prints the tables, writes analysis/cb_model_compare.json
 
-All four runs used the original tools (bash can edit the repository) and --repair-calls. A pair counts as solved when both
-features' hidden tests pass. Only ids and numbers are read (CooperBench's dataset license is unknown: task contents stay
-off pages and out of git).
+Two tool settings: "bash" (the original tools: bash can edit the repository; gpt-oss-20b and Qwen3-Coder-30B, 2026-11-17
+morning) and "edit" (--edit-tools: bash is read-only, files change only through the edit tools, as in the WAL teams;
+gpt-oss-120b, Qwen3.5-122B-A10B, Qwen3.8-27B). A pair counts as solved when both features' hidden tests pass. Only ids
+and numbers are read (CooperBench's dataset license is unknown: task contents stay off pages and out of git).
 """
 import glob
 import json
@@ -12,15 +13,21 @@ import statistics as st
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-RUNS = {"gpt-oss-20b": ["core01", "core02"], "qwen3-coder-30b": ["qcore01", "qcore02"]}
+# label -> (run-directory kind, model, tags)
+RUNS = {"gpt-oss-20b bash": ("sas-rc", "gpt-oss-20b", ["core01", "core02"]),
+        "qwen3-coder-30b bash": ("sas-rc", "qwen3-coder-30b", ["qcore01", "qcore02"]),
+        "gpt-oss-120b edit": ("sas-et-rc", "gpt-oss-120b", ["ecore01", "ecore02"]),
+        "qwen3.5-122b edit": ("sas-et-rc", "qwen3.5-122b", ["ecore01", "ecore02"]),
+        "qwen3.8-27b edit": ("sas-et-rc", "qwen3.8-27b", ["ecore01", "ecore02"])}
 
 
-def load(model, tag):
-    dirs = sorted(glob.glob(str(ROOT / "runs" / f"*-sas-rc-cooperbench-core-{model}-{tag}")))
+def load(kind, model, tag):
+    dirs = sorted(glob.glob(str(ROOT / "runs" / f"*-{kind}-cooperbench-core-{model}-{tag}")))
     return [json.loads(line) for line in open(Path(dirs[-1], "results.jsonl"))] if dirs else []
 
 
-runs = {(m, tag): load(m, tag) for m, tags in RUNS.items() for tag in tags}
+runs = {(m, tag): load(kind, model, tag) for m, (kind, model, tags) in RUNS.items() for tag in tags}
+RUNS = {m: tags for m, (_, _, tags) in RUNS.items()}
 ids = sorted({r["id"] for rows in runs.values() for r in rows})
 
 summary = {}
@@ -55,11 +62,13 @@ for t in ids:
 
 keys = ["runs", "pairs_solved", "features_passed", "at_least_one_feature", "empty_patch", "out_of_turns", "errors",
         "turns", "tool_errors", "tokens_k", "seconds", "tasks"]
-print(f"{'':22s}" + "".join(f"{m:>26s}" for m in summary))
+print(f"{'':22s}" + "".join(f"{m:>22s}" for m in summary))
 for k in keys:
-    print(f"{k:22s}" + "".join(f"{str(summary[m][k]):>26s}" for m in summary))
+    print(f"{k:22s}" + "".join(f"{str(summary[m][k]):>22s}" for m in summary))
 print("\nper pair (features passed, f1 f2; - = not run yet):")
 cols = [f"{m} {tag}" for m, tags in RUNS.items() for tag in tags]
-print(f"{'':42s}" + "".join(f"{c.replace('gpt-oss-20b', 'oss').replace('qwen3-coder-30b', 'qwen'):>14s}" for c in cols))
+short = lambda c: c.replace("gpt-oss-", "oss").replace("qwen3-coder-30b", "coder").replace("qwen3.", "q").split(" ")[0] \
+    + c.split(" ")[-1][-2:]  # noqa: E731
+print(f"{'':40s}" + "".join(f"{short(c):>10s}" for c in cols))
 for row in per_task:
-    print(f"{row['id']:42s}" + "".join(f"{row[c] or '-':>14s}" for c in cols))
+    print(f"{row['id']:40s}" + "".join(f"{row[c] or '-':>10s}" for c in cols))
