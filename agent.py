@@ -687,8 +687,15 @@ def main():
                 verdict = {"correct": False, **{f"feature{i + 1}_passed": False for i in range(len(t["features"]))},
                            "features_passed": 0, "features": len(t["features"]), "patch_lines": 0}
             else:
-                verdict = session.score()
-                session.close()
+                try:
+                    verdict = session.score()
+                except Exception as e:  # e.g. the test container failed: this pair's eval error, not the run's end
+                    verdict = {"correct": False, **{f"feature{i + 1}_passed": False for i in range(len(t["features"]))},
+                               "features_passed": 0, "features": len(t["features"]), "patch_lines": 0,
+                               "eval_error": f"{type(e).__name__}: {str(e)[:300]}"}
+                    print(_c(YELLOW, f"  scoring failed: {verdict['eval_error']}"), flush=True)
+                finally:
+                    session.close()
             if "_patch" in verdict:
                 (run_dir / "patches").mkdir(exist_ok=True)
                 (run_dir / "patches" / f"{t['id']}.patch").write_text(verdict.pop("_patch"))

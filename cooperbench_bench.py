@@ -253,6 +253,17 @@ class Workspace:
         self.container.remove()
 
 
+def _put_patch(sb, filename, content):
+    """A patch into the sandbox's /patches. CooperBench's _write_patch passes it base64-encoded as one command-line
+    argument, which fails for patches over ~96 KB (Linux limits one argument to 128 KB: "Argument list too long"); on
+    Apptainer the container's files are a directory here, so the patch is written straight into it."""
+    root = getattr(getattr(sb, "_container", None), "root", None)
+    if root is None:
+        return _write_patch(sb, filename, content)
+    (Path(root) / "patches").mkdir(exist_ok=True)
+    (Path(root) / "patches" / filename).write_text(content)
+
+
 def score_features(task, patch, timeout=COMMAND_TIMEOUT):
     """Each feature's hidden tests on the patch, in a fresh container (CooperBench's test_solo, for any number of
     features). The task counts as solved only if every feature's tests pass."""
@@ -262,9 +273,9 @@ def score_features(task, patch, timeout=COMMAND_TIMEOUT):
     results = {}
     try:
         base = sb.exec("bash", "-c", "cd /workspace/repo && git rev-parse HEAD").stdout_read().strip()
-        _write_patch(sb, "agent.patch", patch)
+        _put_patch(sb, "agent.patch", patch)
         for f in task["features"]:
-            _write_patch(sb, f"tests{f}.patch", (task_dir / f"feature{f}" / "tests.patch").read_text())
+            _put_patch(sb, f"tests{f}.patch", (task_dir / f"feature{f}" / "tests.patch").read_text())
             results[f] = _run_tests(sb, f"tests{f}.patch", "agent.patch", base)
     finally:
         sb.terminate()

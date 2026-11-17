@@ -28,9 +28,15 @@ RUNS = {"gpt-oss-20b bash": ("sas-rc", "gpt-oss-20b", ["core01", "core02"]),
 
 
 def load(kind, model, tag):
-    dirs = sorted(glob.glob(str(ROOT / "runs" / f"*-{kind}-cooperbench-core-{model}-{tag}")))
-    res = Path(dirs[-1], "results.jsonl") if dirs else None
-    return [json.loads(line) for line in open(res)] if res and res.exists() else []  # none yet: no pair finished
+    """Every run directory with this tag, oldest first, a later result for the same pair replacing an earlier one (a run
+    that stopped part-way is completed by a second job on the missing pairs, with the same tag)."""
+    rows = {}
+    for d in sorted(glob.glob(str(ROOT / "runs" / f"*-{kind}-cooperbench-core-{model}-{tag}"))):
+        res = Path(d, "results.jsonl")
+        for line in (open(res) if res.exists() else []):  # none yet: no pair finished
+            r = json.loads(line)
+            rows[r["id"]] = r
+    return list(rows.values())
 
 
 runs = {(m, tag): load(kind, model, tag) for m, (kind, model, tags) in RUNS.items() for tag in tags}
