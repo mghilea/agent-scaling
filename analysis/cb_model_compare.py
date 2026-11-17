@@ -1,4 +1,5 @@
-"""CooperBench core subset, single agent: the open models, two runs of the 10 pairs each, all with --repair-calls.
+"""CooperBench core subset, single agent: one run of the 10 pairs per model with the edit tools (the user wants one run
+per model; the earlier bash-tools rows have two). Open models with --repair-calls.
 
     python analysis/cb_model_compare.py          # prints the tables, writes analysis/cb_model_compare.json
 
@@ -16,19 +17,20 @@ ROOT = Path(__file__).resolve().parent.parent
 # label -> (run-directory kind, model, tags)
 RUNS = {"gpt-oss-20b bash": ("sas-rc", "gpt-oss-20b", ["core01", "core02"]),
         "qwen3-coder-30b bash": ("sas-rc", "qwen3-coder-30b", ["qcore01", "qcore02"]),
-        "gpt-oss-20b edit": ("sas-et-rc", "gpt-oss-20b", ["ecore01", "ecore02"]),
-        "qwen3-coder-30b edit": ("sas-et-rc", "qwen3-coder-30b", ["ecore01", "ecore02"]),
-        "gpt-oss-120b edit": ("sas-et-rc", "gpt-oss-120b", ["ecore01", "ecore02"]),
-        "qwen3.5-122b edit": ("sas-et-rc", "qwen3.5-122b", ["ecore01", "ecore02"]),
-        "qwen3.8-27b edit": ("sas-et-rc", "qwen3.8-27b", ["ecore01", "ecore02"]),
+        "gpt-oss-20b edit": ("sas-et-rc", "gpt-oss-20b", ["ecore01"]),
+        "qwen3-coder-30b edit": ("sas-et-rc", "qwen3-coder-30b", ["ecore01"]),
+        "gpt-oss-120b edit": ("sas-et-rc", "gpt-oss-120b", ["ecore01"]),
+        "qwen3.5-122b edit": ("sas-et-rc", "qwen3.5-122b", ["ecore01"]),
+        "qwen3.8-27b edit": ("sas-et-rc", "qwen3.8-27b", ["ecore01"]),
         # Claude through the Anthropic API (claude.sbatch; no --repair-calls, which is for the vLLM agent)
-        "claude-sonnet-5-5 edit": ("sas-et", "claude-sonnet-5-5", ["ecore01", "ecore02"]),
-        "claude-opus-5-5 edit": ("sas-et", "claude-opus-5-5", ["ecore01", "ecore02"])}
+        "claude-sonnet-5-5 edit": ("sas-et", "claude-sonnet-5-5", ["ecore01"]),
+        "claude-opus-5-5 edit": ("sas-et", "claude-opus-5-5", ["ecore01"])}
 
 
 def load(kind, model, tag):
     dirs = sorted(glob.glob(str(ROOT / "runs" / f"*-{kind}-cooperbench-core-{model}-{tag}")))
-    return [json.loads(line) for line in open(Path(dirs[-1], "results.jsonl"))] if dirs else []
+    res = Path(dirs[-1], "results.jsonl") if dirs else None
+    return [json.loads(line) for line in open(res)] if res and res.exists() else []  # none yet: no pair finished
 
 
 runs = {(m, tag): load(kind, model, tag) for m, (kind, model, tags) in RUNS.items() for tag in tags}
