@@ -7,6 +7,8 @@
 #   salloc -c 16 --mem=128G --gres=gpu:2 --time=02:00:00
 #   source ~/agent-scaling/setup.sh 120b       # gpt-oss-120b split over 2 GPUs
 #   source ~/agent-scaling/setup.sh qwen3-coder-30b   # Qwen3-Coder-30B-A3B-Instruct (BF16) over 2 GPUs
+#   source ~/agent-scaling/setup.sh qwen3.8-27b       # Qwen3.8-27B, dense, thinking (BF16) over 2 GPUs
+#   salloc -c 16 --mem=192G --gres=gpu:4 ...; source ~/agent-scaling/setup.sh qwen3.5-122b   # Qwen3.5-122B-A10B (FP8), 4 GPUs
 #
 # Safe to re-run: each step is skipped if it's already done on this node.
 # In a second terminal on the same node, re-sourcing it just restores the environment.
@@ -41,7 +43,16 @@ _agent_setup() {
         qwen3-coder-30b)  # 61 GB in BF16: 2 L40s; context capped at 128k (native 256k) to leave room for several agents
             name="$size"; repo="Qwen/Qwen3-Coder-30B-A3B-Instruct"; parser=qwen3_coder; min_gpus=2
             extra=(--max-model-len 131072) ;;
-        *) echo "Unknown model '$size': use 20b, 120b or qwen3-coder-30b" >&2; return 1 ;;
+        # Qwen3.5-family thinking models (Qwen3.8-27B has Qwen3.5's architecture), served as their model cards say:
+        # qwen3 reasoning parser (thinking comes back separately; agent.py passes it back as reasoning_content),
+        # qwen3_coder tool parser, the vision encoder skipped (--language-model-only). Context capped at 128k (native 256k).
+        qwen3.8-27b)    # dense 27B, 56 GB in BF16: 2 L40s
+            name="$size"; repo="Qwen/Qwen3.8-27B"; parser=qwen3_coder; min_gpus=2
+            extra=(--max-model-len 131072 --reasoning-parser qwen3 --language-model-only) ;;
+        qwen3.5-122b)   # Qwen3.5-122B-A10B (10B active), 127 GB in FP8: 4 L40s
+            name="$size"; repo="Qwen/Qwen3.5-122B-A10B-FP8"; parser=qwen3_coder; min_gpus=4
+            extra=(--max-model-len 131072 --reasoning-parser qwen3 --language-model-only) ;;
+        *) echo "Unknown model '$size': use 20b, 120b, qwen3-coder-30b, qwen3.8-27b or qwen3.5-122b" >&2; return 1 ;;
     esac
     local port="${PORT:-8000}"
     local vllm_version="${VLLM_VERSION:-0.30.0}"
@@ -154,9 +165,9 @@ _agent_setup() {
                 tail -n 30 "$log" >&2
                 return 1
             fi
-            if (( SECONDS - start > 900 )); then
+            if (( SECONDS - start > 1500 )); then  # the 127 GB model over 4 GPUs takes a while
                 echo
-                echo "Still not up after 15 minutes. Check: tail -f $log" >&2
+                echo "Still not up after 25 minutes. Check: tail -f $log" >&2
                 return 1
             fi
             sleep 5

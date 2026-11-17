@@ -21,7 +21,9 @@ ROOT = Path(__file__).resolve().parent.parent
 HARD = "--hard" in sys.argv
 TAG = sys.argv[sys.argv.index("--tag") + 1] if "--tag" in sys.argv else ("hard01" if HARD else "big01")
 SPLIT = "test_challenge" if HARD else "dev"
-MODELS = ["claude-sonnet-5-5", "claude-opus-5-5", "qwen3-coder-30b"]  # qwen: run with --repair-calls, as gpt-oss
+MODELS = ["claude-sonnet-5-5", "claude-opus-5-5",
+          # open models, run with --repair-calls as the gpt-oss-20b baseline
+          "qwen3-coder-30b", "gpt-oss-120b", "qwen3.8-27b", "qwen3.5-122b"]
 
 
 def rows(pattern):

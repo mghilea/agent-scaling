@@ -374,6 +374,8 @@ class Agent:
         reasoning = getattr(msg, "reasoning", None) or getattr(msg, "reasoning_content", None)
         if reasoning:
             entry["reasoning"] = reasoning
+            if "gpt-oss" not in (self.model or ""):
+                entry["reasoning_content"] = reasoning  # Qwen's chat templates read earlier thinking from this field
             if self.show_reasoning:
                 self.log(_c(DIM, _block("thinking", reasoning, DIM)))
         return msg, entry
