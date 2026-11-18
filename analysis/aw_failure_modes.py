@@ -10,7 +10,14 @@ failed, or never attempted. Also: success on the tasks the single agent always s
 agent making every change vs several, within the same tasks. Prints API names and numbers only: run it locally, and
 keep task contents off pages (AppWorld license).
 """
+
+import glob
+import json
+import os
+import statistics as st
 from collections import Counter, defaultdict
+
+os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # paths below are relative to the repo
 LEVELS = ["L0", "L1", "L2", "L3", "L4", "L5", "L6"]
 kind = lambda L: "agent-driven-none-rc" if L == "L0" else f"agent-driven-none-{L}-rc"
 runs = []   # (level, tag, row, trace)
