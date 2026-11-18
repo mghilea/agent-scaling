@@ -73,7 +73,7 @@ for name, kind in SETUPS.items():
         continue
     mean = lambda k: round(st.mean(s[k] for s in stats if k in s), 3) if any(k in s for s in stats) else None  # noqa: E731
     row = {"tasks": len(stats), "solved": mean("solved"), "tests": mean("tests"), "calls": mean("calls"),
-           "tokens_k": mean("tokens_k"), "seconds": mean("seconds")}
+           "tokens_k": mean("tokens_k"), "seconds": round(mean("seconds"))}
     if agents:
         row.update({"writes": mean("writes"), "dup": mean("dup"), "coll": mean("coll"), "writers": mean("writers"),
                     "team_s": mean("team_s"),
@@ -87,7 +87,7 @@ for name, kind in SETUPS.items():
 if "--tags" not in sys.argv:
     (ROOT / "analysis" / "aw_hard_ladder.json").write_text(json.dumps({"setups": rows, "runs": per_run}, indent=1))
 cols = ["tasks", "solved", "tests", "writes", "dup", "coll", "writers", "no_change_agents", "reminded_agents",
-        "ended_on_refusal", *(f"ref_{k}" for k in RULES), "team_s", "calls", "tokens_k"]
+        "ended_on_refusal", *(f"ref_{k}" for k in RULES), "seconds", "calls", "tokens_k"]
 short = {"no_change_agents": "no_chg", "reminded_agents": "remind", "ended_on_refusal": "end_ref",
          "ref_intent": "r_int", "ref_relevant_catchup": "r_rel", "ref_read_before_post": "r_post",
          "ref_read_before_write": "r_write", "ref_no_conflict": "r_confl", "tokens_k": "tok_k"}
