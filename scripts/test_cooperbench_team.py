@@ -35,6 +35,12 @@ class Fake:
         self.name, self.tools, self.system_prompt = name, tools, system_prompt
         self.stats = {"turns": 0, "tool_calls": 0, "tool_errors": 0, "prompt_tokens": 0, "completion_tokens": 0}
         self.limit_hits, self.messages, self.max_turns = 0, [], 100
+        self.sent = []
+
+    def send(self, text):  # a reminder from the team: recorded, and the agent stops again
+        self.sent.append(text)
+        print(f"  {self.name} reminded: {text[:160]!r}", flush=True)
+        return {"final": "done", "stop": "final", "messages": self.messages, **self.stats}
 
     def call(self, tool, **kw):
         self.stats["tool_calls"] += 1
@@ -85,6 +91,7 @@ def agent_1_wal(a):
     assert tried.wait(60)
     edits_three_times(a, new)                     # one claim covers every edit of the file
     print("  log:", a.call("wal_read", all=True).replace("\n", " || ")[:400])
+    assert "doesn't claim" in a.call("delete_file", path="README.md")   # refused and never made: reminded at the end
 
 
 def agent_2_wal(a):
@@ -124,10 +131,14 @@ assert c["shared_files"] == 1 and c["crossed_edits"] == 1 and c["overwrites"] ==
 if LEVEL == "L0":
     assert c["edits"] == 4 and c["failed_edits"] == 1 and "wal_level" not in c
 else:
-    assert c["edits"] == 4 and c["wal_refused_intent"] == 1 and c["wal_refused_read_before_post"] >= 1
+    assert c["edits"] == 4 and c["wal_refused_intent"] == 2 and c["wal_refused_read_before_post"] >= 1  # 2: incl. the delete
     assert c["wal_refused_no_conflict"] >= 1 and c["wal_released_stopped"] >= 1 and c["wal_released_expired"] == 0
     entries = r["trace"]["wal_log"]
     assert [e["kind"] for e in entries][:4] == ["intent", "change", "change", "change"]
     assert entries[0]["claims"] == [{"app": "repo", "api": "edit", "target": F, "ids": [F]}], entries[0]
     assert (run_dir / "wal" / f"{TASK['id']}.jsonl").exists()
+    # agent_2's refused edit of F was made later (cleared); agent_1's refused delete of README.md never was
+    assert c["unmade_reminded"] == 1 and c["unmade_at_end"] == 1, c
+    reminders = [e for e in r["trace"]["events"] if e["kind"] == "unmade_reminder"]
+    assert reminders[0]["agent"] == "agent_1" and "README.md" in reminders[0]["calls"][0], reminders
 print(f"cooperbench team test passed ({LEVEL})")

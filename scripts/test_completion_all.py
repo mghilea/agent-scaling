@@ -131,8 +131,54 @@ def scenario_stuck(level):
         appworld_team.TIME_LIMIT, appworld_team.GRACE = limit, grace
 
 
+def scenario_unmade():
+    """L6: agent_2's like of 55 is refused (no claim) and it never makes it: its first complete_task isn't recorded but
+    lists the unmade change; its second call is. agent_1's refused like is made later, so it signs off at once."""
+    out_vote = {}
+
+    class Scripted:
+        def __init__(self, name, tools, system_prompt):
+            self.name, self.tools = name, tools
+            self.stats = dict(turns=0, tool_calls=0, tool_errors=0, prompt_tokens=0, completion_tokens=0)
+            self.messages, self.limit_hits, self.max_turns = [], 0, 100
+
+        def call(self, tool, **kw):
+            return str(self.tools[tool][0](**kw))
+
+        def send(self, msg):
+            return {"final": "done", "stop": "final", "messages": self.messages}
+
+        def run(self, prompt):
+            if self.name == "agent_1":
+                assert "doesn't claim" in self.call("execute_python", code=LOGIN + "apis.spotify.like_song(song_id=54, access_token=tok)")
+                self.call("wal_read")
+                assert self.call("wal_intend", plan="like 54", claims=[{"app": "spotify", "api": "like_song", "target": "54"}]).startswith("Posted")
+                assert "Song liked" in self.call("execute_python", code="print(apis.spotify.like_song(song_id=54, access_token=tok))")
+                out_vote["agent_1"] = self.call("execute_python", code="print(apis.supervisor.complete_task())")
+            elif self.name == "agent_2":
+                assert "doesn't claim" in self.call("execute_python", code=LOGIN + "apis.spotify.like_song(song_id=55, access_token=tok)")
+                out_vote["agent_2a"] = self.call("execute_python", code="print(apis.supervisor.complete_task())")
+                out_vote["agent_2b"] = self.call("execute_python", code="print(apis.supervisor.complete_task())")
+            else:
+                self.call("execute_python", code="print(apis.supervisor.complete_task())")
+            return {"final": "done", "stop": "final", "messages": self.messages}
+
+    run_dir = Path(tempfile.mkdtemp()) / "smoke-unmade"
+    run_dir.mkdir()
+    r = appworld_team.run("57c3486_2", lambda **kw: Scripted(kw["name"], kw["tools"], kw["system_prompt"]), 3, run_dir,
+                          level="L6", completion="all")
+    c = r["comm"]
+    print("unmade:", {k: c.get(k) for k in ("unmade_reminded", "unmade_at_end", "complete_votes")},
+          {k: v[:90] for k, v in out_vote.items()})
+    assert "Recorded" in out_vote["agent_1"], out_vote["agent_1"]           # redone: no reminder
+    assert out_vote["agent_2a"].startswith("Not recorded yet") and "like_song(song_id='55'" in out_vote["agent_2a"]
+    assert "Recorded" in out_vote["agent_2b"]                              # once only
+    assert c["unmade_reminded"] == 1 and c["unmade_at_end"] == 1 and c["complete_votes"] == 3 and r["verdict"]["completed"]
+
+
 scenario("L6")
 scenario(None)
+scenario_unmade()
 scenario_stuck("L6")
 scenario_stuck(None)
 print("completion (all) test passed")

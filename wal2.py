@@ -141,6 +141,7 @@ class Log:
         self.intent = {}               # agent -> id of its current intent
         self.claims = {}               # agent -> open claims of its current intent
         self.done = {}                 # Action.key -> (agent, entry id) of writes that went through
+        self._unmade = {}              # agent -> {Action.key: refused change it hasn't made since} (see commit)
         self.finishing = False         # the task was marked complete while teammates held claims: no new intents,
                                        # and only writes an agent has claimed (set by the team, see appworld_team.py)
         self.path = Path(path)
@@ -406,7 +407,26 @@ class Log:
 
     # ---- the gate ------------------------------------------------------------------------------------------
     def commit(self, me, action, execute):
-        """Check the rules, then run execute() and log the change. The caller holds the lock. Raises Refused."""
+        """Check the rules, then run execute() and log the change. The caller holds the lock. Raises Refused.
+
+        A refused change is remembered as unmade until the agent makes a change to the same target (Action.key: the
+        same record or file, or the same new item), so the team can remind an agent that stops with work it never
+        redid (unmade())."""
+        try:
+            out = self._commit(me, action, execute)
+        except Refused as ex:
+            if not action.exempt:
+                self._unmade.setdefault(me, {})[action.key] = {
+                    "call": action.call, "t": round(now() - self.t0, 2), "why": str(ex).splitlines()[0][:200]}
+            raise
+        self._unmade.get(me, {}).pop(action.key, None)
+        return out
+
+    def unmade(self, me):
+        """Changes this agent tried that were refused and that it hasn't made since, oldest first."""
+        return sorted(self._unmade.get(me, {}).values(), key=lambda u: u["t"])
+
+    def _commit(self, me, action, execute):
         self._expire()
         claim = None
         if not action.exempt:
@@ -551,6 +571,22 @@ def team_concurrency(events, logged, accepted):
                     "refusal_chains_3plus": sum(c >= 3 for c in chains),
                     "stopped_after_refusal": sum(v == "refused" for v in last.values())})
     return out
+
+def unmade_text(unmade):
+    """The list of an agent's refused, never-made changes, as the reminders show it."""
+    return "\n".join(f"- {u['call']} (refused at {u['t']:.0f}s: {u['why'].removeprefix('[WAL] ')[:120]})" for u in unmade)
+
+
+UNMADE_REMINDER = ("Before you stop: {n} change{s} you tried {were} refused by the write-ahead log, and you haven't made "
+                   "{them} since:\n{list}\nA refused change was not made. If {it_is} still needed, make {them} now (post an "
+                   "intent first if needed); if not (for instance a teammate made {them}), you can stop.")
+
+
+def unmade_reminder(unmade, template=UNMADE_REMINDER):
+    n = len(unmade)
+    return template.format(n=n, s="" if n == 1 else "s", were="was" if n == 1 else "were", them="it" if n == 1 else "them",
+                           it_is="it is" if n == 1 else "they are", list=unmade_text(unmade))
+
 
 # The protocol as each agent is told it, by level.
 TEXT = """The team keeps a write-ahead log (WAL): an append-only record, shared by all of you, of what each agent intends to change and of every change made through the apps' APIs. wal_read shows the entries you haven't seen (all=true shows every entry). wal_intend posts your intent: your plan, and one claim per change you will make, naming the app, the API you will call and its target: the record's id (e.g. {{"app": "spotify", "api": "download_song", "target": "114, 161"}}), or for something new a short description (e.g. {{"app": "spotify", "api": "create_playlist", "target": "playlist 'Road trip'"}}). A new intent replaces your previous one. Every change any of you makes through the APIs is added to the WAL automatically, with its result; reading data and logging in don't need the WAL.

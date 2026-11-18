@@ -134,6 +134,17 @@ assert ok(fwrite("a3", edit("README.md"))), "a3: nothing unread about README.md"
 assert ok(fwrite("a2", edit("src/util.py")))
 out = flog.read("a2")
 assert "#2 a3" in out and "#6 a3" in out and "#1 a1" not in out, out
+# refused changes are remembered as unmade until the agent makes a change to the same target
+log, write = team("L6")
+assert ok(log.intend("a1", "like 54", [{"app": "spotify", "api": "like_song", "target": "54"}]))
+log.read("a2")
+assert "doesn't claim" in write("a2", like(54)) and "doesn't claim" in write("a2", like(55))
+assert [u["call"] for u in log.unmade("a2")] == ["like_song(54)", "like_song(55)"], log.unmade("a2")
+assert log.unmade("a1") == []
+log.read("a2"); assert ok(log.intend("a2", "like 55", [{"app": "spotify", "api": "like_song", "target": "55"}]))
+assert ok(write("a2", like(55)))
+assert [u["call"] for u in log.unmade("a2")] == ["like_song(54)"], "the same target made later clears it"
+assert "like_song(54)" in wal2.unmade_reminder(log.unmade("a2")) and "1 change you tried was refused" in wal2.unmade_reminder(log.unmade("a2"))
 print("all wal2 tests passed")
 
 # finishing: no new intents; only writes the agent had claimed

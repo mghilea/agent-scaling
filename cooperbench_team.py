@@ -135,6 +135,7 @@ class Team:
 
     def _setup(self, make_agent, run_dir, level, claim_ttl, max_turns):
         task = self.task
+        self.max_turns = max_turns
         work = Path(os.environ.get("WORK", f"/scratch/{getpass.getuser()}"))
         self.wal_path = work / "wal" / run_dir.name / f"{task['id']}.jsonl"
         self.wal_copy = run_dir / "wal" / f"{task['id']}.jsonl"
@@ -235,7 +236,14 @@ class Team:
         agent = self.agents[me]
         self.event(me, "active", feature=self.feature_of[me])
         try:
-            results[me] = agent.run(self.prompt(me))
+            results[me] = r = agent.run(self.prompt(me))
+            # once: an agent stopping with edits the log refused and it never made is reminded of them
+            pending = self.log.unmade(me) if self.log else []
+            left = self.max_turns - agent.stats["turns"]
+            if pending and r.get("stop") == "final" and not self.expired and left > 0:
+                self.event(me, "unmade_reminder", n=len(pending), at="stop", calls=[u["call"] for u in pending])
+                agent.max_turns = left
+                results[me] = agent.send(wal2.unmade_reminder(pending))
         except Exception as ex:
             results[me] = {"final": "", "stop": f"error: {type(ex).__name__}: {ex}"}
         finally:
@@ -299,6 +307,8 @@ class Team:
         comm = self._edit_metrics()
         comm.update(wal2.team_concurrency(self.events, bool(self.log), lambda e: e["kind"] == "edit" and e["ok"]))
         comm["agent_stops"] = {a: (results.get(a) or {}).get("stop") for a in self.ids}
+        comm["unmade_reminded"] = sum(e["kind"] == "unmade_reminder" for e in self.events)
+        comm["unmade_at_end"] = sum(len(self.log.unmade(a)) for a in self.ids) if self.log else 0
         if self.log:
             comm.update(self.log.counts(self.events))
             self.log.close(copy_to=self.wal_copy)

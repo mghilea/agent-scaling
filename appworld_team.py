@@ -59,6 +59,10 @@ COMPLETE_ALL_WAL = " Calling complete_task also releases your claims in the writ
 VOTED = ("Recorded: you have marked the task complete{answer}. Your part is over: stop now and reply with a short summary, "
          "without calling a tool. The task ends when all of you have called complete_task{waiting}.")
 VOTED_STOP = ("You have already marked the task complete. Stop: reply with a short summary, without calling a tool.")
+UNMADE_AT_VOTE = ("Not recorded yet: {n} change{s} you tried {were} refused by the write-ahead log, and you haven't made "
+                  "{them} since:\n{list}\nA refused change was not made. If {it_is} still needed, make {them} now (post an "
+                  "intent first if needed), then call complete_task again; if not (for instance a teammate made {them}), "
+                  "call complete_task again now.")
 REMINDER_ALL = ("You haven't called apis.supervisor.complete_task(). Each of you calls it once, when you believe the task is "
                 "done (answer=... if the task asks for information); the task ends when all of you have. If you are done, "
                 "call it now; if not, continue.")
@@ -139,6 +143,7 @@ class Team:
         self.t0 = wal2.now()
         self.completion = completion
         self.votes, self.completed_by = {}, None   # completion "all": agent -> its complete_task call
+        self.unmade_nudged = set()                  # agents reminded of refused changes they never made (once each)
         self.ids = [f"agent_{i}" for i in range(1, n_agents + 1)]
         self.events, self.max_turns, self.task_id = [], max_turns, task_id
         self.world, preamble = _capture_preamble(task_id, run_dir.name)
@@ -236,6 +241,13 @@ class Team:
         if me in self.votes:
             print(VOTED_STOP)
             return {"message": VOTED_STOP}
+        pending = self.log.unmade(me) if self.log else []
+        if pending and me not in self.unmade_nudged:  # once: refused changes it never made, before it signs off
+            self.unmade_nudged.add(me)
+            self.event(me, "unmade_reminder", n=len(pending), at="vote", calls=[u["call"] for u in pending])
+            msg = wal2.unmade_reminder(pending, UNMADE_AT_VOTE)
+            print(msg)
+            return {"message": msg}
         self.votes[me] = {"args": args, "kwargs": dict(kwargs), "seq": len(self.events),
                           "t": round(wal2.now() - self.t0, 2)}
         answer = kwargs.get("answer", args[0] if args else None)
@@ -390,7 +402,13 @@ class Team:
                 if r["stop"] == "final" and me not in self.votes and not self.over and not self.expired and left > 0:
                     self.reminded[me] += 1
                     agent.max_turns = left
-                    r = agent.send(REMINDER_ALL)
+                    text = REMINDER_ALL
+                    pending = self.log.unmade(me) if self.log else []
+                    if pending and me not in self.unmade_nudged:
+                        self.unmade_nudged.add(me)
+                        self.event(me, "unmade_reminder", n=len(pending), at="stop", calls=[u["call"] for u in pending])
+                        text = wal2.unmade_reminder(pending) + "\n\n" + REMINDER_ALL
+                    r = agent.send(text)
             elif r["stop"] == "final" and not self.over and not self.finishing and not self.expired and left > 0:
                 self.reminded[me] += 1
                 agent.max_turns = left
@@ -477,6 +495,8 @@ class Team:
         votes = sorted(self.votes.items(), key=lambda kv: kv[1]["seq"])
         comm.update({"completion_rule": self.completion, "complete_votes": len(votes),
                      "agents_abandoned": len(self.abandoned),
+                     "unmade_reminded": sum(e["kind"] == "unmade_reminder" for e in self.events),
+                     "unmade_at_end": sum(len(self.log.unmade(a)) for a in self.ids) if self.log else 0,
                      "answers_distinct": len({self._answer_key(v) for _, v in votes} - {None}),
                      "completed_by": self.completed_by,
                      "vote_spread": round(votes[-1][1]["t"] - votes[0][1]["t"], 2) if votes else 0.0})
