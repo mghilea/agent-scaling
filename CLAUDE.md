@@ -37,7 +37,7 @@ It assumes Docker, which Neuronic lacks: `cooperbench/apptainer.patch` adds an A
 installs it under /scratch, and `sbatch cooperbench.sbatch <cooperbench run args>` runs it on gpt-oss-20b through vLLM. Its dataset
 license is unknown: keep task contents out of git and off artifact pages.
 Our harness on CooperBench (`cooperbench_bench.py`, `agent.py --benchmark cooperbench --subset core [--edit-tools]`) and teams
-(`cooperbench_team.py`, `--topology agent-driven --comm none [--wal-level L1-L4]`): one agent per feature on one shared repository;
+(`cooperbench_team.py`, `--topology agent-driven --comm none [--wal-level L1-L6]`): one agent per feature on one shared repository;
 with edit tools bash is read-only and files change only through write_file/replace_in_file/delete_file, which the log gates with
 file-level claims (`wal_intend(plan, files)`).
 
