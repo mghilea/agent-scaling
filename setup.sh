@@ -77,6 +77,12 @@ _agent_setup() {
     # ---- environment (everything lives on the node's local SSD) ----
     export WORK="/scratch/$USER"
     export UV_CACHE_DIR="$WORK/uv-cache" HF_HOME="$WORK/hf"
+    # A Hugging Face token (free, read-only) in ~/.config/huggingface/token, chmod 600, lifts the rate limit on anonymous
+    # downloads; HF_HOME is per node, so it is passed as HF_TOKEN. Never commit it.
+    if [[ -z "$HF_TOKEN" && -r "$HOME/.config/huggingface/token" ]]; then
+        HF_TOKEN="$(tr -d '[:space:]' < "$HOME/.config/huggingface/token")"
+        export HF_TOKEN
+    fi
     [[ ":$PATH:" == *":$WORK/bin:"* ]] || export PATH="$WORK/bin:$PATH"
     mkdir -p "$WORK/models" || return 1
 
