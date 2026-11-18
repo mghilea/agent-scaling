@@ -1,8 +1,9 @@
-"""The enforcement ladder on CooperBench: gpt-oss-120b, single agent and teams at L0-L6 (2026-11-18 ladder), on core
-(10 feature pairs, 2-agent teams) and core3 (the same pairs plus a third feature, 3-agent teams), runs tagged cl01-cl10.
+"""The enforcement ladder on CooperBench: gpt-oss-120b, single agent and teams at L0-L6 (2026-11-18 ladder), on flash
+(50 feature pairs over 20 tasks, 2-agent teams) and flash3 (the same pairs plus a third feature, 3-agent teams), two
+runs tagged fl01 and fl02 (each run's 50 tasks in 5 chunks of 10, merged by tag).
 
     python analysis/cb_ladder.py                    # prints the tables, writes analysis/cb_ladder.json
-    python analysis/cb_ladder.py --tags t2check     # other runs (here the 2026-11-17 2-agent check)
+    python analysis/cb_ladder.py --subsets core --tags t2check     # other runs (here the 2026-11-17 2-agent check)
 
 Per subset and setup, over the runs found so far (each over the pairs or triples it has finished):
 - solved: share of tasks with every feature's tests passing (mean over runs, and the spread across runs: sd);
@@ -21,8 +22,8 @@ from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-TAGS = (sys.argv[sys.argv.index("--tags") + 1].split(",") if "--tags" in sys.argv
-        else [f"cl{i:02d}" for i in range(1, 11)])
+TAGS = sys.argv[sys.argv.index("--tags") + 1].split(",") if "--tags" in sys.argv else ["fl01", "fl02"]
+SUBSETS = sys.argv[sys.argv.index("--subsets") + 1].split(",") if "--subsets" in sys.argv else ["flash", "flash3"]
 SETUPS = {"single": "sas-et-rc", "L0": "agent-driven-none-rc", **{f"L{i}": f"agent-driven-none-L{i}-rc" for i in range(1, 7)}}
 RULES = ["intent", "relevant_catchup", "read_before_post", "read_before_write", "no_conflict"]
 
@@ -56,7 +57,7 @@ def per_task(d, r):
 
 
 out = {}
-for subset in ("core", "core3"):
+for subset in SUBSETS:
     for name, kind in SETUPS.items():
         stats, agents, by_run = [], Counter(), []
         for tag in TAGS:
@@ -80,14 +81,14 @@ for subset in ("core", "core3"):
                        no_edit_agents=round(agents["no_edit"] / agents["agents"], 3))
         out[f"{subset} {name}"] = row
 
-if "--tags" not in sys.argv:
+if "--tags" not in sys.argv and "--subsets" not in sys.argv:
     (ROOT / "analysis" / "cb_ladder.json").write_text(json.dumps(out, indent=1))
 cols = ["runs", "tasks", "solved", "solved_sd", "features", "edits", "crossed", "overwrites", "no_edit_agents",
         *(f"ref_{k}" for k in RULES), "waits", "wait_s", "unmade_end", "team_s", "calls", "tokens_k"]
 short = {"solved_sd": "sd", "features": "feats", "overwrites": "overwr", "no_edit_agents": "no_edit",
          "ref_intent": "r_int", "ref_relevant_catchup": "r_rel", "ref_read_before_post": "r_post",
          "ref_read_before_write": "r_write", "ref_no_conflict": "r_confl", "unmade_end": "unmade", "tokens_k": "tok_k"}
-print("gpt-oss-120b, CooperBench core (2-agent teams) and core3 (3-agent teams); per task unless noted")
+print(f"gpt-oss-120b, CooperBench {' and '.join(SUBSETS)} (pairs: 2-agent teams; triples: 3-agent teams); per task unless noted")
 print(f"{'':13s}" + "".join(f"{short.get(c, c):>8s}" for c in cols))
 for name, row in out.items():
     print(f"{name:13s}" + "".join(f"{'' if row.get(c) is None else row[c]:>8}" for c in cols))

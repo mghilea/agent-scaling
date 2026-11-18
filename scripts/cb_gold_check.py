@@ -1,6 +1,6 @@
 """Do CooperBench's own reference solutions pass their tests in our setup (Apptainer, cooperbench_bench.score_features)?
 
-    $COOPERBENCH_PYTHON scripts/cb_gold_check.py [--subset core]
+    $COOPERBENCH_PYTHON scripts/cb_gold_check.py [--subset core] [--offset N --limit M]
 
 For each feature pair of the subset: each feature's reference patch (feature<f>/feature.patch) scored on that feature's
 tests alone, then the task's combined.patch scored on both features' tests. A reference that fails points to our
@@ -19,7 +19,9 @@ subset = sys.argv[sys.argv.index("--subset") + 1] if "--subset" in sys.argv else
 out_dir = ROOT / "runs" / "cb_gold"
 out_dir.mkdir(parents=True, exist_ok=True)
 results = []
-for t in cb.load_tasks(subset):
+arg = lambda name, default: int(sys.argv[sys.argv.index(name) + 1]) if name in sys.argv else default  # noqa: E731
+offset, limit = arg("--offset", 0), arg("--limit", None)
+for t in cb.load_tasks(subset, limit, offset):
     td = cb.DATASET / t["repo"] / f"task{t['task_id']}"
     row = {"id": t["id"]}
     for f in t["features"]:
@@ -41,5 +43,6 @@ for t in cb.load_tasks(subset):
             row["combined"] = f"error: {type(e).__name__}: {str(e)[:200]}"
     results.append(row)
     print(json.dumps(row), flush=True)
-(ROOT / "analysis" / f"cb_gold_check{'' if subset == 'core' else '_' + subset}.json").write_text(json.dumps(results, indent=1))
+part = f"_{offset}" if offset or limit else ""
+(ROOT / "analysis" / f"cb_gold_check{'' if subset == 'core' else '_' + subset}{part}.json").write_text(json.dumps(results, indent=1))
 print("done")

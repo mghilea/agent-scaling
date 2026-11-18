@@ -1,0 +1,5 @@
+--benchmark cooperbench --subset flash3 --edit-tools --offset 0 --limit 10 --repair-calls --tag fl01
+--benchmark cooperbench --subset flash3 --edit-tools --offset 10 --limit 10 --repair-calls --tag fl01
+--benchmark cooperbench --subset flash3 --edit-tools --offset 20 --limit 10 --repair-calls --tag fl01
+--benchmark cooperbench --subset flash3 --edit-tools --offset 30 --limit 10 --repair-calls --tag fl01
+--benchmark cooperbench --subset flash3 --edit-tools --offset 40 --limit 10 --repair-calls --tag fl01
