@@ -116,8 +116,15 @@ _agent_setup() {
     local model_dir="$WORK/models/$name"
     if ! _intact "$model_dir"; then
         echo "==> Downloading $repo"
-        hf download "$repo" --exclude "original/*" --exclude "metal/*" \
-            --local-dir "$model_dir" || { exec {lock}>&-; return 1; }
+        # Many jobs starting on fresh nodes at once can hit Hugging Face's rate limit for anonymous downloads (the
+        # cluster shares one IP): wait and retry, with growing pauses (2, 4, ... 14 min; about an hour in all).
+        local tries=0
+        until hf download "$repo" --exclude "original/*" --exclude "metal/*" --local-dir "$model_dir"; do
+            tries=$((tries + 1))
+            if (( tries >= 8 )); then echo "Downloading $repo failed $tries times" >&2; exec {lock}>&-; return 1; fi
+            echo "==> Download failed (Hugging Face's rate limit?); retrying in $((tries * 2)) minutes" >&2
+            sleep $((tries * 120))
+        done
         _mark_intact "$model_dir"
     fi
     if [[ -n "$BROWSECOMP" ]]; then
