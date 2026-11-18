@@ -1,0 +1,115 @@
+{
+ "description": "Core's 10 feature pairs, each extended to a triple with a third feature of the same task (from team3_250 where it has one, else the lowest triple in team3_all): 3-agent teams on the same tasks as the 2-agent teams. Feature ids only.",
+ "tasks": [
+  {
+   "repo": "dottxt_ai_outlines_task",
+   "task_id": 1655,
+   "groups": [
+    [
+     1,
+     3,
+     7
+    ]
+   ]
+  },
+  {
+   "repo": "dspy_task",
+   "task_id": 8563,
+   "groups": [
+    [
+     1,
+     3,
+     4
+    ]
+   ]
+  },
+  {
+   "repo": "go_chi_task",
+   "task_id": 27,
+   "groups": [
+    [
+     1,
+     3,
+     4
+    ]
+   ]
+  },
+  {
+   "repo": "llama_index_task",
+   "task_id": 17244,
+   "groups": [
+    [
+     5,
+     6,
+     7
+    ]
+   ]
+  },
+  {
+   "repo": "openai_tiktoken_task",
+   "task_id": 0,
+   "groups": [
+    [
+     4,
+     5,
+     8
+    ]
+   ]
+  },
+  {
+   "repo": "pallets_click_task",
+   "task_id": 2800,
+   "groups": [
+    [
+     1,
+     2,
+     4
+    ]
+   ]
+  },
+  {
+   "repo": "pallets_jinja_task",
+   "task_id": 1559,
+   "groups": [
+    [
+     5,
+     8,
+     9
+    ]
+   ]
+  },
+  {
+   "repo": "pallets_jinja_task",
+   "task_id": 1621,
+   "groups": [
+    [
+     4,
+     6,
+     10
+    ]
+   ]
+  },
+  {
+   "repo": "react_hook_form_task",
+   "task_id": 153,
+   "groups": [
+    [
+     1,
+     2,
+     6
+    ]
+   ]
+  },
+  {
+   "repo": "typst_task",
+   "task_id": 6554,
+   "groups": [
+    [
+     1,
+     2,
+     6
+    ]
+   ]
+  }
+ ]
+}

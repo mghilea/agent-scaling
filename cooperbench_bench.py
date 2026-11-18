@@ -50,9 +50,14 @@ add test files; hidden tests will check each feature. When both features are don
 you changed, without calling a tool."""
 
 
+OUR_SUBSETS = Path(__file__).resolve().parent / "cooperbench" / "subsets"  # ours, e.g. core3 (feature ids only)
+
+
 def load_tasks(subset="core", limit=None, offset=0):
-    """One task per feature set of the subset (pairs, or groups in the team3 subsets), in the subset's order."""
-    spec = json.load(open(DATASET / "subsets" / f"{subset}.json"))
+    """One task per feature set of the subset (pairs, or groups in the team3 subsets), in the subset's order. The
+    subset is CooperBench's (dataset/subsets) or ours (cooperbench/subsets)."""
+    path = OUR_SUBSETS / f"{subset}.json"
+    spec = json.load(open(path if path.exists() else DATASET / "subsets" / f"{subset}.json"))
     tasks = [{"id": f"{t['repo']}-{t['task_id']}-" + "-".join(f"f{f}" for f in fs), "repo": t["repo"],
               "task_id": t["task_id"], "features": list(fs),
               "question": f"(CooperBench {t['repo']} task {t['task_id']}, features {', '.join(map(str, fs))})"}
@@ -253,7 +258,7 @@ class Workspace:
     def patch(self):
         """Everything changed in the repository, new files included, as a diff against the base commit."""
         out = self.bash("git add -A >/dev/null 2>&1; git diff --cached --binary HEAD", agent="_scorer")
-        return out if not out.startswith("[error]") and "[exit code" not in out else ""
+        return out if not out.startswith(("[error]", "[no output]")) and "[exit code" not in out else ""
 
     def remove(self):
         self.container.remove()

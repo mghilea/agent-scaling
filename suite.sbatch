@@ -21,6 +21,9 @@ suite="$2"
 [[ -f "$suite" ]] || { echo "no suite file: $suite" >&2; exit 1; }
 extra=("${@:3}")
 export PORT=$((20000 + SLURM_JOB_ID % 10000 * 2))  # even, so PORT+1 (BrowseComp's embedder) is never another job's PORT
+# ...unless something on the node already holds it: then the next even port whose pair is free (as in run.sbatch)
+_port_free() { python3 -c "import socket,sys; s=socket.socket(); s.bind(('', int(sys.argv[1])))" "$1" 2>/dev/null; }
+until _port_free "$PORT" && _port_free $((PORT + 1)); do PORT=$((PORT + 2)); done
 
 export VLLM_LOG="$SLURM_SUBMIT_DIR/logs/vllm-$SLURM_JOB_ID.log"
 # AppWorld lines run with AppWorld's own Python (its dependencies clash with vLLM's), set up by setup.sh with APPWORLD=1.
