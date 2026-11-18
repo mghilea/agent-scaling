@@ -12,9 +12,16 @@ The agents think in parallel threads, but their code runs on the main thread, on
 execution timeout uses a signal (main thread only) and it captures printed output process-wide. Cells are short
 (the APIs run in-process), and the time each one waited for its turn is recorded.
 
-The task is complete when an agent calls apis.supervisor.complete_task (the first call counts; it is logged, but no
-rule applies to it). After that, every agent's code gets "the task is complete" instead of running. An agent that
-stops before anyone completed the task is reminded once, as in the single-agent harness.
+Completing the task (--team-complete; the default, "all", since 2026-11-17): every agent calls
+apis.supervisor.complete_task when it believes the task is done. A call is that agent's vote, with its answer: it
+doesn't end the task, the agent is told to stop, and (with the log) its claims are released. The task ends when every
+agent has voted or stopped (an agent that stops without voting is reminded once; one that runs out of turns or time
+counts as stopped). Then AppWorld's complete_task runs once, with the answer most voters gave (non-empty answers
+first; on a tie, the latest), logged but exempt from the rules. If nobody voted, the task isn't completed.
+"first" (runs before 2026-11-17, e.g. the lad02-lad06 ladder): the first call completes the task for the team, and
+after that every agent's code gets "the task is complete" instead of running; with the log, a call while teammates
+hold claims is deferred until those are done (the finishing state). An agent that stops before anyone completed the
+task is reminded once, as in the single-agent harness.
 
 Records nothing of the task's contents beyond the run's own traces (AppWorld's data must not be redistributed
 unencrypted): runs/<run>/traces/<task>.json and the log file runs/<run>/wal/<task>.jsonl.
@@ -39,7 +46,20 @@ TEAM_TEXT = """You are {me}, one of {n} agents working on this task together; yo
 
 {channels}
 
-The task is complete when one of you calls apis.supervisor.complete_task, once for the whole team. After that nobody needs to do anything more."""
+{completion}"""
+COMPLETE_FIRST = ("The task is complete when one of you calls apis.supervisor.complete_task, once for the whole team. After "
+                  "that nobody needs to do anything more.")
+COMPLETE_ALL = ("Each of you decides when the task is done. When you believe it is, call apis.supervisor.complete_task (with "
+                "answer=... if the task asks for information), then stop. Each of you calls it once: the task ends when all "
+                "of you have called it (or stopped), not before. If the task asks for information, the team's answer is the "
+                "one most of you gave (on a tie, the latest).")
+COMPLETE_ALL_WAL = " Calling complete_task also releases your claims in the write-ahead log."
+VOTED = ("Recorded: you have marked the task complete{answer}. Your part is over: stop now and reply with a short summary, "
+         "without calling a tool. The task ends when all of you have called complete_task{waiting}.")
+VOTED_STOP = ("You have already marked the task complete. Stop: reply with a short summary, without calling a tool.")
+REMINDER_ALL = ("You haven't called apis.supervisor.complete_task(). Each of you calls it once, when you believe the task is "
+                "done (answer=... if the task asks for information); the task ends when all of you have. If you are done, "
+                "call it now; if not, continue.")
 NO_CHANNELS = "You have no way to contact your teammates; you can only see the changes they make in the apps."
 NO_CHANNELS_WAL = ("Apart from the write-ahead log below, you have no way to contact your teammates; you can only see "
                    "the changes they make in the apps.")
@@ -110,8 +130,13 @@ def _capture_preamble(task_id, experiment_name):
 
 
 class Team:
-    def __init__(self, task_id, make_agent, n_agents, run_dir, level=None, claim_ttl=wal2.CLAIM_TTL, max_turns=100):
+    def __init__(self, task_id, make_agent, n_agents, run_dir, level=None, claim_ttl=wal2.CLAIM_TTL, max_turns=100,
+                 completion="all"):
+        if completion not in ("all", "first"):
+            raise ValueError(f"completion must be 'all' or 'first', not {completion!r}")
         self.t0 = wal2.now()
+        self.completion = completion
+        self.votes, self.completed_by = {}, None   # completion "all": agent -> its complete_task call
         self.ids = [f"agent_{i}" for i in range(1, n_agents + 1)]
         self.events, self.max_turns, self.task_id = [], max_turns, task_id
         self.world, preamble = _capture_preamble(task_id, run_dir.name)
@@ -139,8 +164,9 @@ class Team:
             self.shells[me] = shell
         self.base_shell = base
         sup = self.world.task.supervisor
-        channels = (NO_CHANNELS if not level
-                    else NO_CHANNELS_WAL + "\n\n" + wal2.text(level, claim_ttl) + "\n" + COMPLETION_WAL)
+        channels = (NO_CHANNELS if not level else NO_CHANNELS_WAL + "\n\n" + wal2.text(level, claim_ttl)
+                    + ("\n" + COMPLETION_WAL if completion == "first" else ""))
+        completion_text = COMPLETE_FIRST if completion == "first" else COMPLETE_ALL + (COMPLETE_ALL_WAL if level else "")
         self.agents = {}
         for me in self.ids:
             tools = {"execute_python": (lambda code, me=me: self.execute(me, code), aw._schema(
@@ -151,7 +177,8 @@ class Team:
             if self.log:
                 tools.update(self.log.tools(me, aw._schema))
             prompt = aw.SYSTEM_PROMPT.format(**sup) + "\n\n" + TEAM_TEXT.format(
-                me=me, n=n_agents, others=", ".join(a for a in self.ids if a != me), channels=channels)
+                me=me, n=n_agents, others=", ".join(a for a in self.ids if a != me), channels=channels,
+                completion=completion_text)
             self.agents[me] = make_agent(name=me, tools=tools, system_prompt=prompt)
             self.agents[me].max_turns = max_turns
 
@@ -187,6 +214,8 @@ class Team:
                 self.event(me, "api_write", app=app, api=api, ids=action.ids, identity=action.identity,
                            call=action.call, ok=True)
                 return out
+            if (app, api) == ("supervisor", "complete_task") and self.completion == "all":
+                return self._vote(me, args, kwargs)
             if not self.log:
                 return execute()
             with self.lock:
@@ -198,7 +227,62 @@ class Team:
         call.__name__ = api
         return call
 
-    # ---- completing, with the log: wait for teammates' open claims ----------------------------------------------
+    # ---- completing, "all": every agent votes; the task completes once all have voted or stopped -----------------
+    def _vote(self, me, args, kwargs):
+        """An agent's complete_task call (on the main thread, in its cell): recorded as its vote."""
+        if me in self.votes:
+            print(VOTED_STOP)
+            return {"message": VOTED_STOP}
+        self.votes[me] = {"args": args, "kwargs": dict(kwargs), "seq": len(self.events),
+                          "t": round(wal2.now() - self.t0, 2)}
+        answer = kwargs.get("answer", args[0] if args else None)
+        self.event(me, "complete_vote", answer=None if answer is None else str(answer)[:300],
+                   status=kwargs.get("status"), votes=len(self.votes))
+        if self.log:
+            self.log.release_agent(me, "completed")
+        waiting = [a for a in self.ids if a not in self.votes and a not in self.done_agents]
+        msg = VOTED.format(answer=f" (answer: {str(answer)[:100]!r})" if answer not in (None, "") else "",
+                           waiting=f" (still working: {', '.join(waiting)})" if waiting
+                           else " (you are the last: the task is marked complete once you stop)")
+        print(msg)
+        return {"message": msg}
+
+    @staticmethod
+    def _answer_key(v):
+        a = v["kwargs"].get("answer", v["args"][0] if v["args"] else None)
+        return None if a in (None, "") else " ".join(str(a).lower().split())
+
+    def _team_vote(self):
+        """The vote whose call runs: among non-empty answers if any, the most common answer; on a tie, the latest."""
+        votes = sorted(self.votes.items(), key=lambda kv: kv[1]["seq"])
+        pool = [(a, v) for a, v in votes if self._answer_key(v) is not None] or votes
+        counts = Counter(self._answer_key(v) for _, v in pool)
+        top = max(counts.values())
+        return [(a, v) for a, v in pool if counts[self._answer_key(v)] == top][-1]
+
+    def _finish_votes(self):
+        """On the main thread, once every agent has voted or stopped: AppWorld's complete_task, once."""
+        if self.completion != "all" or self.over or not self.votes:
+            return
+        me, v = self._team_vote()
+        fn = self.world.apis.supervisor.complete_task
+        action = self.adapter.action("supervisor", "complete_task", v["kwargs"])
+
+        def execute():
+            out = fn(*v["args"], **v["kwargs"])
+            self.event(me, "api_write", app="supervisor", api="complete_task", ids=(), identity=action.identity,
+                       call=action.call, ok=True, team=True)
+            return out
+        try:
+            with self.lock:
+                self.log.commit(me, action, execute) if self.log else execute()
+        except Exception as ex:
+            self.event(me, "complete_failed", error=str(ex).strip()[:200])
+        self.completed_by = me
+        if self.world.task_completed():
+            self.over = True
+
+    # ---- completing, "first", with the log: wait for teammates' open claims -------------------------------------
     def _held(self, me):
         """Teammates' open claims, {agent: [claim text]} (the caller holds the lock)."""
         self.log._expire()
@@ -244,6 +328,8 @@ class Team:
         """The reply instead of running an agent's cell, or None to run it."""
         if self.over:
             return OVER
+        if self.completion == "all":
+            return VOTED_STOP if me in self.votes else None
         if self.finishing and (me == self.finishing["agent"] or not self.log.claims.get(me)):
             return OVER
         return None
@@ -297,7 +383,12 @@ class Team:
         try:
             r = agent.run(prompt)
             left = self.max_turns - agent.stats["turns"]
-            if r["stop"] == "final" and not self.over and not self.finishing and not self.expired and left > 0:
+            if self.completion == "all":
+                if r["stop"] == "final" and me not in self.votes and not self.over and not self.expired and left > 0:
+                    self.reminded[me] += 1
+                    agent.max_turns = left
+                    r = agent.send(REMINDER_ALL)
+            elif r["stop"] == "final" and not self.over and not self.finishing and not self.expired and left > 0:
                 self.reminded[me] += 1
                 agent.max_turns = left
                 r = agent.send(REMINDER)
@@ -331,6 +422,7 @@ class Team:
                 done.set()
             self._maybe_finish()
         self._maybe_finish(force=True)  # everyone stopped: their claims are released, so a recorded completion runs
+        self._finish_votes()            # completion "all": every agent has voted or stopped
         while not self.jobs.empty():  # release anyone still waiting (only possible after a crash)
             job = self.jobs.get()
             if job is not None:
@@ -372,6 +464,11 @@ class Team:
                      "finish_held": sum(len(v) for v in f.get("held", {}).values()),
                      "finish_writes": sum(e["ok"] and e["api"] != "complete_task" and e["seq"] > f["seq"]
                                           for e in writes) if f else 0})
+        votes = sorted(self.votes.items(), key=lambda kv: kv[1]["seq"])
+        comm.update({"completion_rule": self.completion, "complete_votes": len(votes),
+                     "answers_distinct": len({self._answer_key(v) for _, v in votes} - {None}),
+                     "completed_by": self.completed_by,
+                     "vote_spread": round(votes[-1][1]["t"] - votes[0][1]["t"], 2) if votes else 0.0})
         if self.log:
             comm.update(self.log.counts(self.events))
             self.log.close(copy_to=self.wal_copy)
@@ -379,7 +476,9 @@ class Team:
                    "difficulty": r.difficulty, "completed": self.world.task_completed(),
                    "reminded": sum(self.reminded.values()) > 0}
         trace = {"topology": "agent-driven", "benchmark": "appworld", "task": self.task_id, "comm": "none",
-                 "wal_level": self.log.level if self.log else None, "events": self.events,
+                 "wal_level": self.log.level if self.log else None, "completion": self.completion,
+                 "votes": [{"agent": a, "t": v["t"], "answer": self._answer_key(v)} for a, v in votes],
+                 "events": self.events,
                  **({"wal_log": self.log.entries} if self.log else {}),
                  "conversations": {a: ag.messages for a, ag in self.agents.items()}}
         self.world.close()
@@ -390,5 +489,5 @@ class Team:
                 "duplicate_changes": comm["duplicate_writes"], "trace": trace}
 
 
-def run(task_id, make_agent, n_agents, run_dir, level=None, claim_ttl=wal2.CLAIM_TTL, max_turns=100):
-    return Team(task_id, make_agent, n_agents, run_dir, level, claim_ttl, max_turns).run()
+def run(task_id, make_agent, n_agents, run_dir, level=None, claim_ttl=wal2.CLAIM_TTL, max_turns=100, completion="all"):
+    return Team(task_id, make_agent, n_agents, run_dir, level, claim_ttl, max_turns, completion).run()

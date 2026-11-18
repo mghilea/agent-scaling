@@ -1,5 +1,5 @@
 # Run with AppWorld's Python on a node with AppWorld set up: $APPWORLD_PYTHON scripts/test_completion.py
-"""End-to-end: deferred completion on a real AppWorld task with scripted agents (no model)."""
+"""End-to-end: deferred completion (--team-complete first) on a real AppWorld task with scripted agents (no model)."""
 import os, sys, json, threading, time, tempfile
 from pathlib import Path
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
@@ -52,7 +52,8 @@ class Scripted:
 
 run_dir = Path(tempfile.mkdtemp()) / "smoke-completion"
 run_dir.mkdir()
-r = appworld_team.run("57c3486_2", lambda **kw: Scripted(kw["name"], kw["tools"], kw["system_prompt"]), 3, run_dir, level="L4")
+r = appworld_team.run("57c3486_2", lambda **kw: Scripted(kw["name"], kw["tools"], kw["system_prompt"]), 3, run_dir, level="L4",
+                      completion="first")  # the earlier rule (--team-complete first); test_completion_all.py tests "all"
 c = r["comm"]
 for a, rs in replies.items():
     for tool, out in rs:

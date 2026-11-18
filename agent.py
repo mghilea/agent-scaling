@@ -484,6 +484,9 @@ def main():
     ap.add_argument("--claim-ttl", type=int,
                     help="with --wal-level: seconds a claim stays open without its change (default 90; cooperbench: "
                          "600 seconds without an edit to the claimed file)")
+    ap.add_argument("--team-complete", default="all", choices=["all", "first"],
+                    help="appworld teams: all (default since 2026-11-17): the task ends once every agent has called "
+                         "complete_task (or stopped), with the answer most gave; first: the first call ends it (earlier runs)")
     ap.add_argument("--agents", type=int,
                     help="multi-agent: number of worker agents (default 3, as in the paper; cooperbench teams have one "
                          "agent per feature of the task instead)")
@@ -589,6 +592,7 @@ def main():
     topo_name += "-np" if args.no_pause else ""
     topo_name += f"-tb{args.turn_budget}" if args.turn_budget else ""
     topo_name += f"-{args.wal_level}" if args.wal_level else ""
+    topo_name += "-cfirst" if aw and driven and args.team_complete == "first" else ""
     kind = "ask" if args.ask else ("sas" if not multi else topo_name) + ("-et" if cb and not multi and args.edit_tools else "") + \
         ("-rc" if args.repair_calls else "") + \
         ("-workbench" if wb else "-browsecomp" if bc else f"-appworld-{args.dataset}" if aw else f"-cooperbench-{args.subset}" if cb else "")
@@ -621,7 +625,7 @@ def main():
         try:
             if aw_team:
                 r = appworld_team.run(t["id"], make_agent, args.agents, run_dir, level=args.wal_level,
-                                      claim_ttl=args.claim_ttl, max_turns=args.max_turns)
+                                      claim_ttl=args.claim_ttl, max_turns=args.max_turns, completion=args.team_complete)
             elif cb_team:
                 r = cooperbench_team.run(t, make_agent, run_dir, level=args.wal_level, claim_ttl=args.claim_ttl,
                                          max_turns=args.max_turns)
