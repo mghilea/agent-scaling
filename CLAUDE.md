@@ -27,8 +27,10 @@ venv (`$APPWORLD_PYTHON`, built by `APPWORLD=1 source setup.sh`; `run.sbatch` do
 `/scratch/$USER/appworld`. Its license requires encrypted redistribution, so task contents stay out of git and off artifact pages.
 AppWorld teams (`appworld_team.py`, `--topology agent-driven --comm none --agents N`): one shared world, a shell per agent, code run
 one cell at a time on the main thread; the task ends once every agent has called complete_task or stopped (`--team-complete all`,
-the default since 2026-11-17; `first`, the first call ends it, for earlier runs). `--wal-level L1|L2|L3|L4` (L4v0/L4v0-strict: the earlier L4s, runs lad02-lad06) adds the second-version write-ahead log (`wal2.py`: claims
-{app, api, target}, levels from nothing enforced to conflicts refused, a JSON-lines file per task); `wal.py`/`--wal` is the
+the default since 2026-11-17; `first`, the first call ends it, for earlier runs). `--wal-level L1..L6` adds the second-version write-ahead log (`wal2.py`: claims {app, api, target}, a JSON-lines file per task).
+The ladder (user, 2026-11-18): L0 no log; L1 nothing enforced; L2 intent required; L3 + catch-up on relevant entries only (others
+only via wal_read); L4 + catch-up on all entries; L5 = L3 + open-claim conflicts refused; L6 = L4 + the same; no piggybacking.
+Runs before 2026-11-18 named L3 are this L4; L4v0/L4v0-strict are the lad02-lad06 L4s; `wal.py`/`--wal` is the
 first version, WorkBench only, kept unchanged so earlier runs stay reproducible. No more WorkBench work (user, 2026-11-11).
 Fourth benchmark, started 2026-11-16: CooperBench (github.com/cooperbench/CooperBench, pinned; two coding agents on one repo).
 It assumes Docker, which Neuronic lacks: `cooperbench/apptainer.patch` adds an Apptainer backend, `COOPERBENCH=1 source setup.sh`

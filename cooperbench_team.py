@@ -19,8 +19,11 @@ each edit restarts its expiry clock. It is released when its agent posts an inte
 stops, or when the file goes claim_ttl seconds without an edit. The levels are wal2's:
 - L1: nothing is checked;
 - L2: an edit needs a claim;
-- L3: L2, plus the agent must have read every entry before posting or editing;
-- L4: L3, plus no edit or claim on a file a teammate holds an open claim on.
+- L3: L2, plus the agent must have read the entries about the same files (teammates' intents and edits) before posting
+  or editing; other entries only when it calls wal_read;
+- L4: L2, plus the agent must have read every entry before posting or editing;
+- L5: L3, plus no edit or claim on a file a teammate holds an open claim on;
+- L6: L4, plus the same conflict rule.
 
 The work ends when every agent has stopped (replied without a tool call, or run out of turns), or at the time limit.
 It is scored on the final repository: every feature's hidden tests (cooperbench_bench.score_features). The task counts
@@ -59,12 +62,17 @@ Before editing: 1. read the WAL; 2. post your intent; 3. make the edits.
 CLAIM = "An edit is refused unless your current intent claims its file."
 CATCH_UP = ("Posting an intent, and making an edit, are refused while the WAL has entries you haven't read; you are "
             "then shown them.")
+CATCH_UP_REL = ("Posting an intent, and making an edit, are refused while the WAL has entries you haven't read about the "
+                "same files (teammates' intents and edits); you are then shown them. Other new entries are shown only "
+                "when you call wal_read.")
 CONFLICT = "An intent or an edit is also refused if a teammate holds an open claim on the same file."
-RULES = {
+RULES = {  # the ladder of wal2.LEVELS
     "L1": "Nothing checks that you do this: it is up to you.",
     "L2": CLAIM,
-    "L3": CLAIM + " " + CATCH_UP,
-    "L4": CLAIM + " " + CATCH_UP + " " + CONFLICT,
+    "L3": CLAIM + " " + CATCH_UP_REL,
+    "L4": CLAIM + " " + CATCH_UP,
+    "L5": CLAIM + " " + CATCH_UP_REL + " " + CONFLICT,
+    "L6": CLAIM + " " + CATCH_UP + " " + CONFLICT,
 }
 HINT = ("Work on other files first, or wait (e.g. execute_bash with `sleep 60`) and try again: the file is free once "
         "the teammate posts an intent without it or stops.")

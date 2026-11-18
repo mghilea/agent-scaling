@@ -477,10 +477,11 @@ def main():
     ap.add_argument("--no-pause", action="store_true",
                     help="agent-driven: one activation may use the agent's whole budget, instead of pausing "
                          "after 12 calls until a teammate contacts it")
-    ap.add_argument("--wal-level", choices=["L1", "L2", "L3", "L4", "L4v0", "L4v0-strict"],
+    ap.add_argument("--wal-level", choices=["L1", "L2", "L3", "L4", "L5", "L6", "L4v0", "L4v0-strict"],
                     help="appworld and cooperbench teams (--topology agent-driven): the write-ahead log of wal2.py at this "
-                         "enforcement level (L1 nothing checked, L2 claims, L3 catch-up, L4 L3 + a teammate's open claim on the "
-                         "same target refused; L4v0, L4v0-strict: earlier L4 definitions); without it, no log")
+                         "enforcement level (L1 nothing checked; L2 claims; L3 L2 + catch-up on relevant entries; L4 L2 + "
+                         "catch-up on every entry; L5 L3 + a teammate's open claim on the same target refused; L6 L4 + the "
+                         "same; L4v0, L4v0-strict: earlier definitions, runs lad02-lad06); without it, no log (L0)")
     ap.add_argument("--claim-ttl", type=int,
                     help="with --wal-level: seconds a claim stays open without its change (default 90; cooperbench: "
                          "600 seconds without an edit to the claimed file)")
@@ -542,8 +543,8 @@ def main():
         args.agents = 3
     if args.wal_level and not ((aw or cb) and args.topology == "agent-driven"):
         sys.exit("--wal-level is for AppWorld and CooperBench teams (--topology agent-driven); WorkBench uses --wal")
-    if cb and args.wal_level and args.wal_level not in ("L1", "L2", "L3", "L4"):
-        sys.exit("CooperBench teams have WAL levels L1-L4 (L4v0 and L4v0-strict are AppWorld's earlier definitions)")
+    if cb and args.wal_level and args.wal_level not in ("L1", "L2", "L3", "L4", "L5", "L6"):
+        sys.exit("CooperBench teams have WAL levels L1-L6 (L4v0 and L4v0-strict are AppWorld's earlier definitions)")
     if args.edit_tools and not cb:
         sys.exit("--edit-tools is for --benchmark cooperbench")
     args.claim_ttl = args.claim_ttl or (600 if cb else 90)

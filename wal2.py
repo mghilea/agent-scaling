@@ -14,14 +14,22 @@ Changes are logged by the harness, never by agents. Agents read with wal_read an
 changes through the environment as usual, and every write passes commit(), which checks the level's rules, records
 the pending line, runs the write and records the change, all under one lock (the caller's).
 
-Levels: L1 nothing is checked; L2 a write needs a claim of the agent's current intent (same app and API, and for an
-existing record its id in the target); L3 also, posting and writing need every entry read; L4 is L3 plus: an intent
-or write may not touch a target a teammate holds an open claim on (the same record, or the same new item). Once a
-claim closes, its target is free again: the log doesn't stop an agent from redoing what a teammate already did.
-Earlier definitions, kept so the runs tagged lad02-lad06 can be reproduced: L4v0 is L2 plus catch-up on relevant
-entries only (teammates' intents and changes on the same records, or for new items the same API; the rest are shown
-with the result instead of blocking) plus refusing both open claims and work a teammate already did ("no_redo");
-L4v0-strict is L4v0 with L3's catch-up on every entry.
+Levels (the ladder of 2026-11-18; L0 is no log at all):
+- L1: nothing is checked.
+- L2: a write needs a claim of the agent's current intent (same app and API, and for an existing record its id in the
+  target).
+- L3: L2, and posting or writing is refused while the agent has unread entries relevant to it: teammates' intents and
+  changes on the same records (for new items, the same API). It is then shown those, and only those: other unread
+  entries stay unread until it calls wal_read ("relevant_catchup").
+- L4: L2, and posting or writing needs every entry read.
+- L5: L3, and an intent or write may not touch a target a teammate holds an open claim on (the same record, or the same
+  new item).
+- L6: L4 plus the same conflict rule.
+Once a claim closes, its target is free again: the log doesn't stop an agent from redoing what a teammate already did.
+Earlier names: runs before 2026-11-18 named L3 used this L4's rules, and the L4 of 2026-11-17 (only in tests and checks)
+is this L6. Kept so the runs tagged lad02-lad06 can be reproduced: L4v0 is L2 plus catch-up on relevant entries
+("relevant_read", where the other unread entries are shown with the result and count as read) plus refusing both open
+claims and work a teammate already did ("no_redo"); L4v0-strict is L4v0 with catch-up on every entry.
 Claims name their targets at every level; from L2 on, a claim on an existing record must name its id.
 
 The adapter describes the environment: is_write(app, api), has_ids(app, api), path(app, api). Optional hooks, for
@@ -47,8 +55,10 @@ from pathlib import Path
 LEVELS = {
     "L1": set(),
     "L2": {"intent"},
-    "L3": {"intent", "read_before_post", "read_before_write"},
-    "L4": {"intent", "read_before_post", "read_before_write", "no_conflict"},
+    "L3": {"intent", "relevant_catchup"},
+    "L4": {"intent", "read_before_post", "read_before_write"},
+    "L5": {"intent", "relevant_catchup", "no_conflict"},
+    "L6": {"intent", "read_before_post", "read_before_write", "no_conflict"},
     # earlier definitions (runs tagged lad02-lad06, which were named L4 and L4-strict), kept for reproducibility
     "L4v0": {"intent", "relevant_read", "no_conflict", "no_redo"},
     "L4v0-strict": {"intent", "read_before_post", "read_before_write", "no_conflict", "no_redo"},
@@ -125,7 +135,9 @@ class Log:
         self.t0 = now() if t0 is None else t0
         self.claim_ttl = claim_ttl
         self.entries = []              # what agents see: intents, changes, releases (ids are positions + 1)
-        self.seen = Counter()          # agent -> entries seen
+        self.seen = Counter()          # agent -> entries seen (a read position: the first n entries)
+        self.shown = {}                # agent -> ids past its read position it has already been shown (L3, L5: the
+                                       # relevant entries of a refusal), so wal_read doesn't repeat them
         self.intent = {}               # agent -> id of its current intent
         self.claims = {}               # agent -> open claims of its current intent
         self.done = {}                 # Action.key -> (agent, entry id) of writes that went through
@@ -145,11 +157,15 @@ class Log:
 
     def _append(self, agent, kind, **data):
         e = {"id": len(self.entries) + 1, "t": round(now() - self.t0, 2), "agent": agent, "kind": kind, **data}
-        caught_up = self.seen[agent] >= len(self.entries)
+        shown = self.shown.get(agent, ())
+        caught_up = all(x["id"] in shown for x in self.entries[self.seen[agent]:])
         self.entries.append(e)
         self._write(e)
         if caught_up and agent:
             self.seen[agent] = e["id"]
+            self.shown.pop(agent, None)
+        elif agent and "relevant_catchup" in self.rules:
+            self.shown.setdefault(agent, set()).add(e["id"])  # its own entry: nothing for it to read
         return e
 
     def close(self, copy_to=None):
@@ -171,9 +187,21 @@ class Log:
         return f"#{e['id']} RELEASE {e['owner']}'s claim {e['claim']} ({e['reason']})"
 
     def catch_up(self, me):
-        unseen = self.entries[self.seen[me]:]
+        shown = self.shown.pop(me, ())
+        unseen = [e for e in self.entries[self.seen[me]:] if e["id"] not in shown]
         self.seen[me] = len(self.entries)
         return "\n".join(map(self.line, unseen)), len(unseen)
+
+    def _unseen_relevant(self, me, targets):
+        """L3, L5: unread entries relevant to any of targets [(app, api, path, ids)], not shown to the agent yet."""
+        shown = self.shown.get(me, ())
+        return [e for e in self.entries[self.seen[me]:]
+                if e["id"] not in shown and any(self._relevant(me, e, *t) for t in targets)]
+
+    def _show(self, me, entries):
+        self.shown.setdefault(me, set()).update(e["id"] for e in entries)
+        n = len(entries)
+        return "\n".join(map(self.line, entries)), f"entr{'y' if n == 1 else 'ies'}", ("it" if n == 1 else "them")
 
     def _relevant(self, me, e, app, api, path, ids):
         """Whether an entry concerns the same record (ids under the same path) or, for a new item, the same API."""
@@ -255,6 +283,7 @@ class Log:
             if all in (True, "true", "True", 1):
                 text, n = "\n".join(map(self.line, self.entries)), len(self.entries)
                 self.seen[me] = len(self.entries)
+                self.shown.pop(me, None)
             else:
                 text, n = self.catch_up(me)
         self.event(me, "wal_read", n=n, whole=bool(all))
@@ -312,6 +341,15 @@ class Log:
                     self.event(me, "wal_refused", rule="read_before_post", unseen=n)
                     return (f"[WAL] Not posted: the WAL has {n} entr{'y' if n == 1 else 'ies'} you hadn't read:\n"
                             f"{unseen}\nYou have now seen them. Post your intent again, revised if they overlap with it.")
+            if "relevant_catchup" in self.rules:
+                rel = self._unseen_relevant(me, [(c["app"], c["api"], self.adapter.path(c["app"], c["api"]),
+                                                  tuple(c["ids"])) for c in parsed])
+                if rel:
+                    text, word, pron = self._show(me, rel)
+                    self.event(me, "wal_refused", rule="relevant_catchup", at="post", unseen=len(rel))
+                    return (f"[WAL] Not posted: the WAL has {len(rel)} {word} you hadn't read about what you are "
+                            f"claiming:\n{text}\nYou have now seen {pron}. Post your intent again, revised if they "
+                            "overlap with it.")
             news = ""
             if "relevant_read" in self.rules:
                 targets = [(c["app"], c["api"], self.adapter.path(c["app"], c["api"]), tuple(c["ids"])) for c in parsed]
@@ -393,6 +431,15 @@ class Log:
                     raise Refused(f"[WAL] Refused: the WAL has {n} entr{'y' if n == 1 else 'ies'} you hadn't read:\n"
                                   f"{unseen}\nYou have now seen them. If they don't affect your plan, make the change "
                                   "again; if they do, post a revised intent first. Nothing was changed.")
+            if "relevant_catchup" in self.rules:
+                rel = self._unseen_relevant(me, [(action.app, action.api, action.path, action.ids)])
+                if rel:
+                    text, word, pron = self._show(me, rel)
+                    self.event(me, "wal_refused", rule="relevant_catchup", at="write", call=action.call,
+                               unseen=len(rel))
+                    raise Refused(f"[WAL] Refused: the WAL has {len(rel)} {word} you hadn't read about what you are "
+                                  f"changing:\n{text}\nYou have now seen {pron}. If they don't affect your plan, make the "
+                                  "change again; if they do, post a revised intent first. Nothing was changed.")
             if "relevant_read" in self.rules:
                 rel, other, nr, no = self.catch_up_relevant(me, [(action.app, action.api, action.path, action.ids)])
                 if nr:
@@ -460,7 +507,8 @@ class Log:
         return {"wal_level": self.level, "wal_intents": kinds["wal_intend"], "wal_reads": kinds["wal_read"],
                 "wal_changes": sum(e["kind"] == "change" for e in self.entries),
                 **{f"wal_refused_{r}": refused[r] for r in ("intent", "read_before_post", "read_before_write",
-                                                            "relevant_read", "no_conflict", "no_redo", "finishing")},
+                                                            "relevant_catchup", "relevant_read", "no_conflict", "no_redo",
+                                                            "finishing")},
                 "wal_delivered": kinds["wal_delivered"],
                 **{f"wal_released_{r}": releases[r] for r in ("stopped", "expired", "completed", "abandoned")}}
 
@@ -510,6 +558,9 @@ Before changing anything: 1. read the WAL; 2. post your intent; 3. make the chan
 {rules}"""
 CLAIM = "A change is refused unless your current intent claims it: the same app and API and, for an existing record, its id in the target."
 CATCH_UP = "Posting an intent, and making a change, are refused while the WAL has entries you haven't read; you are then shown them."
+CATCH_UP_REL = ("Posting an intent, and making a change, are refused while the WAL has entries you haven't read about the "
+                "same records (or, for something new, the same API): teammates' intents and changes; you are then shown "
+                "them. Other new entries are shown only when you call wal_read.")
 CATCH_UP_RELEVANT = ("Posting an intent, and making a change, are refused while the WAL has entries you haven't read about the "
                      "same records (or, for something new, the same API); you are then shown them. Other new entries are shown "
                      "to you with the result instead.")
@@ -522,8 +573,10 @@ CONFLICT_V0 = ("An intent or a change is also refused if it conflicts with a tea
 RULES = {
     "L1": "Nothing checks that you do this: it is up to you.",
     "L2": CLAIM,
-    "L3": CLAIM + " " + CATCH_UP,
-    "L4": CLAIM + " " + CATCH_UP + " " + CONFLICT,
+    "L3": CLAIM + " " + CATCH_UP_REL,
+    "L4": CLAIM + " " + CATCH_UP,
+    "L5": CLAIM + " " + CATCH_UP_REL + " " + CONFLICT,
+    "L6": CLAIM + " " + CATCH_UP + " " + CONFLICT,
     "L4v0": CLAIM + " " + CATCH_UP_RELEVANT + " " + CONFLICT_V0,
     "L4v0-strict": CLAIM + " " + CATCH_UP + " " + CONFLICT_V0,
 }

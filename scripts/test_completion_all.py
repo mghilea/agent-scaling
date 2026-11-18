@@ -131,8 +131,8 @@ def scenario_stuck(level):
         appworld_team.TIME_LIMIT, appworld_team.GRACE = limit, grace
 
 
-scenario("L4")
+scenario("L6")
 scenario(None)
-scenario_stuck("L4")
+scenario_stuck("L6")
 scenario_stuck(None)
 print("completion (all) test passed")

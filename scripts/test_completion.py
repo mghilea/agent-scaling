@@ -52,7 +52,7 @@ class Scripted:
 
 run_dir = Path(tempfile.mkdtemp()) / "smoke-completion"
 run_dir.mkdir()
-r = appworld_team.run("57c3486_2", lambda **kw: Scripted(kw["name"], kw["tools"], kw["system_prompt"]), 3, run_dir, level="L4",
+r = appworld_team.run("57c3486_2", lambda **kw: Scripted(kw["name"], kw["tools"], kw["system_prompt"]), 3, run_dir, level="L6",
                       completion="first")  # the earlier rule (--team-complete first); test_completion_all.py tests "all"
 c = r["comm"]
 for a, rs in replies.items():

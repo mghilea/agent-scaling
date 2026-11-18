@@ -1,9 +1,9 @@
 """Offline test of CooperBench teams (cooperbench_team.py) with scripted agents, no model.
 
-    $COOPERBENCH_PYTHON scripts/test_cooperbench_team.py [L4|L0]
+    $COOPERBENCH_PYTHON scripts/test_cooperbench_team.py [L6|L0]
 
 On the core pair dottxt_ai_outlines 1655 f1+f3, with the smoke run's passing patch (one file) as the work:
-- L4: agent_1 claims the file and edits it three times under one claim; agent_2's edit without a claim, its catch-up and
+- L6 (full catch-up and open-claim conflicts; named L4 before 2026-11-18): agent_1 claims the file and edits it three times under one claim; agent_2's edit without a claim, its catch-up and
   its claim on the same file are refused until agent_1 stops; then it claims the file and edits it. Both features pass.
 - L0: no log; both agents edit the file, and the edit metrics count the crossing.
 Both levels also check that bash can't change the repository, and that each agent is told only its own feature.
@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 import cooperbench_team as ct  # noqa: E402
 
-LEVEL = sys.argv[1] if len(sys.argv) > 1 else "L4"
+LEVEL = sys.argv[1] if len(sys.argv) > 1 else "L6"
 TASK = {"id": "dottxt_ai_outlines_task-1655-f1-f3", "repo": "dottxt_ai_outlines_task", "task_id": 1655,
         "features": [1, 3]}
 F = "outlines/types/__init__.py"
@@ -93,7 +93,7 @@ def agent_2_wal(a):
     out = a.call("wal_intend", plan="feature 3", files=[F])
     assert "hadn't read" in out, out                                                       # L3: catch up first
     out = a.call("wal_intend", plan="feature 3", files=[F])
-    assert "conflicts with agent_1's open claim" in out and "sleep 60" in out, out         # L4: agent_1 holds it
+    assert "conflicts with agent_1's open claim" in out and "sleep 60" in out, out         # L6: agent_1 holds it
     tried.set()
     a.until("wal_intend", lambda o: o.startswith("Posted"), plan="feature 3", files=[F])   # free once agent_1 stops
     first = a.call("execute_bash", command=f"head -1 {F}").strip()
