@@ -94,6 +94,45 @@ def scenario(level):
         assert any(e["kind"] == "change" and "complete_task" in e["call"] for e in tr["wal_log"])
 
 
+def scenario_stuck(level):
+    """agent_3 hangs (a model call that never returns): the team ends GRACE seconds after TIME_LIMIT anyway, agent_3
+    counts as abandoned, and the two votes decide."""
+    limit, grace = appworld_team.TIME_LIMIT, appworld_team.GRACE
+    appworld_team.TIME_LIMIT, appworld_team.GRACE = 6, 3
+    try:
+        class Scripted:
+            def __init__(self, name, tools, system_prompt):
+                self.name, self.tools = name, tools
+                self.stats = dict(turns=0, tool_calls=0, tool_errors=0, prompt_tokens=0, completion_tokens=0)
+                self.messages, self.limit_hits, self.max_turns = [], 0, 100
+
+            def send(self, msg):
+                return {"final": "done", "stop": "final", "messages": self.messages}
+
+            def run(self, prompt):
+                if self.name == "agent_3":
+                    time.sleep(60)  # stuck
+                else:
+                    self.tools["execute_python"][0](code="print(apis.supervisor.complete_task(answer='same'))")
+                return {"final": "done", "stop": "final", "messages": self.messages}
+
+        run_dir = Path(tempfile.mkdtemp()) / f"smoke-stuck-{level or 'L0'}"
+        run_dir.mkdir()
+        t = time.time()
+        r = appworld_team.run("57c3486_2", lambda **kw: Scripted(kw["name"], kw["tools"], kw["system_prompt"]), 3,
+                              run_dir, level=level, completion="all")
+        took, c = time.time() - t, r["comm"]
+        print(level or "L0", "stuck agent:", f"team ended after {took:.1f}s,",
+              {k: c.get(k) for k in ("agents_abandoned", "complete_votes", "completed_by")}, "stop:", r["stop"],
+              "completed:", r["verdict"]["completed"])
+        assert took < 30 and c["agents_abandoned"] == 1 and c["complete_votes"] == 2 and r["verdict"]["completed"]
+        assert r["stop"] == "time_limit"
+    finally:
+        appworld_team.TIME_LIMIT, appworld_team.GRACE = limit, grace
+
+
 scenario("L4")
 scenario(None)
+scenario_stuck("L4")
+scenario_stuck(None)
 print("completion (all) test passed")

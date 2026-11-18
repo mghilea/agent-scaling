@@ -39,7 +39,9 @@ import wal2
 from appworld import AppWorld
 from IPython.terminal.embed import InteractiveShellEmbed
 
-TIME_LIMIT = 1800  # seconds per task for the whole team
+TIME_LIMIT = 1800  # seconds per task for the whole team: after it, agents are told to stop (tool calls answer "time is up")
+GRACE = 120        # ...and this long after it, the team ends without waiting for agents still running (e.g. stuck in a
+                   # model call that never returns): they count as stopped ("abandoned"), and the votes so far decide
 READ_ONLY_WRITES = {"login", "logout"}  # POSTs that only open or close a session
 
 TEAM_TEXT = """You are {me}, one of {n} agents working on this task together; your teammates are {others}. You all received the same task from your supervisor and work on the same apps and accounts: a change any of you makes happens once, and all of you see it in the apps, so a change made twice happens twice. Nobody has assigned roles or a plan: decide for yourself how to get the task done.
@@ -144,6 +146,7 @@ class Team:
         self.lock = threading.RLock()       # the log's lock (writes are committed under it)
         self.jobs = queue.Queue()           # code cells waiting for the main thread
         self.done_agents, self.over, self.expired = set(), False, False
+        self.abandoned = []
         self.finishing, self.notified = None, set()  # a recorded complete_task waiting for teammates' open claims
         self.reminded, self.waits = Counter(), []
         work = Path(os.environ.get("WORK", f"/scratch/{getpass.getuser()}"))
@@ -412,6 +415,13 @@ class Team:
         while len(self.done_agents) < len(self.ids):
             if wal2.now() - self.t0 > TIME_LIMIT:
                 self.expired = True
+            if wal2.now() - self.t0 > TIME_LIMIT + GRACE:  # hard stop: don't wait for agents that are stuck
+                self.abandoned = [a for a in self.ids if a not in self.done_agents]
+                for a in self.abandoned:
+                    self.event(a, "abandoned")
+                    if self.log:
+                        self.log.release_agent(a, "abandoned")
+                break
             try:
                 job = self.jobs.get(timeout=1)
             except queue.Empty:
@@ -466,6 +476,7 @@ class Team:
                                           for e in writes) if f else 0})
         votes = sorted(self.votes.items(), key=lambda kv: kv[1]["seq"])
         comm.update({"completion_rule": self.completion, "complete_votes": len(votes),
+                     "agents_abandoned": len(self.abandoned),
                      "answers_distinct": len({self._answer_key(v) for _, v in votes} - {None}),
                      "completed_by": self.completed_by,
                      "vote_spread": round(votes[-1][1]["t"] - votes[0][1]["t"], 2) if votes else 0.0})

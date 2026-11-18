@@ -462,7 +462,7 @@ class Log:
                 **{f"wal_refused_{r}": refused[r] for r in ("intent", "read_before_post", "read_before_write",
                                                             "relevant_read", "no_conflict", "no_redo", "finishing")},
                 "wal_delivered": kinds["wal_delivered"],
-                **{f"wal_released_{r}": releases[r] for r in ("stopped", "expired", "completed")}}
+                **{f"wal_released_{r}": releases[r] for r in ("stopped", "expired", "completed", "abandoned")}}
 
 
 def team_concurrency(events, logged, accepted):
