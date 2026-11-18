@@ -378,6 +378,28 @@ class Log:
         self.event(me, "wal_intend", id=e["id"], claims=parsed)
         return f"Posted as intent #{e['id']}." + news
 
+    def wait(self, me, claims, timeout=300, poll=2.0, stop=None):
+        """Block until none of these claims would conflict with a teammate's open claim (L5, L6), or timeout seconds
+        pass, or stop() is true. Doesn't claim anything: the agent posts its intent afterwards. Returns the reply."""
+        parsed, error = self._parse_claims(claims)
+        if error:
+            return error
+        t0 = now()
+        while True:
+            with self.lock:
+                self._expire()
+                held = [(c, hit[1]) for c in parsed if (hit := self._claim_conflict(me, c))]
+            waited = round(now() - t0, 1)
+            if not held:
+                self.event(me, "wal_wait", waited=waited, free=True)
+                return (f"Free now (after {waited:.0f}s): no teammate holds a claim on "
+                        f"{', '.join(c['target'] for c in parsed)}. Post your intent with wal_intend to claim it.")
+            if waited >= timeout or (stop and stop()):
+                self.event(me, "wal_wait", waited=waited, free=False)
+                return (f"Still held after {waited:.0f}s: " + "; ".join(f"{c['target']} by {why}" for c, why in held)
+                        + ". You can wait again, or work on something else meanwhile.")
+            time.sleep(poll)
+
     def _claim_conflict(self, me, c):
         """(rule, text) for a teammate's open claim on the same target (no_conflict) or, in the earlier definitions,
         a change a teammate already made to it (no_redo); None if neither."""

@@ -63,6 +63,7 @@ class Fake:
         mine = {"agent_1": 1, "agent_2": 3}[self.name]
         assert f"## Feature {mine}" in prompt and prompt.count("## Feature") == 1, "an agent sees only its feature"
         assert "write-ahead log" in self.system_prompt.lower() if LEVEL != "L0" else "wal_intend" not in self.tools
+        assert ("wal_wait" in self.tools) == (LEVEL in ("L5", "L6")), "wal_wait only where claims can block"
         globals()[f"{self.name}_{'wal' if LEVEL != 'L0' else 'plain'}"](self)
         return {"final": "done", "stop": "final", "messages": self.messages, **self.stats}
 
@@ -100,8 +101,10 @@ def agent_2_wal(a):
     out = a.call("wal_intend", plan="feature 3", files=[F])
     assert "hadn't read" in out, out                                                       # L3: catch up first
     out = a.call("wal_intend", plan="feature 3", files=[F])
-    assert "conflicts with agent_1's open claim" in out and "sleep 60" in out, out         # L6: agent_1 holds it
+    assert "conflicts with agent_1's open claim" in out and "wal_wait" in out, out         # L6: agent_1 holds it
     tried.set()
+    out = a.call("wal_wait", files=[F], timeout=120)                                       # until agent_1 stops
+    assert out.startswith("Free now"), out
     a.until("wal_intend", lambda o: o.startswith("Posted"), plan="feature 3", files=[F])   # free once agent_1 stops
     first = a.call("execute_bash", command=f"head -1 {F}").strip()
     a.until("replace_in_file", lambda o: not o.startswith("[WAL]"), path=F, old=first + "\n", new=first + "\n")

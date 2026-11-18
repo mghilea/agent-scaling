@@ -134,6 +134,19 @@ assert ok(fwrite("a3", edit("README.md"))), "a3: nothing unread about README.md"
 assert ok(fwrite("a2", edit("src/util.py")))
 out = flog.read("a2")
 assert "#2 a3" in out and "#6 a3" in out and "#1 a1" not in out, out
+# wait(): returns once no teammate holds a conflicting claim (L6, files), or after the timeout
+wlog = wal2.Log("L6", Files(), tempfile.mktemp(suffix=".jsonl"), threading.RLock(), lambda *a, **k: None)
+assert ok(wlog.intend("a1", "core", fclaim("src/core.py")))
+r = wlog.wait("a2", fclaim("src/core.py"), timeout=0.5, poll=0.1)
+assert r.startswith("Still held") and "a1's open claim" in r, r
+assert wlog.wait("a2", fclaim("src/other.py"), timeout=5, poll=0.1).startswith("Free now"), "unclaimed: free at once"
+releaser = threading.Timer(0.6, lambda: wlog.intend("a1", "moved on", fclaim("src/util.py")))
+releaser.start()
+t = time.time()
+r = wlog.wait("a2", fclaim("src/core.py"), timeout=10, poll=0.1)
+assert r.startswith("Free now") and 0.5 < time.time() - t < 3, (r, time.time() - t)
+releaser.join()
+
 # refused changes are remembered as unmade until the agent makes a change to the same target
 log, write = team("L6")
 assert ok(log.intend("a1", "like 54", [{"app": "spotify", "api": "like_song", "target": "54"}]))

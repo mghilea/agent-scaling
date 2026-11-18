@@ -65,7 +65,8 @@ CATCH_UP = ("Posting an intent, and making an edit, are refused while the WAL ha
 CATCH_UP_REL = ("Posting an intent, and making an edit, are refused while the WAL has entries you haven't read about the "
                 "same files (teammates' intents and edits); you are then shown them. Other new entries are shown only "
                 "when you call wal_read.")
-CONFLICT = "An intent or an edit is also refused if a teammate holds an open claim on the same file."
+CONFLICT = ("An intent or an edit is also refused if a teammate holds an open claim on the same file. wal_wait(files) "
+            "waits until none of those files is claimed by a teammate (up to 10 minutes), so you can claim them then.")
 RULES = {  # the ladder of wal2.LEVELS
     "L1": "Nothing checks that you do this: it is up to you.",
     "L2": CLAIM,
@@ -74,8 +75,9 @@ RULES = {  # the ladder of wal2.LEVELS
     "L5": CLAIM + " " + CATCH_UP_REL + " " + CONFLICT,
     "L6": CLAIM + " " + CATCH_UP + " " + CONFLICT,
 }
-HINT = ("Work on other files first, or wait (e.g. execute_bash with `sleep 60`) and try again: the file is free once "
-        "the teammate posts an intent without it or stops.")
+HINT = ("Wait for it with wal_wait (it returns as soon as the file is free: when the teammate posts an intent without "
+        "it or stops), or work on other files first.")
+WAIT_MAX = 600      # seconds one wal_wait call may block
 
 
 def wal_text(level, claim_ttl=CLAIM_TTL):
@@ -213,7 +215,30 @@ class Team:
                     seen.add(rel)
                     claims.append({"app": "repo", "api": "edit", "target": rel})
             return self.log.intend(me, plan, claims)
-        return {
+
+        def wait(files=None, timeout=300):
+            if self.expired:
+                return TIME_UP
+            if isinstance(files, str):
+                try:
+                    files = json.loads(files)
+                except json.JSONDecodeError:
+                    files = [f for f in re.split(r"[,\s]+", files) if f]
+            files = [files] if isinstance(files, str) else files or []
+            claims = []
+            for f in files:
+                target, rel = self.ws._resolve(f)
+                if target is None:
+                    return rel
+                claims.append({"app": "repo", "api": "edit", "target": rel})
+            if not claims:
+                return "[error] files must name at least one file, relative to /workspace/repo"
+            try:
+                timeout = max(1.0, min(float(timeout), WAIT_MAX))
+            except (TypeError, ValueError):
+                timeout = 300.0
+            return self.log.wait(me, claims, timeout, stop=lambda: self.expired)
+        tools = {
             "wal_read": (lambda all=False: self.log.read(me, all), _schema(
                 "wal_read", "Read the team's write-ahead log: the entries you haven't seen yet (all=true: every entry).",
                 {"all": {"type": "boolean", "description": "Show every entry, not only the ones you haven't seen"}}, [])),
@@ -225,6 +250,15 @@ class Team:
                            "description": "Every file you will edit or create, relative to /workspace/repo"}},
                 ["plan", "files"])),
         }
+        if "no_conflict" in self.log.rules:  # only where a teammate's claim can block you (L5, L6)
+            tools["wal_wait"] = (wait, _schema(
+                "wal_wait", "Wait until none of these files is claimed by a teammate (returns as soon as they are free, "
+                "or after timeout seconds), so you can claim them with wal_intend.",
+                {"files": {"type": "array", "items": {"type": "string"},
+                           "description": "The files you are waiting for, relative to /workspace/repo"},
+                 "timeout": {"type": "number", "description": f"Seconds to wait at most (default 300, max {WAIT_MAX})"}},
+                ["files"]))
+        return tools
 
     # ---- the team -------------------------------------------------------------------------------------------------
     def prompt(self, me):
