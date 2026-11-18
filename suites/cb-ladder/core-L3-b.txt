@@ -1,0 +1,5 @@
+--benchmark cooperbench --subset core --topology agent-driven --comm none --wal-level L3 --repair-calls --tag cl06
+--benchmark cooperbench --subset core --topology agent-driven --comm none --wal-level L3 --repair-calls --tag cl07
+--benchmark cooperbench --subset core --topology agent-driven --comm none --wal-level L3 --repair-calls --tag cl08
+--benchmark cooperbench --subset core --topology agent-driven --comm none --wal-level L3 --repair-calls --tag cl09
+--benchmark cooperbench --subset core --topology agent-driven --comm none --wal-level L3 --repair-calls --tag cl10
