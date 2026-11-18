@@ -597,8 +597,17 @@ def main():
     kind = "ask" if args.ask else ("sas" if not multi else topo_name) + ("-et" if cb and not multi and args.edit_tools else "") + \
         ("-rc" if args.repair_calls else "") + \
         ("-workbench" if wb else "-browsecomp" if bc else f"-appworld-{args.dataset}" if aw else f"-cooperbench-{args.subset}" if cb else "")
-    run_dir = ROOT / "runs" / f"{datetime.now():%Y%m%d-%H%M%S}-{kind}-{args.model}{'-' + args.tag if args.tag else ''}"
-    (run_dir / "traces").mkdir(parents=True)
+    # A run's directory is named by the second it starts. Several runs started together (suite.sbatch's chunks of one
+    # run share their tag) can land on the same second: claim the directory atomically, else take the next second's.
+    (ROOT / "runs").mkdir(exist_ok=True)
+    while True:
+        run_dir = ROOT / "runs" / f"{datetime.now():%Y%m%d-%H%M%S}-{kind}-{args.model}{'-' + args.tag if args.tag else ''}"
+        try:
+            run_dir.mkdir()
+            break
+        except FileExistsError:
+            time.sleep(1.1)
+    (run_dir / "traces").mkdir()
     (run_dir / "config.json").write_text(json.dumps({"git_commit": git_commit(), **vars(args)}, indent=2))
 
     def make_agent(**kwargs):
