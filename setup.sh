@@ -301,7 +301,8 @@ _cooperbench() {
         git clone -q https://github.com/cooperbench/CooperBench.git "$src" || return 1
         git -C "$src" checkout -q "$commit" || return 1
     fi
-    if ! git -C "$src" apply --check -R "$patch" 2>/dev/null; then  # not applied yet
+    if ! git -C "$src" apply --check -R "$patch" 2>/dev/null; then  # not applied yet, or an earlier version of it is
+        git -C "$src" checkout -q -- . && git -C "$src" clean -qfd -- src  # back to the pinned commit (ignored files stay)
         git -C "$src" apply "$patch" || { echo "cooperbench/apptainer.patch doesn't apply to $src" >&2; return 1; }
     fi
     if ! "$WORK/cooperbench-venv/bin/python" -c "import cooperbench.infra.apptainer" >/dev/null 2>&1; then

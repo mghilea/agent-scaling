@@ -156,10 +156,16 @@ class Workspace:
         self.homes = {}
 
     def _home(self, agent):
+        """The agent's own HOME (a copy of the image's /root, where images install tools such as rustup's toolchain)
+        and /tmp, kept from one command to the next."""
         if agent not in self.homes:
-            self.homes[agent] = (self.container.dir / f"home-{agent}", self.container.dir / f"tmp-{agent}")
-            for d in self.homes[agent]:
-                d.mkdir(exist_ok=True)
+            home, tmp = self.container.dir / f"home-{agent}", self.container.dir / f"tmp-{agent}"
+            image_root = self.container.root / "root"
+            if not home.exists() and image_root.is_dir():
+                subprocess.run(["cp", "-a", "--reflink=auto", str(image_root), str(home)], check=True)
+            home.mkdir(exist_ok=True)
+            tmp.mkdir(exist_ok=True)
+            self.homes[agent] = (home, tmp)
         return self.homes[agent]
 
     def bash(self, command, agent="agent", timeout=COMMAND_TIMEOUT):

@@ -163,19 +163,21 @@ index 0000000..5e35322
 +        return sandbox
 diff --git a/src/cooperbench/infra/apptainer.py b/src/cooperbench/infra/apptainer.py
 new file mode 100644
-index 0000000..fcbaf79
+index 0000000..b3d4997
 --- /dev/null
 +++ b/src/cooperbench/infra/apptainer.py
-@@ -0,0 +1,84 @@
+@@ -0,0 +1,87 @@
 +"""Apptainer containers for CooperBench, for clusters without Docker (added for Neuronic).
 +
 +A task image (a Docker Hub image) is unpacked once per node into a sandbox directory under $COOPERBENCH_IMAGES
 +(default /scratch/$USER/cooperbench/images), which needs no root and leaves its files owned by the user. Each
 +container is a fast copy of that directory (reflink where the filesystem supports it) under
-+$COOPERBENCH_CONTAINERS, with its own /tmp and home, so its changes persist from one command to the next, as with
++$COOPERBENCH_CONTAINERS, with its own /tmp, so its changes persist from one command to the next, as with
 +`docker run -d` + `docker exec`, and disappear with remove(). Commands run with --containall: none of the host's
 +directories (home included) are visible, and the environment is the image's own. They run as the user, not root
 +(the cluster has no --fakeroot), which is enough to edit the repo and pip-install, since the user owns every file.
++HOME is the image's own /root, as under Docker: images install tools there (e.g. rustup's toolchain in /root/.cargo,
++which the tiktoken tasks need to build); an empty home bound over /root would hide them.
 +"""
 +
 +from __future__ import annotations
@@ -226,11 +228,12 @@ index 0000000..fcbaf79
 +        CONTAINERS.mkdir(parents=True, exist_ok=True)
 +        self.dir = CONTAINERS / f"{base.name}-{uuid.uuid4().hex[:8]}"
 +        self.root = self.dir / "root"
-+        self.tmp, self.home = self.dir / "tmp", self.dir / "home"
++        self.tmp = self.dir / "tmp"
++        self.home = self.root / "root"  # the image's own /root (the container's copy of it), bound as HOME=/root
 +        self.dir.mkdir()
 +        subprocess.run(["cp", "-a", "--reflink=auto", str(base), str(self.root)], check=True)
 +        self.tmp.mkdir()
-+        self.home.mkdir()
++        self.home.mkdir(exist_ok=True)
 +
 +    def command(self, argv: list[str], cwd: str | None = None, env: dict[str, str] | None = None) -> list[str]:
 +        # -s: only errors, so a warning (e.g. about /etc/localtime) can't precede the command's output
