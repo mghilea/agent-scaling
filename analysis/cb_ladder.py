@@ -25,6 +25,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 TAGS = sys.argv[sys.argv.index("--tags") + 1].split(",") if "--tags" in sys.argv else ["fl01", "fl02"]
+# the 4/6/8-agent scaling runs: python analysis/cb_ladder.py --subsets big4,big6,big8 --tags bg01,bg02
 SUBSETS = sys.argv[sys.argv.index("--subsets") + 1].split(",") if "--subsets" in sys.argv else ["flash", "flash3"]
 SETUPS = {"single": "sas-et-rc", "L0": "agent-driven-none-rc", **{f"L{i}": f"agent-driven-none-L{i}-rc" for i in range(1, 7)}}
 RULES = ["intent", "relevant_catchup", "read_before_post", "read_before_write", "no_conflict"]
