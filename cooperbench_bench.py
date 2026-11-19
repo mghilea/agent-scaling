@@ -20,6 +20,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
 import uuid
 from pathlib import Path
 
@@ -29,7 +30,7 @@ sys.path.insert(0, str(SRC / "src"))
 
 from cooperbench.eval.backends import get_backend  # noqa: E402
 from cooperbench.eval.sandbox import _filter_test_files, _run_tests, _write_patch, test_solo  # noqa: E402
-from cooperbench.infra.apptainer import APPTAINER, Container  # noqa: E402
+from cooperbench.infra.apptainer import APPTAINER, Container, ensure_image  # noqa: E402
 from cooperbench.utils import get_image_name  # noqa: E402
 
 REPO = "/workspace/repo"
@@ -140,6 +141,20 @@ _SCRATCH = ("__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".tox"
             "/build/", "/dist/", ".git/")
 
 
+def _ensure_image(image, tries=6):
+    """Unpack the task's image on this node, retrying with growing pauses: many jobs pulling at once can hit Docker
+    Hub's limit for anonymous pulls (on 2026-11-18, 51 task runs failed this way). The last failure keeps the build's
+    own error output."""
+    for i in range(tries):
+        try:
+            return ensure_image(image)
+        except subprocess.CalledProcessError as e:
+            if i == tries - 1:
+                raise RuntimeError(f"building {image} failed {tries} times; last error: "
+                                   f"{(e.stderr or e.stdout or '').strip()[-500:]}") from e
+            time.sleep(60 * (i + 1))
+
+
 def _lines(n):
     return f"{n} line{'' if n == 1 else 's'}"
 
@@ -155,7 +170,9 @@ class Workspace:
 
     def __init__(self, task):
         self.task = task
-        self.container = Container(get_image_name(task["repo"], task["task_id"]))
+        image = get_image_name(task["repo"], task["task_id"])
+        _ensure_image(image)
+        self.container = Container(image)
         self.repo = self.container.root / REPO.lstrip("/")
         self.lock = threading.RLock()
         self.homes = {}
