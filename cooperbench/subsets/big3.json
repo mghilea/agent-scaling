@@ -1,0 +1,115 @@
+{
+ "description": "3-agent CooperBench scaling: the tasks with >= 8 jointly usable features, each with its first 3 (nested: big1 within big2 ... within big8; scripts/cb_make_big_subsets.py). Feature ids only.",
+ "tasks": [
+  {
+   "repo": "dottxt_ai_outlines_task",
+   "task_id": 1655,
+   "groups": [
+    [
+     1,
+     2,
+     3
+    ]
+   ]
+  },
+  {
+   "repo": "dottxt_ai_outlines_task",
+   "task_id": 1706,
+   "groups": [
+    [
+     1,
+     2,
+     3
+    ]
+   ]
+  },
+  {
+   "repo": "openai_tiktoken_task",
+   "task_id": 0,
+   "groups": [
+    [
+     1,
+     2,
+     3
+    ]
+   ]
+  },
+  {
+   "repo": "pallets_click_task",
+   "task_id": 2068,
+   "groups": [
+    [
+     1,
+     2,
+     3
+    ]
+   ]
+  },
+  {
+   "repo": "pallets_click_task",
+   "task_id": 2956,
+   "groups": [
+    [
+     1,
+     2,
+     3
+    ]
+   ]
+  },
+  {
+   "repo": "pallets_jinja_task",
+   "task_id": 1465,
+   "groups": [
+    [
+     1,
+     2,
+     3
+    ]
+   ]
+  },
+  {
+   "repo": "pallets_jinja_task",
+   "task_id": 1559,
+   "groups": [
+    [
+     1,
+     2,
+     3
+    ]
+   ]
+  },
+  {
+   "repo": "pallets_jinja_task",
+   "task_id": 1621,
+   "groups": [
+    [
+     1,
+     2,
+     3
+    ]
+   ]
+  },
+  {
+   "repo": "samuelcolvin_dirty_equals_task",
+   "task_id": 43,
+   "groups": [
+    [
+     1,
+     2,
+     3
+    ]
+   ]
+  },
+  {
+   "repo": "typst_task",
+   "task_id": 6554,
+   "groups": [
+    [
+     1,
+     2,
+     3
+    ]
+   ]
+  }
+ ]
+}
