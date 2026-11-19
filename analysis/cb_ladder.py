@@ -6,6 +6,8 @@ runs tagged fl01 and fl02 (each run's 50 tasks in 5 chunks of 10, merged by tag)
     python analysis/cb_ladder.py --subsets core --tags t2check     # other runs (here the 2026-11-17 2-agent check)
 
 Per subset and setup, over the runs found so far (each over the pairs or triples it has finished):
+- task runs that errored before the agents started (e.g. the task image couldn't be unpacked) are left out and counted
+  (err); a later run of the same task and tag replaces them
 - solved: share of tasks with every feature's tests passing (mean over runs, and the spread across runs: sd);
   features: share of features passing
 - per task: edits, edits interleaved with a teammate's on the same file (crossed), whole-file rewrites over a teammate's
@@ -34,8 +36,15 @@ def results(kind, subset, tag):
         res = Path(d, "results.jsonl")
         for line in (open(res) if res.exists() else []):
             r = json.loads(line)
-            rows[r["id"]] = (Path(d), r)
+            # a later run of the same task replaces an earlier one, unless the later one errored and the earlier didn't
+            if r["id"] not in rows or not str(r["stop"]).startswith("error"):
+                rows[r["id"]] = (Path(d), r)
     return list(rows.values())
+
+
+def ran(rows):
+    """Task runs that ran: an error before the agents started (e.g. the task image couldn't be unpacked) is no result."""
+    return [(d, r) for d, r in rows if not str(r["stop"]).startswith("error")]
 
 
 def per_task(d, r):
@@ -59,9 +68,11 @@ def per_task(d, r):
 out = {}
 for subset in SUBSETS:
     for name, kind in SETUPS.items():
-        stats, agents, by_run = [], Counter(), []
+        stats, agents, by_run, errored = [], Counter(), [], 0
         for tag in TAGS:
             rows = results(kind, subset, tag)
+            errored += len(rows) - len(ran(rows))
+            rows = ran(rows)
             if not rows:
                 continue
             run = [per_task(d, r) for d, r in rows]
@@ -72,7 +83,7 @@ for subset in SUBSETS:
         if not stats:
             continue
         mean = lambda k: round(st.mean(s[k] for s in stats if k in s), 3) if any(k in s for s in stats) else None  # noqa: E731
-        row = {"runs": len(by_run), "tasks": len(stats), "solved": mean("solved"),
+        row = {"runs": len(by_run), "tasks": len(stats), "errored": errored, "solved": mean("solved"),
                "solved_sd": round(st.stdev(by_run), 3) if len(by_run) > 1 else None, "features": mean("features"),
                "calls": mean("calls"), "tokens_k": round(mean("tokens_k")), "seconds": round(mean("seconds"))}
         if agents:
@@ -83,9 +94,9 @@ for subset in SUBSETS:
 
 if "--tags" not in sys.argv and "--subsets" not in sys.argv:
     (ROOT / "analysis" / "cb_ladder.json").write_text(json.dumps(out, indent=1))
-cols = ["runs", "tasks", "solved", "solved_sd", "features", "edits", "crossed", "overwrites", "no_edit_agents",
+cols = ["runs", "tasks", "errored", "solved", "solved_sd", "features", "edits", "crossed", "overwrites", "no_edit_agents",
         *(f"ref_{k}" for k in RULES), "waits", "wait_s", "unmade_end", "team_s", "calls", "tokens_k"]
-short = {"solved_sd": "sd", "features": "feats", "overwrites": "overwr", "no_edit_agents": "no_edit",
+short = {"errored": "err", "solved_sd": "sd", "features": "feats", "overwrites": "overwr", "no_edit_agents": "no_edit",
          "ref_intent": "r_int", "ref_relevant_catchup": "r_rel", "ref_read_before_post": "r_post",
          "ref_read_before_write": "r_write", "ref_no_conflict": "r_confl", "unmade_end": "unmade", "tokens_k": "tok_k"}
 print(f"gpt-oss-120b, CooperBench {' and '.join(SUBSETS)} (pairs: 2-agent teams; triples: 3-agent teams); per task unless noted")
