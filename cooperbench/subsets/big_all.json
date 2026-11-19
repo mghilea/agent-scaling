@@ -1,0 +1,182 @@
+{
+ "description": "The 10 CooperBench tasks with at least 8 features, each with all of its features as one group: for checking which features pass together under the task's combined reference (scripts/cb_gold_check.py), to pick the nested groups of the 4/6/8-agent scaling runs. Feature ids only.",
+ "tasks": [
+  {
+   "repo": "dottxt_ai_outlines_task",
+   "task_id": 1655,
+   "groups": [
+    [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10
+    ]
+   ]
+  },
+  {
+   "repo": "dottxt_ai_outlines_task",
+   "task_id": 1706,
+   "groups": [
+    [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8
+    ]
+   ]
+  },
+  {
+   "repo": "openai_tiktoken_task",
+   "task_id": 0,
+   "groups": [
+    [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10
+    ]
+   ]
+  },
+  {
+   "repo": "pallets_click_task",
+   "task_id": 2068,
+   "groups": [
+    [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12
+    ]
+   ]
+  },
+  {
+   "repo": "pallets_click_task",
+   "task_id": 2956,
+   "groups": [
+    [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8
+    ]
+   ]
+  },
+  {
+   "repo": "pallets_jinja_task",
+   "task_id": 1465,
+   "groups": [
+    [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10
+    ]
+   ]
+  },
+  {
+   "repo": "pallets_jinja_task",
+   "task_id": 1559,
+   "groups": [
+    [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10
+    ]
+   ]
+  },
+  {
+   "repo": "pallets_jinja_task",
+   "task_id": 1621,
+   "groups": [
+    [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10
+    ]
+   ]
+  },
+  {
+   "repo": "samuelcolvin_dirty_equals_task",
+   "task_id": 43,
+   "groups": [
+    [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9
+    ]
+   ]
+  },
+  {
+   "repo": "typst_task",
+   "task_id": 6554,
+   "groups": [
+    [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10
+    ]
+   ]
+  }
+ ]
+}
