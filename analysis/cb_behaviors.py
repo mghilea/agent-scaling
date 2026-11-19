@@ -21,7 +21,7 @@ def load(sub, L):
         f = d + "/results.jsonl"
         for l in (open(f) if glob.glob(f) else []):
             r = json.loads(l)
-            if str(r["stop"]).startswith("error"): continue
+            if str(r["stop"]).startswith(("error: CalledProcessError: Command '['apptainer'", "error: RuntimeError: building ")): continue
             rows[(d.rsplit("-", 1)[1], r["id"])] = (d, r)
     return rows.values()
 pct = lambda xs, q: sorted(xs)[int(q * (len(xs) - 1))] if xs else 0

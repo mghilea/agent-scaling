@@ -6,8 +6,8 @@ runs tagged fl01 and fl02 (each run's 50 tasks in 5 chunks of 10, merged by tag)
     python analysis/cb_ladder.py --subsets core --tags t2check     # other runs (here the 2026-11-17 2-agent check)
 
 Per subset and setup, over the runs found so far (each over the pairs or triples it has finished):
-- task runs that errored before the agents started (e.g. the task image couldn't be unpacked) are left out and counted
-  (err); a later run of the same task and tag replaces them
+- task runs that errored before the agents started (the task image couldn't be unpacked) are left out and counted
+  (err); a later run of the same task and tag replaces them. Other errors (e.g. over the context window) count as failures
 - solved: share of tasks with every feature's tests passing (mean over runs, and the spread across runs: sd);
   features: share of features passing
 - per task: edits, edits interleaved with a teammate's on the same file (crossed), whole-file rewrites over a teammate's
@@ -38,14 +38,22 @@ def results(kind, subset, tag):
         for line in (open(res) if res.exists() else []):
             r = json.loads(line)
             # a later run of the same task replaces an earlier one, unless the later one errored and the earlier didn't
-            if r["id"] not in rows or not str(r["stop"]).startswith("error"):
+            if r["id"] not in rows or not infra_error(r):
                 rows[r["id"]] = (Path(d), r)
     return list(rows.values())
 
 
+INFRA = ("error: CalledProcessError: Command '['apptainer'", "error: RuntimeError: building ")  # the task image wasn't built
+
+
+def infra_error(r):
+    return str(r["stop"]).startswith(INFRA)
+
+
 def ran(rows):
-    """Task runs that ran: an error before the agents started (e.g. the task image couldn't be unpacked) is no result."""
-    return [(d, r) for d, r in rows if not str(r["stop"]).startswith("error")]
+    """Task runs that ran: one that errored before the agents started (its task image couldn't be unpacked) is no
+    result. Any other error (e.g. a model call over the context window) is the run's outcome and counts as a failure."""
+    return [(d, r) for d, r in rows if not infra_error(r)]
 
 
 def per_task(d, r):
