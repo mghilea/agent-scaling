@@ -6,7 +6,7 @@ The tasks: the 10 with at least 8 features (cooperbench/subsets/big_all.json). A
 reference patch passes its tests and it also passes under the task's combined reference (all features merged), so the
 features of a group can all be satisfied together. Per task, the usable features in ascending order; the first n form the
 n-agent group (n = 1, 2, 3, 4, 6, 8): each larger team gets the same task with features added (big1 is for the single
-agent only). A task with fewer than 8 usable features is left out of all three, so the three sizes share their
+agent only). A task with fewer than 8 usable features is left out of every size, so all sizes share their
 tasks. Feature ids only.
 """
 import glob
