@@ -1,0 +1,4 @@
+--benchmark cooperbench --subset big4 --topology agent-driven --comm none --wal-level L4 --offset 0 --limit 5 --repair-calls --tag bg01
+--benchmark cooperbench --subset big4 --topology agent-driven --comm none --wal-level L4 --offset 5 --limit 5 --repair-calls --tag bg01
+--benchmark cooperbench --subset big4 --topology agent-driven --comm none --wal-level L4 --offset 0 --limit 5 --repair-calls --tag bg02
+--benchmark cooperbench --subset big4 --topology agent-driven --comm none --wal-level L4 --offset 5 --limit 5 --repair-calls --tag bg02
