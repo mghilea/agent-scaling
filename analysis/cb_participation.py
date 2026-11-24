@@ -1,11 +1,12 @@
 """Per-agent participation in CooperBench teams (flash: 2 agents, flash3: 3, big4/6/8): agents with no edits, own feature
 passing, active share of team time, the busiest agent's share of calls, edits on the agent's own feature's reference files vs
-files only teammates' features touch, out of calls. Usage: python analysis/cb_participation.py [L0 L4 L5 L6]. Ids and numbers only."""
+files only teammates' features touch, out of calls. Usage: python analysis/cb_participation.py [--ctx] [L0 L4 L5 L6] (--ctx: the equal-context ladder, runs cx01/cx02). Ids and numbers only."""
 import json, glob, statistics as st, re, sys
 from collections import defaultdict, Counter
 D = "/scratch/mg3117/cooperbench-src/dataset"
 INFRA = ("error: CalledProcessError: Command '['apptainer'", "error: RuntimeError: building ")
-def kind(L): return "agent-driven-none-rc" if L == "L0" else f"agent-driven-none-{L}-rc"
+CTX = "--ctx" in sys.argv
+def kind(L): return ("agent-driven-none-rc" if L == "L0" else f"agent-driven-none-{L}-rc") + ("-ctx128k" if CTX else "")
 _files = {}
 def ref_files(task_id, f):
     m = re.match(r"(.+_task)-(\d+)-", task_id)
@@ -58,8 +59,9 @@ def analyze(sub, tags, L):
             "active (of team time)": f"{st.median(active_frac):.0%}", "busiest agent's share of calls": f"{st.mean(share_max):.0%}",
             "edits on own feature's files": f"{a['edits_on_own_ref']/e:.0%}", "edits on teammates' files": f"{a['edits_on_teammates_ref']/e:.0%}",
             "agents editing only teammates' files": a["edited_only_teammates_ref"], "out of calls": f"{a['out_of_calls']/n:.0%}"}
-sets = [("flash", ["fl01", "fl02"], "2"), ("flash3", ["fl01", "fl02"], "3")] + [(f"big{k}", ["bg01", "bg02"], f"{k}*") for k in (4, 6, 8)]
-which = sys.argv[1:] or ["L0", "L5", "L6"]
+sets = ([("flash", ["cx01", "cx02"], "2"), ("flash3", ["cx01", "cx02"], "3")] if CTX else
+        [("flash", ["fl01", "fl02"], "2"), ("flash3", ["fl01", "fl02"], "3")] + [(f"big{k}", ["bg01", "bg02"], f"{k}*") for k in (4, 6, 8)])
+which = [a for a in sys.argv[1:] if a != "--ctx"] or ["L0", "L5", "L6"]
 for sub, tags, label in sets:
     for L in which:
         res = analyze(sub, tags, L)

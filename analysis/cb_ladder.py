@@ -4,6 +4,12 @@ runs tagged fl01 and fl02 (each run's 50 tasks in 5 chunks of 10, merged by tag)
 
     python analysis/cb_ladder.py                    # prints the tables, writes analysis/cb_ladder.json
     python analysis/cb_ladder.py --subsets core --tags t2check     # other runs (here the 2026-11-17 2-agent check)
+    python analysis/cb_ladder.py --ctx              # the equal-context ladder (runs cx01, cx02; writes cb_ladder_ctx.json)
+
+--ctx reads the runs made with --context-total 131072 (2026-11-24): one 131k-token window per setup, the single agent's
+whole and split evenly among a team's agents, which drop their oldest tool outputs to stay within it; the single agent
+also gets 100 calls per feature. Its extra columns: tool outputs dropped per task (drops), the share of agents that had
+to drop any (trimmed), and the largest prompt in thousands of tokens (max_pk, the task's largest over its agents).
 
 Per subset and setup, over the runs found so far (each over the pairs or triples it has finished):
 - task runs that errored before the agents started (the task image couldn't be unpacked) are left out and counted
@@ -24,10 +30,13 @@ from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-TAGS = sys.argv[sys.argv.index("--tags") + 1].split(",") if "--tags" in sys.argv else ["fl01", "fl02"]
+CTX = "--ctx" in sys.argv
+TAGS = sys.argv[sys.argv.index("--tags") + 1].split(",") if "--tags" in sys.argv else ["cx01", "cx02"] if CTX else ["fl01", "fl02"]
 # the 4/6/8-agent scaling runs: python analysis/cb_ladder.py --subsets big4,big6,big8 --tags bg01,bg02
 SUBSETS = sys.argv[sys.argv.index("--subsets") + 1].split(",") if "--subsets" in sys.argv else ["flash", "flash3"]
 SETUPS = {"single": "sas-et-rc", "L0": "agent-driven-none-rc", **{f"L{i}": f"agent-driven-none-L{i}-rc" for i in range(1, 7)}}
+if CTX:
+    SETUPS = {k: v + "-ctx128k" for k, v in SETUPS.items()}
 RULES = ["intent", "relevant_catchup", "read_before_post", "read_before_write", "no_conflict"]
 
 
@@ -61,8 +70,11 @@ def per_task(d, r):
     s = {"solved": float(bool(r["correct"])), "features": (r.get("features_passed") or 0) / n,
          "calls": r["turns"], "tokens_k": (r["prompt_tokens"] + r["completion_tokens"]) / 1000, "seconds": r["seconds"]}
     c = r.get("comm")
+    if CTX:  # single agent: its own row; team: the comm's totals over agents
+        src = c or r
+        s.update({"drops": src.get("context_drops", 0), "max_pk": src.get("max_prompt_tokens", 0) / 1000})
     if not c:
-        return s, None
+        return s, ({"agents": 1, "trimmed": int(r.get("context_drops", 0) > 0)} if CTX else None)
     s.update({"edits": c.get("edits", 0), "crossed": c.get("crossed_edits", 0), "overwrites": c.get("overwrites", 0),
               "unmade_end": c.get("unmade_at_end", 0), "team_s": c.get("team_seconds", 0),
               **{f"ref_{k}": c.get(f"wal_refused_{k}", 0) for k in RULES}})
@@ -71,7 +83,8 @@ def per_task(d, r):
     waits = [e for e in ev if e["kind"] == "wal_wait"]
     s.update({"waits": len(waits), "wait_s": sum(e["waited"] for e in waits)})
     writers = {e["agent"] for e in ev if e["kind"] == "edit" and e["ok"]}
-    return s, {"agents": len(tr["features"]), "no_edit": len(tr["features"]) - len(writers)}
+    return s, {"agents": len(tr["features"]), "no_edit": len(tr["features"]) - len(writers),
+               **({"trimmed": c.get("agents_trimmed", 0)} if CTX else {})}
 
 
 out = {}
@@ -95,16 +108,20 @@ for subset in SUBSETS:
         row = {"runs": len(by_run), "tasks": len(stats), "errored": errored, "solved": mean("solved"),
                "solved_sd": round(st.stdev(by_run), 3) if len(by_run) > 1 else None, "features": mean("features"),
                "calls": mean("calls"), "tokens_k": round(mean("tokens_k")), "seconds": round(mean("seconds"))}
-        if agents:
+        if CTX:
+            row.update(drops=mean("drops"), max_pk=round(mean("max_pk"), 1),
+                       trimmed=round(agents["trimmed"] / agents["agents"], 3) if agents["agents"] else None)
+        if "no_edit" in agents:  # teams only
             row.update({k: mean(k) for k in ("edits", "crossed", "overwrites", "waits", "wait_s", "unmade_end", "team_s")},
                        **{f"ref_{k}": mean(f"ref_{k}") for k in RULES},
                        no_edit_agents=round(agents["no_edit"] / agents["agents"], 3))
         out[f"{subset} {name}"] = row
 
 if "--tags" not in sys.argv and "--subsets" not in sys.argv:
-    (ROOT / "analysis" / "cb_ladder.json").write_text(json.dumps(out, indent=1))
+    (ROOT / "analysis" / ("cb_ladder_ctx.json" if CTX else "cb_ladder.json")).write_text(json.dumps(out, indent=1))
 cols = ["runs", "tasks", "errored", "solved", "solved_sd", "features", "edits", "crossed", "overwrites", "no_edit_agents",
-        *(f"ref_{k}" for k in RULES), "waits", "wait_s", "unmade_end", "team_s", "calls", "tokens_k"]
+        *(f"ref_{k}" for k in RULES), "waits", "wait_s", "unmade_end", "team_s", "calls", "tokens_k",
+        *(["drops", "trimmed", "max_pk"] if CTX else [])]
 short = {"errored": "err", "solved_sd": "sd", "features": "feats", "overwrites": "overwr", "no_edit_agents": "no_edit",
          "ref_intent": "r_int", "ref_relevant_catchup": "r_rel", "ref_read_before_post": "r_post",
          "ref_read_before_write": "r_write", "ref_no_conflict": "r_confl", "unmade_end": "unmade", "tokens_k": "tok_k"}

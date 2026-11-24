@@ -8,16 +8,18 @@
   over a teammate's edit (overwr); bash writes discarded; refused-change reminders and refused changes still unmade at the
   end; agents that ran out of turns
 Task runs that errored before the agents started are left out. Ids and numbers only.
+--ctx: the equal-context ladder instead (--context-total 131072, runs cx01/cx02).
 """
 import os
 os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import json, glob, re, statistics as st
+import json, glob, re, statistics as st, sys
+CTX = "--ctx" in sys.argv
 from collections import Counter, defaultdict
 LEVELS = ["L0", "L1", "L2", "L3", "L4", "L5", "L6"]
-def kind(L): return "agent-driven-none-rc" if L == "L0" else f"agent-driven-none-{L}-rc"
+def kind(L): return ("agent-driven-none-rc" if L == "L0" else f"agent-driven-none-{L}-rc") + ("-ctx128k" if CTX else "")
 def load(sub, L):
     rows = {}
-    for d in sorted(glob.glob(f"runs/*-{kind(L)}-cooperbench-{sub}-gpt-oss-120b-fl0[12]")):
+    for d in sorted(glob.glob(f"runs/*-{kind(L)}-cooperbench-{sub}-gpt-oss-120b-{'cx' if CTX else 'fl'}0[12]")):
         f = d + "/results.jsonl"
         for l in (open(f) if glob.glob(f) else []):
             r = json.loads(l)
