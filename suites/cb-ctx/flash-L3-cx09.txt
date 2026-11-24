@@ -1,0 +1,5 @@
+--benchmark cooperbench --subset flash --topology agent-driven --comm none --wal-level L3 --context-total 131072 --offset 0 --limit 10 --repair-calls --tag cx09
+--benchmark cooperbench --subset flash --topology agent-driven --comm none --wal-level L3 --context-total 131072 --offset 10 --limit 10 --repair-calls --tag cx09
+--benchmark cooperbench --subset flash --topology agent-driven --comm none --wal-level L3 --context-total 131072 --offset 20 --limit 10 --repair-calls --tag cx09
+--benchmark cooperbench --subset flash --topology agent-driven --comm none --wal-level L3 --context-total 131072 --offset 30 --limit 10 --repair-calls --tag cx09
+--benchmark cooperbench --subset flash --topology agent-driven --comm none --wal-level L3 --context-total 131072 --offset 40 --limit 10 --repair-calls --tag cx09

@@ -1,5 +1,5 @@
 """Suite files for the equal-context CooperBench ladder (user, 2026-11-24): flash (2-agent teams) and flash3 (3-agent
-teams), single agent plus L0-L6, runs cx01 and cx02, as the fl01/fl02 ladder but with one context window per setup:
+teams), single agent plus L0-L6, ten runs cx01-cx10 (user: 10 runs per setup), as the fl01/fl02 ladder but with one context window per setup:
 --context-total 131072 (gpt-oss-120b's full window) goes to the single agent whole and is split evenly among a team's
 agents (65536 each for 2, 43690 for 3; agent.py drops the oldest tool outputs to stay within it). Call budgets are equal
 per setup too: the single agent gets 100 model calls per feature (--max-turns 200 on pairs, 300 on triples), each team
@@ -19,7 +19,7 @@ for sub, size in (("flash", 2), ("flash3", 3)):
         base = (f"--benchmark cooperbench --subset {sub} --edit-tools --max-turns {100 * size}" if setup == "single" else
                 f"--benchmark cooperbench --subset {sub} --topology agent-driven --comm none"
                 + ("" if setup == "L0" else f" --wal-level {setup}"))
-        for run in ("cx01", "cx02"):
+        for run in [f"cx{i:02d}" for i in range(1, 11)]:
             (out / f"{sub}-{setup}-{run}.txt").write_text("".join(
                 f"{base} --context-total 131072 --offset {off} --limit 10 --repair-calls --tag {run}\n" for off in range(0, 50, 10)))
 print(len(list(out.glob("*.txt"))), "suite files in", out)

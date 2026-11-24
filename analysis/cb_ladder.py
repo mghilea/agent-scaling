@@ -4,7 +4,7 @@ runs tagged fl01 and fl02 (each run's 50 tasks in 5 chunks of 10, merged by tag)
 
     python analysis/cb_ladder.py                    # prints the tables, writes analysis/cb_ladder.json
     python analysis/cb_ladder.py --subsets core --tags t2check     # other runs (here the 2026-11-17 2-agent check)
-    python analysis/cb_ladder.py --ctx              # the equal-context ladder (runs cx01, cx02; writes cb_ladder_ctx.json)
+    python analysis/cb_ladder.py --ctx              # the equal-context ladder (runs cx01-cx10; writes cb_ladder_ctx.json)
 
 --ctx reads the runs made with --context-total 131072 (2026-11-24): one 131k-token window per setup, the single agent's
 whole and split evenly among a team's agents, which drop their oldest tool outputs to stay within it; the single agent
@@ -31,7 +31,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 CTX = "--ctx" in sys.argv
-TAGS = sys.argv[sys.argv.index("--tags") + 1].split(",") if "--tags" in sys.argv else ["cx01", "cx02"] if CTX else ["fl01", "fl02"]
+TAGS = sys.argv[sys.argv.index("--tags") + 1].split(",") if "--tags" in sys.argv else [f"cx{i:02d}" for i in range(1, 11)] if CTX else ["fl01", "fl02"]
 # the 4/6/8-agent scaling runs: python analysis/cb_ladder.py --subsets big4,big6,big8 --tags bg01,bg02
 SUBSETS = sys.argv[sys.argv.index("--subsets") + 1].split(",") if "--subsets" in sys.argv else ["flash", "flash3"]
 SETUPS = {"single": "sas-et-rc", "L0": "agent-driven-none-rc", **{f"L{i}": f"agent-driven-none-L{i}-rc" for i in range(1, 7)}}
