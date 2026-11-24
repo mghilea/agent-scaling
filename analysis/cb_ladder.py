@@ -20,10 +20,13 @@ Per subset and setup, over the runs found so far (each over the pairs or triples
   edit (overwrites), refusals by rule, wal_wait calls and seconds waited, refused edits never made (unmade at the end),
   team time, model calls, tokens
 - agents that made no edit (share of team agents)
+- solved with a 95% interval, and paired comparisons: setup A minus setup B on the tasks both ran, each task's solved
+  rate averaged over its runs first, so task difficulty cancels; intervals bootstrap over tasks (10,000 resamples)
 Only ids and numbers are read (CooperBench's dataset license is unknown).
 """
 import glob
 import json
+import random
 import statistics as st
 import sys
 from collections import Counter
@@ -87,7 +90,7 @@ def per_task(d, r):
                **({"trimmed": c.get("agents_trimmed", 0)} if CTX else {})}
 
 
-out = {}
+out, by_task = {}, {}
 for subset in SUBSETS:
     for name, kind in SETUPS.items():
         stats, agents, by_run, errored = [], Counter(), [], 0
@@ -98,6 +101,8 @@ for subset in SUBSETS:
             if not rows:
                 continue
             run = [per_task(d, r) for d, r in rows]
+            for (d, r), (s, _) in zip(rows, run):
+                by_task.setdefault((subset, name), {}).setdefault(r["id"], []).append(s["solved"])
             by_run.append(st.mean(s["solved"] for s, _ in run))
             stats += [s for s, _ in run]
             for _, a in run:
@@ -117,8 +122,32 @@ for subset in SUBSETS:
                        no_edit_agents=round(agents["no_edit"] / agents["agents"], 3))
         out[f"{subset} {name}"] = row
 
+
+
+def boot(per_task_values, n=10000, seed=0):
+    """Mean over tasks and its 95% interval, resampling tasks."""
+    xs, rng = list(per_task_values), random.Random(seed)
+    means = sorted(st.mean(rng.choices(xs, k=len(xs))) for _ in range(n))
+    return st.mean(xs), means[int(0.025 * n)], means[int(0.975 * n) - 1]
+
+
+PAIRS = [("L0", "single"), ("L6", "single"), ("L5", "single"), ("L1", "L0"), ("L2", "L0"), ("L5", "L0"), ("L6", "L0"),
+         ("L6", "L5"), ("L3", "L0"), ("L4", "L0"), ("L5", "L3"), ("L6", "L4")]
+paired = {}
+for (subset, name), tasks in by_task.items():
+    out[f"{subset} {name}"]["solved_ci"] = [round(v, 3) for v in boot(st.mean(v) for v in tasks.values())[1:]]
+for subset in SUBSETS:
+    for a, b in PAIRS:
+        A, B = by_task.get((subset, a)), by_task.get((subset, b))
+        if not A or not B:
+            continue
+        ids = sorted(set(A) & set(B))
+        m, lo, hi = boot(st.mean(A[i]) - st.mean(B[i]) for i in ids)
+        paired[f"{subset} {a}-{b}"] = {"tasks": len(ids), "diff": round(m, 3), "lo": round(lo, 3), "hi": round(hi, 3)}
+
 if "--tags" not in sys.argv and "--subsets" not in sys.argv:
     (ROOT / "analysis" / ("cb_ladder_ctx.json" if CTX else "cb_ladder.json")).write_text(json.dumps(out, indent=1))
+    (ROOT / "analysis" / ("cb_ladder_paired_ctx.json" if CTX else "cb_ladder_paired.json")).write_text(json.dumps(paired, indent=1))
 cols = ["runs", "tasks", "errored", "solved", "solved_sd", "features", "edits", "crossed", "overwrites", "no_edit_agents",
         *(f"ref_{k}" for k in RULES), "waits", "wait_s", "unmade_end", "team_s", "calls", "tokens_k",
         *(["drops", "trimmed", "max_pk"] if CTX else [])]
@@ -129,3 +158,9 @@ print(f"gpt-oss-120b, CooperBench {' and '.join(SUBSETS)} (pairs: 2-agent teams;
 print(f"{'':13s}" + "".join(f"{short.get(c, c):>8s}" for c in cols))
 for name, row in out.items():
     print(f"{name:13s}" + "".join(f"{'' if row.get(c) is None else row[c]:>8}" for c in cols))
+print("\nsolved, 95% interval over tasks:  " + "  ".join(f"{k} {v['solved']:.0%} [{v['solved_ci'][0]:.0%}, {v['solved_ci'][1]:.0%}]"
+                                                    for k, v in out.items()))
+print("paired (A - B on the same tasks), solved, points with 95% interval:")
+for k, v in paired.items():
+    print(f"  {k:20s} {v['diff'] * 100:+6.1f}  [{v['lo'] * 100:+6.1f}, {v['hi'] * 100:+6.1f}]  over {v['tasks']} tasks"
+          + ("  *" if v["lo"] > 0 or v["hi"] < 0 else ""))
