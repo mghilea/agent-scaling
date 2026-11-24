@@ -31,9 +31,11 @@ held, tried = threading.Event(), threading.Event()
 class Fake:
     """Agent's interface (run, stats, limit_hits, messages) running a script instead of a model."""
 
-    def __init__(self, name, tools, system_prompt, **_):
+    def __init__(self, name, tools, system_prompt, team_size=1, **_):
         self.name, self.tools, self.system_prompt = name, tools, system_prompt
-        self.stats = {"turns": 0, "tool_calls": 0, "tool_errors": 0, "prompt_tokens": 0, "completion_tokens": 0}
+        self.context_limit = 131072 // team_size  # as agent.make_agent with --context-total 131072
+        self.stats = {"turns": 0, "tool_calls": 0, "tool_errors": 0, "prompt_tokens": 0, "completion_tokens": 0,
+                      "max_prompt_tokens": 0, "context_drops": 0}
         self.limit_hits, self.messages, self.max_turns = 0, [], 100
         self.sent = []
 
@@ -130,6 +132,7 @@ print("verdict:", {k: v for k, v in v.items() if not k.startswith("_")})
 print("comm:", c)
 assert v["correct"] and v["features_passed"] == 2, "both features pass on the team's final tree"
 assert [l for l in v["_patch"].splitlines() if l.startswith("diff --git")] == [f"diff --git a/{F} b/{F}"]
+assert c["context_limit"] == 65536 and c["context_drops"] == 0, "each of the 2 agents gets half of --context-total"
 assert c["shared_files"] == 1 and c["crossed_edits"] == 1 and c["overwrites"] == 0 and c["bash_writes_discarded"] == 1
 if LEVEL == "L0":
     assert c["edits"] == 4 and c["failed_edits"] == 1 and "wal_level" not in c

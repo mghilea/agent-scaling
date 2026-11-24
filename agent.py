@@ -230,7 +230,24 @@ def repair_name(name, tools):
 
 
 def new_stats():
-    return {"turns": 0, "tool_calls": 0, "tool_errors": 0, "prompt_tokens": 0, "completion_tokens": 0}
+    return {"turns": 0, "tool_calls": 0, "tool_errors": 0, "prompt_tokens": 0, "completion_tokens": 0,
+            "max_prompt_tokens": 0, "context_drops": 0}
+
+
+# Context limits (--context-total): an agent whose conversation would no longer fit replaces its oldest tool outputs
+# with this note, keeping the system prompt, the task and its most recent tool outputs.
+CONTEXT_DROPPED = "[This older tool output was removed to keep the conversation within your context limit.]"
+CONTEXT_RESERVE = 8192   # tokens kept free for the model's reply (reasoning and tool calls)
+CONTEXT_KEEP_RECENT = 4  # the latest tool outputs are never removed
+CONTEXT_MARGIN = 1.05    # the prompt estimate is padded by 5%, so an undercount can't push a request past the window
+
+
+def _chars(m):
+    """Characters of a message as the model sees it: its text, reasoning and tool-call arguments."""
+    n = len(str(m.get("content") or "")) + len(str(m.get("reasoning") or ""))
+    for tc in m.get("tool_calls") or []:
+        n += len(str((tc.get("function") or {}).get("arguments") or "")) + 20
+    return n + 12  # per-message framing
 
 
 class Agent:
@@ -242,7 +259,7 @@ class Agent:
 
     def __init__(self, client, model, tools=TOOLS, system_prompt=SYSTEM_PROMPT, max_turns=12,
                  reasoning_effort="medium", verbose=True, show_reasoning=False, name="", retry_malformed=False,
-                 repair_calls=False, max_tool_output=None):
+                 repair_calls=False, max_tool_output=None, context_limit=None):
         self.client = client
         self.model = model
         self.tools = tools
@@ -259,6 +276,11 @@ class Agent:
         # (its reasoning ends "Let's do wal_append."), and strip stray characters from tool names.
         self.repair_calls = repair_calls
         self.max_tool_output = max_tool_output  # characters of a tool result the model sees (default MAX_TOOL_OUTPUT)
+        # Tokens this agent's conversation may take, prompt and reply together (--context-total split among a team),
+        # or None for the server's own limit. See _fit_context.
+        self.context_limit = context_limit
+        self._tokens_per_char = 1 / 3  # cautious until calibrated against the server's exact prompt counts
+        self._schema_chars = 0  # characters of the tool schemas sent with the current call
         self.messages = [{"role": "system", "content": system_prompt}]
         self.stats = new_stats()
         self.limit_hits = 0  # times a send() stopped at max_turns
@@ -349,14 +371,59 @@ class Agent:
         msg, entry = self._call(messages, use_tools=False)
         return msg.content or "", entry.get("reasoning", "")
 
+    def _estimate(self, messages):
+        return int((sum(_chars(m) for m in messages) + self._schema_chars) * self._tokens_per_char)
+
+    def _fit_context(self, messages):
+        """Keep the conversation within self.context_limit: replace the oldest tool outputs (all but the last
+        CONTEXT_KEEP_RECENT) with CONTEXT_DROPPED until the prompt leaves CONTEXT_RESERVE tokens for the reply.
+        Returns the tokens left for the reply (None without a limit)."""
+        if not self.context_limit:
+            return None
+        budget = int((self.context_limit - CONTEXT_RESERVE) / CONTEXT_MARGIN)
+        est = self._estimate(messages)
+        if est > budget:
+            tools = [m for m in messages if m.get("role") == "tool" and m.get("content") != CONTEXT_DROPPED]
+            for m in tools[:max(0, len(tools) - CONTEXT_KEEP_RECENT)]:
+                if est <= budget:
+                    break
+                est -= int((len(str(m.get("content") or "")) - len(CONTEXT_DROPPED)) * self._tokens_per_char)
+                m["content"] = CONTEXT_DROPPED
+                with self._stats_lock:
+                    self.stats["context_drops"] += 1
+            if est > budget:  # still too long: earlier reasoning goes too (all but the latest reply's)
+                replies = [m for m in messages if m.get("role") == "assistant" and m.get("reasoning")]
+                for m in replies[:-1]:
+                    est -= int(len(str(m["reasoning"])) * self._tokens_per_char)
+                    m.pop("reasoning", None)
+                    m.pop("reasoning_content", None)
+                    if est <= budget:
+                        break
+            self.log(_c(YELLOW, f"  {self.name or 'agent'}: conversation trimmed to fit its context limit "
+                                f"({self.context_limit} tokens): about {est} prompt tokens now"))
+        return max(1024, self.context_limit - int(est * CONTEXT_MARGIN) - 16)
+
     def _call(self, messages, use_tools):
-        from openai import NOT_GIVEN
+        from openai import NOT_GIVEN, BadRequestError
         started = time.time()
         schemas = [schema for _, schema in self.tools.values()] if use_tools else []
-        resp = self.client.chat.completions.create(
-            model=self.model, messages=messages, tools=schemas or NOT_GIVEN,
-            # reasoning_effort is gpt-oss's (Harmony) setting; other models served by vLLM don't take it
-            **({"reasoning_effort": self.reasoning_effort} if "gpt-oss" in (self.model or "") else {}))
+        self._schema_chars = len(json.dumps(schemas)) if schemas else 0
+        room = self._fit_context(messages)
+        kwargs = dict(model=self.model, messages=messages, tools=schemas or NOT_GIVEN,
+                      # reasoning_effort is gpt-oss's (Harmony) setting; other models served by vLLM don't take it
+                      **({"reasoning_effort": self.reasoning_effort} if "gpt-oss" in (self.model or "") else {}),
+                      **({"max_tokens": room} if room else {}))
+        for attempt in range(4):
+            try:
+                resp = self.client.chat.completions.create(**kwargs)
+                break
+            except BadRequestError as e:
+                if not (self.context_limit and "context" in str(e).lower()) or attempt == 3:
+                    raise
+                # the estimate was too low (e.g. a denser tool output than the calibration saw): count more
+                # conservatively, trim again and retry
+                self._tokens_per_char *= 1.25
+                kwargs["max_tokens"] = self._fit_context(messages)
         used = ""
         with self._stats_lock:
             self.stats["turns"] += 1
@@ -364,7 +431,11 @@ class Agent:
             if resp.usage:
                 self.stats["prompt_tokens"] += resp.usage.prompt_tokens
                 self.stats["completion_tokens"] += resp.usage.completion_tokens
+                self.stats["max_prompt_tokens"] = max(self.stats["max_prompt_tokens"], resp.usage.prompt_tokens)
                 used = f"{resp.usage.prompt_tokens} prompt + {resp.usage.completion_tokens} completion tokens, "
+                chars = sum(_chars(m) for m in messages) + self._schema_chars
+                if chars:  # calibrate the estimate on this exact count (never below 1 token per 4.5 characters)
+                    self._tokens_per_char = max(resp.usage.prompt_tokens / chars, 1 / 4.5)
         who = f"{self.name} " if self.name else ""
         self.log(_c(BOLD, f"── {who}turn {turn} ──") + _c(DIM, f" {used}{time.time() - started:.1f}s"))
 
@@ -488,6 +559,10 @@ def main():
     ap.add_argument("--team-complete", default="all", choices=["all", "first"],
                     help="appworld teams: all (default since 2026-11-17): the task ends once every agent has called "
                          "complete_task (or stopped), with the answer most gave; first: the first call ends it (earlier runs)")
+    ap.add_argument("--context-total", type=int,
+                    help="tokens of context for the whole setup: a single agent gets all of it, each agent of an "
+                         "N-agent team 1/N (cooperbench). An agent whose conversation would no longer fit drops its "
+                         "oldest tool outputs. Default: no limit beyond the server's")
     ap.add_argument("--agents", type=int,
                     help="multi-agent: number of worker agents (default 3, as in the paper; cooperbench teams have one "
                          "agent per feature of the task instead)")
@@ -545,6 +620,8 @@ def main():
         sys.exit("--wal-level is for AppWorld and CooperBench teams (--topology agent-driven); WorkBench uses --wal")
     if cb and args.wal_level and args.wal_level not in ("L1", "L2", "L3", "L4", "L5", "L6"):
         sys.exit("CooperBench teams have WAL levels L1-L6 (L4v0 and L4v0-strict are AppWorld's earlier definitions)")
+    if args.context_total and not cb:
+        sys.exit("--context-total is for --benchmark cooperbench (its teams split it among their agents)")
     if args.edit_tools and not cb:
         sys.exit("--edit-tools is for --benchmark cooperbench")
     args.claim_ttl = args.claim_ttl or (600 if cb else 90)
@@ -560,6 +637,8 @@ def main():
         sys.exit("--split needs --benchmark browsecomp, a multi-agent topology, and one part per agent (--agents)")
 
     claude = (args.model or "").startswith("claude-")  # an Anthropic API model instead of the local vLLM server
+    if args.context_total and claude:
+        sys.exit("--context-total is implemented for the vLLM agent only")
     if claude:
         import claude_agent
         if bc:
@@ -595,7 +674,7 @@ def main():
     topo_name += f"-{args.wal_level}" if args.wal_level else ""
     topo_name += "-cfirst" if aw and driven and args.team_complete == "first" else ""
     kind = "ask" if args.ask else ("sas" if not multi else topo_name) + ("-et" if cb and not multi and args.edit_tools else "") + \
-        ("-rc" if args.repair_calls else "") + \
+        ("-rc" if args.repair_calls else "") + (f"-ctx{args.context_total // 1024}k" if args.context_total else "") + \
         ("-workbench" if wb else "-browsecomp" if bc else f"-appworld-{args.dataset}" if aw else f"-cooperbench-{args.subset}" if cb else "")
     # A run's directory is named by the second it starts. Several runs started together (suite.sbatch's chunks of one
     # run share their tag) can land on the same second: claim the directory atomically, else take the next second's.
@@ -611,6 +690,9 @@ def main():
     (run_dir / "config.json").write_text(json.dumps({"git_commit": git_commit(), **vars(args)}, indent=2))
 
     def make_agent(**kwargs):
+        team_size = kwargs.pop("team_size", 1)  # --context-total is split among a team's agents
+        if args.context_total and not claude:
+            kwargs["context_limit"] = args.context_total // team_size
         if claude:
             return claude_agent.ClaudeAgent(client, args.model, budget, max_turns=args.max_turns, effort=args.effort,
                                             verbose=not args.quiet, fallbacks=not args.no_fallbacks,
@@ -746,6 +828,7 @@ def main():
                "out_of_calls": r.get("out_of_calls", int(r["stop"] == "max_turns")),
                **({"paused": r["paused"]} if "paused" in r else {}),
                **{k: r[k] for k in ("dollars", "cache_read_tokens", "cache_write_tokens", "fallbacks", "refusals") if k in r},
+               **{k: r[k] for k in ("max_prompt_tokens", "context_drops") if args.context_total and k in r},
                "seconds": round(time.time() - start, 1)}
         rows.append(row)
         # Multi-agent runs trace every agent, not one conversation.

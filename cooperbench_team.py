@@ -157,7 +157,7 @@ class Team:
                 tools.update(self._wal_tools(me))
             prompt = cb.EDIT_PROMPT + "\n\n" + TEAM_TEXT.format(
                 me=me, n=len(self.ids), others=", ".join(a for a in self.ids if a != me), channels=channels)
-            self.agents[me] = make_agent(name=me, tools=tools, system_prompt=prompt)
+            self.agents[me] = make_agent(name=me, tools=tools, system_prompt=prompt, team_size=len(self.ids))
             self.agents[me].max_turns = max_turns
 
     def event(self, agent, kind, **data):
@@ -342,6 +342,11 @@ class Team:
         comm.update(wal2.team_concurrency(self.events, bool(self.log), lambda e: e["kind"] == "edit" and e["ok"]))
         comm["agent_stops"] = {a: (results.get(a) or {}).get("stop") for a in self.ids}
         comm["unmade_reminded"] = sum(e["kind"] == "unmade_reminder" for e in self.events)
+        limits = {getattr(a, "context_limit", None) for a in self.agents.values()} - {None}
+        if limits:  # --context-total: each agent's share, how often old tool outputs were dropped, the largest prompt
+            comm.update({"context_limit": min(limits), "context_drops": sum(a.stats.get("context_drops", 0) for a in self.agents.values()),
+                         "agents_trimmed": sum(a.stats.get("context_drops", 0) > 0 for a in self.agents.values()),
+                         "max_prompt_tokens": max(a.stats.get("max_prompt_tokens", 0) for a in self.agents.values())})
         comm["unmade_at_end"] = sum(len(self.log.unmade(a)) for a in self.ids) if self.log else 0
         if self.log:
             comm.update(self.log.counts(self.events))
